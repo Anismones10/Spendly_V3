@@ -6,6 +6,7 @@ import '../providers/expense_provider.dart';
 import '../providers/category_provider.dart';
 import '../providers/settings_provider.dart';
 import '../utils/app_utils.dart';
+import '../utils/category_icons.dart';
 import '../utils/sound_helper.dart';
 import '../widgets/calculator_sheet.dart';
 
@@ -245,7 +246,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
             _buildLabel('Category *'),
             const SizedBox(height: 8),
             SizedBox(
-              height: 90,
+              height: 100,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: categories.length,
@@ -276,24 +277,28 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                           ),
                         ],
                       ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(cat.icon, style: const TextStyle(fontSize: 28)),
-                          const SizedBox(height: 4),
-                          Text(
-                            cat.name,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
-                              color: isSelected
-                                  ? Color(cat.colorValue)
-                                  : theme.colorScheme.onSurface.withOpacity(0.7),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(CategoryIcons.resolve(cat.icon), color: Color(cat.colorValue), size: 24),
+                            const SizedBox(height: 6),
+                            Text(
+                              cat.name,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+                                color: isSelected
+                                    ? Color(cat.colorValue)
+                                    : theme.colorScheme.onSurface.withOpacity(0.7),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   );

@@ -22,6 +22,9 @@ class GoalModel extends HiveObject {
   @HiveField(5)
   bool isCompleted;
 
+  @HiveField(6)
+  String? iconKey;
+
   GoalModel({
     required this.id,
     required this.name,
@@ -29,6 +32,7 @@ class GoalModel extends HiveObject {
     this.savedAmount = 0,
     this.deadline,
     this.isCompleted = false,
+    this.iconKey,
   });
 
   double get progress => savedAmount / targetAmount;

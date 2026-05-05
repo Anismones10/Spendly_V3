@@ -95,7 +95,7 @@ class _CalculatorSheetState extends State<CalculatorSheet> {
       ['7', '8', '9', '×'],
       ['4', '5', '6', '−'],
       ['1', '2', '3', '+'],
-      ['0', '.', '=', ''],
+      ['0', '.', '=', 'OK'],
     ];
 
     return Container(
@@ -149,28 +149,31 @@ class _CalculatorSheetState extends State<CalculatorSheet> {
               children: keys.map((row) {
                 return Row(
                   children: row.map((key) {
-                    if (key.isEmpty) {
+                    if (key == 'OK') {
                       return Expanded(
-                        child: Container(
-                          margin: const EdgeInsets.all(5),
-                          height: 64,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              final result = double.tryParse(
-                                _display.split(' ').last,
-                              );
-                              Navigator.pop(context, result);
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: theme.colorScheme.primary,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              elevation: 2,
+                        child: GestureDetector(
+                          onTap: () {
+                            final result = double.tryParse(
+                              _display.split(' ').last,
+                            );
+                            Navigator.pop(context, result);
+                          },
+                          child: Container(
+                            margin: const EdgeInsets.all(5),
+                            height: 64,
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primary,
+                              borderRadius: BorderRadius.circular(16),
                             ),
-                            child: const Text('OK',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.w700, fontSize: 18)),
+                            alignment: Alignment.center,
+                            child: const Text(
+                              'OK',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 20,
+                              ),
+                            ),
                           ),
                         ),
                       );

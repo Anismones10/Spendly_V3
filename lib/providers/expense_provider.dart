@@ -144,7 +144,7 @@ class ExpenseProvider extends ChangeNotifier {
   }
 
   // Smart insights
-  List<String> getInsights() {
+  List<String> getInsights({Map<String, String> categoryNames = const {}}) {
     final now = DateTime.now();
     final insights = <String>[];
 
@@ -166,7 +166,9 @@ class ExpenseProvider extends ChangeNotifier {
     final catTotals = getCategoryTotals(now.year, now.month);
     if (catTotals.isNotEmpty) {
       final topCat = catTotals.entries.reduce((a, b) => a.value > b.value ? a : b);
-      insights.add('Your biggest expense this month was "${topCat.key}".');
+      // Use the category names map passed in from the UI layer
+      final catName = categoryNames[topCat.key] ?? topCat.key;
+      insights.add('Your biggest expense this month was "$catName".');
     }
 
     final todayTotal = getTotalForDay(now);

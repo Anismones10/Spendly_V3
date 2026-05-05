@@ -6,6 +6,8 @@ import '../providers/expense_provider.dart';
 import '../providers/category_provider.dart';
 import '../providers/settings_provider.dart';
 import '../utils/app_utils.dart';
+import '../providers/income_provider.dart';
+import '../utils/category_icons.dart';
 import 'calendar_screen.dart';
 
 class StatisticsScreen extends StatefulWidget {
@@ -50,7 +52,8 @@ class _StatisticsScreenState extends State<StatisticsScreen>
       appBar: AppBar(
         backgroundColor:
             isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
-        title: const Text('Statistics'),
+        title: const Text('Statistics',
+            style: TextStyle(fontWeight: FontWeight.w700)),
         bottom: TabBar(
           controller: _tabController,
           labelColor: theme.colorScheme.primary,
@@ -69,7 +72,7 @@ class _StatisticsScreenState extends State<StatisticsScreen>
       body: TabBarView(
         controller: _tabController,
         children: [
-          _OverviewTab(expenses: expenses, settings: settings, now: now),
+          _OverviewTab(expenses: expenses, settings: settings, now: now, monthlyBudget: settings.monthlyBudget),
           _CategoriesTab(
               expenses: expenses,
               settings: settings,
@@ -95,25 +98,32 @@ class _OverviewTab extends StatelessWidget {
   final ExpenseProvider expenses;
   final SettingsProvider settings;
   final DateTime now;
+  final double monthlyBudget;
 
   const _OverviewTab(
       {required this.expenses,
       required this.settings,
-      required this.now});
+      required this.now,
+      this.monthlyBudget = 0});
 
   @override
   Widget build(BuildContext context) {
     final symbol = settings.currencySymbol;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final incomeProvider = context.watch<IncomeProvider>();
 
-    final thisMonth =
-        expenses.getTotalForMonth(now.year, now.month);
+    final thisMonth = expenses.getTotalForMonth(now.year, now.month);
     final lastMonth = expenses.getTotalForMonth(
         now.month == 1 ? now.year - 1 : now.year,
         now.month == 1 ? 12 : now.month - 1);
     final thisWeek = expenses.getTotalForWeek();
     final today = expenses.getTotalForDay(now);
+    final thisMonthIncome = incomeProvider.getTotalForMonth(now.year, now.month);
+    final lastMonthIncome = incomeProvider.getTotalForMonth(
+        now.month == 1 ? now.year - 1 : now.year,
+        now.month == 1 ? 12 : now.month - 1);
+    final balance = thisMonthIncome - thisMonth;
 
     final dailyTotals =
         expenses.getDailyTotals(now.year, now.month);
@@ -178,6 +188,83 @@ class _OverviewTab extends StatelessWidget {
           ],
         ),
 
+        const SizedBox(height: 16),
+
+        // ── Income vs Expense this month ───────────────────────
+        if (thisMonthIncome > 0)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('This Month Summary',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14,
+                        color: theme.colorScheme.onSurface.withOpacity(0.7))),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text('Income', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurface.withOpacity(0.5))),
+                        Text(AppUtils.formatAmount(thisMonthIncome, symbol),
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF2ECC71))),
+                      ]),
+                    ),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                        Text('Balance', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurface.withOpacity(0.5))),
+                        Text(
+                          '${balance >= 0 ? '+' : ''}${AppUtils.formatAmount(balance.abs(), symbol)}',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700,
+                              color: balance >= 0 ? const Color(0xFF2ECC71) : const Color(0xFFE57373)),
+                        ),
+                      ]),
+                    ),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                        Text('Expenses', style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurface.withOpacity(0.5))),
+                        Text(AppUtils.formatAmount(thisMonth, symbol),
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFFE57373))),
+                      ]),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // Income bar
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Stack(children: [
+                    Container(height: 10, color: const Color(0xFF2ECC71).withOpacity(0.12)),
+                    FractionallySizedBox(
+                      widthFactor: thisMonthIncome > 0
+                          ? (thisMonth / thisMonthIncome).clamp(0.0, 1.0)
+                          : 0,
+                      child: Container(height: 10,
+                          decoration: BoxDecoration(
+                            color: thisMonth > thisMonthIncome
+                                ? const Color(0xFFE57373)
+                                : const Color(0xFF2ECC71),
+                            borderRadius: BorderRadius.circular(6),
+                          )),
+                    ),
+                  ]),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  thisMonthIncome > 0
+                      ? '${(thisMonth / thisMonthIncome * 100).toStringAsFixed(1)}% of income spent'
+                      : '',
+                  style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurface.withOpacity(0.4)),
+                ),
+              ],
+            ),
+          ).animate().fadeIn(delay: 280.ms),
+
         const SizedBox(height: 20),
 
         // ── Month vs last month comparison ─────────────────────
@@ -188,97 +275,273 @@ class _OverviewTab extends StatelessWidget {
 
         // ── Daily bar chart ────────────────────────────────────
         if (dailyTotals.isNotEmpty) ...[
-          Text('Daily Spending — ${AppUtils.formatMonthYear(now)}',
-              style: const TextStyle(
-                  fontWeight: FontWeight.w700, fontSize: 15)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Daily Spending — ${AppUtils.formatMonthYear(now)}',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700, fontSize: 15)),
+              if (monthlyBudget > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    'Budget: ${AppUtils.formatAmount(monthlyBudget, symbol)}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                ),
+            ],
+          ),
           const SizedBox(height: 12),
-          Container(
-            height: 200,
-            padding: const EdgeInsets.fromLTRB(8, 16, 8, 8),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 12)
-              ],
-            ),
-            child: BarChart(
-              BarChartData(
-                maxY: maxVal * 1.3,
-                barTouchData: BarTouchData(
-                  touchTooltipData: BarTouchTooltipData(
-                    getTooltipColor: (_) =>
-                        theme.colorScheme.primary.withOpacity(0.9),
-                    getTooltipItem: (g, gi, rod, ri) =>
-                        BarTooltipItem(
-                      rod.toY.toStringAsFixed(0),
-                      const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 11),
+          Builder(builder: (context) {
+            // Y-axis: divide by monthly budget into 4 lines, or use maxVal
+            final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+            final dailyLimit = monthlyBudget > 0 ? monthlyBudget / daysInMonth : 0.0;
+
+            // Calculate smart Y-axis max and intervals
+            final double chartMax;
+            final double yInterval;
+            if (monthlyBudget > 0) {
+              // Use budget-based Y axis: 4 equal intervals up to budget/days*2
+              final budgetStep = (monthlyBudget / 4).ceilToDouble();
+              chartMax = budgetStep * 5;
+              yInterval = budgetStep;
+            } else {
+              chartMax = maxVal * 1.3;
+              yInterval = maxVal > 0 ? (maxVal / 4).ceilToDouble() : 100;
+            }
+
+            // Bar color based on daily limit
+            Color barColor(double value) {
+              if (dailyLimit <= 0) return theme.colorScheme.primary;
+              if (value >= dailyLimit * 1.5) return const Color(0xFFE57373); // red
+              if (value >= dailyLimit) return const Color(0xFFFF9800);       // orange
+              if (value >= dailyLimit * 0.75) return const Color(0xFFF39C12); // amber
+              return const Color(0xFF2ECC71);                                  // green
+            }
+
+            // Each bar is 18px wide + 4px gap = 22px per day
+            // 31 days × 22 = 682px total chart width
+            const double barWidth = 14.0;
+            const double barSpacing = 8.0;
+            const double leftAxisWidth = 52.0;
+            final double chartWidth =
+                leftAxisWidth + (daysInMonth * (barWidth + barSpacing)) + 16;
+
+            final hScrollController = ScrollController();
+            final vScrollController = ScrollController();
+
+            return Container(
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 12)
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Legend row ────────────────────────────────
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                    child: Wrap(
+                      spacing: 16,
+                      children: [
+                        _LegendDot(color: const Color(0xFF2ECC71), label: 'Safe'),
+                        _LegendDot(color: const Color(0xFFF39C12), label: 'Near limit'),
+                        _LegendDot(color: const Color(0xFFFF9800), label: 'Over limit'),
+                        _LegendDot(color: const Color(0xFFE57373), label: 'High'),
+                      ],
                     ),
                   ),
-                ),
-                titlesData: FlTitlesData(
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 18,
-                      getTitlesWidget: (v, _) {
-                        final d = v.toInt();
-                        if (d % 7 != 1 && d != 1) {
-                          return const SizedBox.shrink();
-                        }
-                        return Text('$d',
-                            style: TextStyle(
-                                fontSize: 9,
-                                color: theme.colorScheme.onSurface
-                                    .withOpacity(0.4)));
-                      },
-                    ),
-                  ),
-                  leftTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false)),
-                  topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false)),
-                ),
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: false,
-                  getDrawingHorizontalLine: (_) => FlLine(
-                    color:
-                        theme.colorScheme.onSurface.withOpacity(0.06),
-                    strokeWidth: 1,
-                  ),
-                ),
-                borderData: FlBorderData(show: false),
-                barGroups: dailyTotals.entries.map((e) {
-                  return BarChartGroupData(
-                    x: e.key,
-                    barRods: [
-                      BarChartRodData(
-                        toY: e.value,
-                        color: theme.colorScheme.primary,
-                        width: 6,
-                        borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(4)),
-                        backDrawRodData: BackgroundBarChartRodData(
-                          show: true,
-                          toY: maxVal * 1.3,
-                          color: theme.colorScheme.primary
-                              .withOpacity(0.06),
+                  const SizedBox(height: 8),
+
+                  // ── Scrollable chart area ─────────────────────
+                  Scrollbar(
+                    controller: hScrollController,
+                    thumbVisibility: true,
+                    trackVisibility: true,
+                    child: SingleChildScrollView(
+                      controller: hScrollController,
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Scrollbar(
+                        controller: vScrollController,
+                        thumbVisibility: false,
+                        notificationPredicate: (n) => n.depth == 1,
+                        child: SingleChildScrollView(
+                          controller: vScrollController,
+                          scrollDirection: Axis.vertical,
+                          child: SizedBox(
+                            width: chartWidth,
+                            height: 240,
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(0, 8, 12, 0),
+                              child: BarChart(
+                                BarChartData(
+                                  maxY: chartMax,
+                                  groupsSpace: barSpacing,
+                                  barTouchData: BarTouchData(
+                                    touchTooltipData: BarTouchTooltipData(
+                                      getTooltipColor: (_) =>
+                                          theme.colorScheme.primary.withOpacity(0.9),
+                                      getTooltipItem: (g, gi, rod, ri) => BarTooltipItem(
+                                        'Day ${g.x}\n${AppUtils.formatAmount(rod.toY, symbol)}',
+                                        const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 11),
+                                      ),
+                                    ),
+                                  ),
+                                  titlesData: FlTitlesData(
+                                    bottomTitles: AxisTitles(
+                                      sideTitles: SideTitles(
+                                        showTitles: true,
+                                        reservedSize: 26,
+                                        getTitlesWidget: (v, meta) {
+                                          final d = v.toInt();
+                                          final hasExpense = dailyTotals.containsKey(d);
+                                          return Padding(
+                                            padding: const EdgeInsets.only(top: 6),
+                                            child: Text(
+                                              '$d',
+                                              style: TextStyle(
+                                                fontSize: 9,
+                                                fontWeight: hasExpense
+                                                    ? FontWeight.w700
+                                                    : FontWeight.w400,
+                                                color: hasExpense
+                                                    ? theme.colorScheme.primary
+                                                    : theme.colorScheme.onSurface
+                                                        .withOpacity(0.35),
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                    leftTitles: AxisTitles(
+                                      sideTitles: SideTitles(
+                                        showTitles: true,
+                                        reservedSize: leftAxisWidth.toInt().toDouble(),
+                                        interval: yInterval,
+                                        getTitlesWidget: (v, meta) {
+                                          if (v == 0) return const SizedBox.shrink();
+                                          final label = v >= 1000
+                                              ? '${(v / 1000).toStringAsFixed(v % 1000 == 0 ? 0 : 1)}k'
+                                              : v.toStringAsFixed(0);
+                                          return Padding(
+                                            padding: const EdgeInsets.only(right: 4),
+                                            child: Text(
+                                              label,
+                                              style: TextStyle(
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.w500,
+                                                color: theme.colorScheme.onSurface
+                                                    .withOpacity(0.45),
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                    topTitles: const AxisTitles(
+                                        sideTitles: SideTitles(showTitles: false)),
+                                    rightTitles: const AxisTitles(
+                                        sideTitles: SideTitles(showTitles: false)),
+                                  ),
+                                  gridData: FlGridData(
+                                    show: true,
+                                    drawVerticalLine: false,
+                                    horizontalInterval: yInterval,
+                                    getDrawingHorizontalLine: (v) {
+                                      if (dailyLimit > 0 &&
+                                          (v - dailyLimit).abs() < yInterval * 0.15) {
+                                        return FlLine(
+                                          color: const Color(0xFFFF9800).withOpacity(0.5),
+                                          strokeWidth: 1.5,
+                                          dashArray: [6, 4],
+                                        );
+                                      }
+                                      return FlLine(
+                                        color: theme.colorScheme.onSurface
+                                            .withOpacity(0.06),
+                                        strokeWidth: 1,
+                                      );
+                                    },
+                                  ),
+                                  extraLinesData: dailyLimit > 0
+                                      ? ExtraLinesData(
+                                          horizontalLines: [
+                                            HorizontalLine(
+                                              y: dailyLimit,
+                                              color: const Color(0xFFFF9800)
+                                                  .withOpacity(0.7),
+                                              strokeWidth: 1.5,
+                                              dashArray: [6, 4],
+                                              label: HorizontalLineLabel(
+                                                show: true,
+                                                alignment: Alignment.topRight,
+                                                padding: const EdgeInsets.only(
+                                                    right: 4, bottom: 2),
+                                                style: const TextStyle(
+                                                  color: Color(0xFFFF9800),
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                                labelResolver: (_) => 'Daily limit',
+                                              ),
+                                            ),
+                                          ],
+                                        )
+                                      : null,
+                                  borderData: FlBorderData(show: false),
+                                  barGroups: List.generate(daysInMonth, (i) {
+                                    final day = i + 1;
+                                    final value = dailyTotals[day] ?? 0.0;
+                                    return BarChartGroupData(
+                                      x: day,
+                                      barRods: [
+                                        BarChartRodData(
+                                          toY: value,
+                                          color: value > 0
+                                              ? barColor(value)
+                                              : Colors.transparent,
+                                          width: barWidth,
+                                          borderRadius: const BorderRadius.vertical(
+                                              top: Radius.circular(4)),
+                                          backDrawRodData: BackgroundBarChartRodData(
+                                            show: value > 0,
+                                            toY: chartMax,
+                                            color: barColor(value).withOpacity(0.07),
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  }),
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                    ],
-                  );
-                }).toList(),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ).animate().fadeIn(delay: 300.ms),
+            );
+          }),
         ],
       ],
     );
@@ -364,8 +627,7 @@ class _CategoriesTab extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final totals =
-        expenses.getCategoryTotals(now.year, now.month);
+    final totals = expenses.getCategoryTotals(now.year, now.month);
     if (totals.isEmpty) {
       return const Center(
         child: Column(
@@ -388,9 +650,8 @@ class _CategoriesTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Pie chart
+        // ── Pie chart with legend beside it ──────────────────────────
         Container(
-          height: 240,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
@@ -400,119 +661,214 @@ class _CategoriesTab extends StatelessWidget {
                   color: Colors.black.withOpacity(0.05), blurRadius: 12)
             ],
           ),
-          child: PieChart(
-            PieChartData(
-              pieTouchData: PieTouchData(
-                touchCallback: (event, response) {
-                  if (!event.isInterestedForInteractions ||
-                      response?.touchedSection == null) {
-                    onTouch(-1);
-                  } else {
-                    onTouch(response!
-                        .touchedSection!.touchedSectionIndex);
-                  }
-                },
+          child: Row(
+            children: [
+              // Pie chart
+              SizedBox(
+                width: 160,
+                height: 160,
+                child: PieChart(
+                  PieChartData(
+                    pieTouchData: PieTouchData(
+                      touchCallback: (event, response) {
+                        if (!event.isInterestedForInteractions ||
+                            response?.touchedSection == null) {
+                          onTouch(-1);
+                        } else {
+                          onTouch(response!
+                              .touchedSection!.touchedSectionIndex);
+                        }
+                      },
+                    ),
+                    sectionsSpace: 2,
+                    centerSpaceRadius: 36,
+                    sections: entries.asMap().entries.map((e) {
+                      final isTouched = e.key == touchedIndex;
+                      final cat = categories.getById(e.value.key);
+                      final color = cat != null
+                          ? Color(cat.colorValue)
+                          : theme.colorScheme.primary;
+                      final pct =
+                          (e.value.value / total * 100).toStringAsFixed(1);
+                      return PieChartSectionData(
+                        color: color,
+                        value: e.value.value,
+                        title: isTouched ? '$pct%' : '',
+                        radius: isTouched ? 65 : 52,
+                        titleStyle: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12),
+                      );
+                    }).toList(),
+                  ),
+                ),
               ),
-              sectionsSpace: 3,
-              centerSpaceRadius: 50,
-              sections: entries.asMap().entries.map((e) {
-                final isTouched = e.key == touchedIndex;
-                final cat = categories.getById(e.value.key);
-                final color = cat != null
-                    ? Color(cat.colorValue)
-                    : theme.colorScheme.primary;
-                final pct =
-                    (e.value.value / total * 100).toStringAsFixed(1);
-                return PieChartSectionData(
-                  color: color,
-                  value: e.value.value,
-                  title: isTouched ? '$pct%' : '',
-                  radius: isTouched ? 75 : 60,
-                  titleStyle: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13),
-                );
-              }).toList(),
-            ),
+              const SizedBox(width: 16),
+              // Legend beside pie chart
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: entries.take(6).map((e) {
+                    final cat = categories.getById(e.key);
+                    final color = cat != null
+                        ? Color(cat.colorValue)
+                        : theme.colorScheme.primary;
+                    final pct =
+                        (e.value / total * 100).toStringAsFixed(1);
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              color: color,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              cat?.name ?? e.key,
+                              style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Text(
+                            '$pct%',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: color,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
           ),
         ).animate().fadeIn(duration: 400.ms),
 
         const SizedBox(height: 20),
 
-        Text('Breakdown',
-            style: const TextStyle(
-                fontWeight: FontWeight.w700, fontSize: 15)),
+        const Text('Breakdown',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
         const SizedBox(height: 12),
 
-        // Category breakdown list
+        // ── Breakdown list — highlighted when pie slice is touched ────
         ...entries.asMap().entries.map((e) {
           final cat = categories.getById(e.value.key);
           final color = cat != null
               ? Color(cat.colorValue)
               : theme.colorScheme.primary;
           final pct = (e.value.value / total * 100);
+          final isHighlighted = e.key == touchedIndex;
 
-          return Container(
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
             margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.all(14),
+            padding: EdgeInsets.all(isHighlighted ? 16 : 14),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              // Highlighted row gets colored background
+              color: isHighlighted
+                  ? color.withOpacity(0.12)
+                  : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
               borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isHighlighted ? color.withOpacity(0.5) : Colors.transparent,
+                width: 1.5,
+              ),
               boxShadow: [
                 BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 8)
+                    color: isHighlighted
+                        ? color.withOpacity(0.15)
+                        : Colors.black.withOpacity(0.04),
+                    blurRadius: isHighlighted ? 12 : 8)
               ],
             ),
             child: Column(
               children: [
                 Row(
                   children: [
-                    Text(cat?.icon ?? '💰',
-                        style: const TextStyle(fontSize: 22)),
+                    // ── Icon instead of emoji key ──────────────────
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        CategoryIcons.resolve(cat?.icon ?? ''),
+                        color: color,
+                        size: 18,
+                      ),
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
+                        // ── Just the name, NO icon key prefix ──────
                         cat?.name ?? e.value.key,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14),
+                        style: TextStyle(
+                          fontWeight: isHighlighted
+                              ? FontWeight.w800
+                              : FontWeight.w600,
+                          fontSize: isHighlighted ? 15 : 14,
+                          color: isHighlighted ? color : null,
+                        ),
                       ),
                     ),
                     Text(
                       AppUtils.formatAmount(e.value.value, symbol),
                       style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: color,
-                          fontSize: 14),
+                        fontWeight: isHighlighted
+                            ? FontWeight.w800
+                            : FontWeight.w700,
+                        color: color,
+                        fontSize: isHighlighted ? 15 : 14,
+                      ),
                     ),
                     const SizedBox(width: 8),
                     Text(
                       '${pct.toStringAsFixed(1)}%',
                       style: TextStyle(
-                          fontSize: 12,
-                          color: theme.colorScheme.onSurface
-                              .withOpacity(0.4)),
+                        fontSize: 12,
+                        fontWeight: isHighlighted
+                            ? FontWeight.w700
+                            : FontWeight.w400,
+                        color: isHighlighted
+                            ? color
+                            : theme.colorScheme.onSurface.withOpacity(0.4),
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: pct / 100,
-                    minHeight: 6,
-                    backgroundColor: color.withOpacity(0.12),
-                    valueColor: AlwaysStoppedAnimation<Color>(color),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    child: LinearProgressIndicator(
+                      value: pct / 100,
+                      minHeight: isHighlighted ? 8 : 6,
+                      backgroundColor: color.withOpacity(0.12),
+                      valueColor: AlwaysStoppedAnimation<Color>(color),
+                    ),
                   ),
                 ),
               ],
             ),
-          )
-              .animate()
-              .fadeIn(delay: (e.key * 60).ms)
-              .slideX(begin: 0.1);
+          ).animate().fadeIn(delay: (e.key * 60).ms).slideX(begin: 0.1);
         }),
       ],
     );
@@ -860,4 +1216,32 @@ class _PeriodData {
   final String label;
   final double total;
   const _PeriodData({required this.label, required this.total});
+}
+
+// ── Legend dot helper ─────────────────────────────────────────────────────────
+
+class _LegendDot extends StatelessWidget {
+  final Color color;
+  final String label;
+  const _LegendDot({required this.color, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 4),
+        Text(label,
+            style: TextStyle(
+              fontSize: 11,
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+            )),
+      ],
+    );
+  }
 }

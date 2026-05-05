@@ -7,6 +7,8 @@ import 'expenses_screen.dart';
 import 'goals_screen.dart';
 import 'settings_screen.dart';
 import 'statistics_screen.dart';
+import 'income_screen.dart';
+import 'loans_screen.dart';
 
 // All available tabs definition
 class _TabDef {
@@ -41,6 +43,20 @@ final List<_TabDef> _allTabs = [
     screen: const ExpensesScreen(),
   ),
   _TabDef(
+    id: 'income',
+    label: 'Income',
+    icon: Icons.account_balance_wallet_outlined,
+    activeIcon: Icons.account_balance_wallet_rounded,
+    screen: const IncomeScreen(),
+  ),
+  _TabDef(
+    id: 'loans',
+    label: 'Loans',
+    icon: Icons.handshake_outlined,
+    activeIcon: Icons.handshake_rounded,
+    screen: const LoansScreen(),
+  ),
+  _TabDef(
     id: 'goals',
     label: 'Goals',
     icon: Icons.flag_outlined,
@@ -63,12 +79,12 @@ final List<_TabDef> _allTabs = [
   ),
 ];
 
-// Default order — right-hand friendly: Goals | Stats | Home(center) | Expenses | Settings
+// Tab order: Home | Expenses | Stats | Goals
 const List<String> _defaultTabOrder = [
   'home',
   'expenses',
-  'goals',
   'stats',
+  'goals',
 ];
 
 class MainShell extends StatefulWidget {
@@ -92,22 +108,25 @@ class _MainShellState extends State<MainShell> {
 
   void _loadTabPrefs() {
     final saved = _settingsBox.get('visibleTabs') as List?;
-    if (saved != null && saved.length >= 3) {
-      _visibleTabIds = List<String>.from(saved);
+    if (saved != null && saved.length >= 2) {
+      _visibleTabIds = List<String>.from(saved)
+          ..remove('settings'); // settings NEVER appears in main bar
     } else {
       _visibleTabIds = List<String>.from(_defaultTabOrder);
     }
-    // Always ensure 'home' is present
-    if (!_visibleTabIds.contains('home')) {
-      _visibleTabIds.insert(_visibleTabIds.length ~/ 2, 'home');
-    }
-    _currentIndex = _visibleTabIds.indexOf('home');
+    // Extra safety: always remove settings
+    _visibleTabIds.remove('settings');
+    // Always ensure 'home' is present and first (leftmost)
+    _visibleTabIds.remove('home');
+    _visibleTabIds.insert(0, 'home');
+    _currentIndex = 0; // home is always index 0
     if (_currentIndex < 0) _currentIndex = 0;
     _previousIndex = _currentIndex;
   }
 
   void _saveTabPrefs() {
-    _settingsBox.put('visibleTabs', _visibleTabIds);
+    final toSave = List<String>.from(_visibleTabIds)..remove('settings');
+    _settingsBox.put('visibleTabs', toSave);
   }
 
   List<_TabDef> get _visibleTabs =>
@@ -124,11 +143,12 @@ class _MainShellState extends State<MainShell> {
     });
   }
 
+
   void _showMoreMenu() {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final hiddenTabs = _allTabs
-        .where((t) => !_visibleTabIds.contains(t.id))
+        .where((t) => !_visibleTabIds.contains(t.id) && t.id != 'settings')
         .toList();
 
     showModalBottomSheet(
@@ -184,7 +204,7 @@ class _MainShellState extends State<MainShell> {
                 label: tab.label,
                 onTap: () {
                   Navigator.pop(ctx);
-                  // Temporarily navigate by adding to visible list
+                  if (tab.id == 'settings') return;
                   setState(() {
                     if (!_visibleTabIds.contains(tab.id)) {
                       _visibleTabIds.add(tab.id);
@@ -221,7 +241,7 @@ class _MainShellState extends State<MainShell> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _TabCustomizerSheet(
-        allTabs: _allTabs.where((t) => t.id != 'settings').toList(),
+        allTabs: _allTabs.where((t) => t.id != 'settings').toList(), // settings never in customizer
         visibleTabIds: List<String>.from(_visibleTabIds),
         onSave: (newIds) {
           setState(() {
@@ -249,16 +269,7 @@ class _MainShellState extends State<MainShell> {
     final centerIdx = _centerIndex;
 
     return Scaffold(
-      body: GestureDetector(
-        onHorizontalDragEnd: (details) {
-          final v = details.primaryVelocity ?? 0;
-          if (v < -400 && _currentIndex < tabs.length - 1) {
-            _goTo(_currentIndex + 1);
-          } else if (v > 400 && _currentIndex > 0) {
-            _goTo(_currentIndex - 1);
-          }
-        },
-        child: AnimatedSwitcher(
+      body: AnimatedSwitcher(
           duration: const Duration(milliseconds: 260),
           transitionBuilder: (child, animation) {
             final goRight = _currentIndex >= _previousIndex;
@@ -280,7 +291,6 @@ class _MainShellState extends State<MainShell> {
                 ? tabs[_currentIndex].screen
                 : const DashboardScreen(),
           ),
-        ),
       ),
 
       bottomNavigationBar: Container(
@@ -308,7 +318,7 @@ class _MainShellState extends State<MainShell> {
                 ...List.generate(tabs.length, (i) {
                   final tab = tabs[i];
                   final isSelected = i == _currentIndex;
-                  final isCenter = i == centerIdx;
+                  final isCenter = false; // home is leftmost, no floating center button
 
                   if (isCenter) {
                     return _CenterButton(
@@ -511,13 +521,7 @@ class _TabCustomizerSheetState extends State<_TabCustomizerSheet> {
         _selected.remove(id);
       } else {
         if (_selected.length >= 5) return; // maximum 5 tabs
-        // Insert before settings if present, else append
-        final settingsIdx = _selected.indexOf('settings');
-        if (settingsIdx >= 0) {
-          _selected.insert(settingsIdx, id);
-        } else {
-          _selected.add(id);
-        }
+        _selected.add(id);
       }
     });
   }

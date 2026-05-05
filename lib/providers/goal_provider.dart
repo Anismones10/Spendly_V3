@@ -26,6 +26,24 @@ class GoalProvider extends ChangeNotifier {
     }
   }
 
+  void updateGoalDetails({
+    required String id,
+    required String name,
+    required double targetAmount,
+    DateTime? deadline,
+    String? iconKey,
+  }) {
+    final goal = _box.get(id);
+    if (goal != null) {
+      goal.name = name;
+      goal.targetAmount = targetAmount;
+      goal.deadline = deadline;
+      goal.iconKey = iconKey;
+      goal.save();
+      notifyListeners();
+    }
+  }
+
   void deleteGoal(String id) {
     _box.delete(id);
     notifyListeners();

@@ -9,6 +9,7 @@ import '../providers/settings_provider.dart';
 import '../widgets/expense_tile.dart';
 import '../widgets/empty_state.dart';
 import '../utils/app_utils.dart';
+import '../utils/category_icons.dart';
 import 'add_expense_screen.dart';
 
 class ExpensesScreen extends StatefulWidget {
@@ -238,16 +239,20 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 spacing: 6,
                 children: [
                   if (expenses.filterCategory != null)
-                    Chip(
-                      label: Text(context
-                              .read<CategoryProvider>()
-                              .getById(expenses.filterCategory!)
-                              ?.name ??
-                          ''),
-                      deleteIcon: const Icon(Icons.close, size: 14),
-                      onDeleted: () => expenses.setFilterCategory(null),
-                      visualDensity: VisualDensity.compact,
-                    ),
+                    Builder(builder: (ctx) {
+                      final cat = context.read<CategoryProvider>()
+                          .getById(expenses.filterCategory!);
+                      return Chip(
+                        avatar: cat != null
+                            ? Icon(CategoryIcons.resolve(cat.icon),
+                                size: 14, color: Color(cat.colorValue))
+                            : null,
+                        label: Text(cat?.name ?? ''),
+                        deleteIcon: const Icon(Icons.close, size: 14),
+                        onDeleted: () => expenses.setFilterCategory(null),
+                        visualDensity: VisualDensity.compact,
+                      );
+                    }),
                   if (_periodFilter == 'custom' && expenses.dateRange != null)
                     Chip(
                       label: Text(
@@ -625,9 +630,11 @@ class _FilterSheetState extends State<_FilterSheet> {
               children: [
                 _chip('All', null, _category == null,
                     () => setState(() => _category = null)),
-                ...categories.categories.map((cat) => _chip(
-                      '${cat.icon} ${cat.name}',
+                ...categories.categories.map((cat) => _catChip(
                       cat.id,
+                      cat.name,
+                      cat.icon,
+                      cat.colorValue,
                       _category == cat.id,
                       () => setState(() => _category = cat.id),
                     )),
@@ -672,6 +679,48 @@ class _FilterSheetState extends State<_FilterSheet> {
             fontWeight: FontWeight.w600,
             color: selected ? Colors.white : theme.colorScheme.primary,
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _catChip(String id, String name, String iconKey, int colorValue,
+      bool selected, VoidCallback onTap) {
+    final theme = Theme.of(context);
+    final catColor = Color(colorValue);
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected
+              ? catColor.withOpacity(0.15)
+              : theme.colorScheme.primary.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? catColor : Colors.transparent,
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              CategoryIcons.resolve(iconKey),
+              size: 14,
+              color: selected ? catColor : theme.colorScheme.onSurface.withOpacity(0.5),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              name,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: selected ? catColor : theme.colorScheme.onSurface.withOpacity(0.6),
+              ),
+            ),
+          ],
         ),
       ),
     );

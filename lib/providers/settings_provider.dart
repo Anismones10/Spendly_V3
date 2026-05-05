@@ -14,15 +14,41 @@ class SettingsProvider extends ChangeNotifier {
 
   String _getCurrencySymbol(String code) {
     const map = {
-      'USD': '\$',
+      // Americas
+      'USD': r'$',
+      'CAD': r'CA$',
+      'AUD': r'A$',
+      'BRL': r'R$',
+      'MXN': r'MX$',
+      // Europe
       'EUR': '€',
       'GBP': '£',
+      'CHF': 'Fr',
+      'RUB': '₽',
+      'TRY': '₺',
+      'SEK': 'kr',
+      'NOK': 'kr',
+      // Middle East & Africa
+      'AED': 'د.إ',
+      'SAR': '﷼',
       'IRR': '﷼',
+      'AFN': '؋',
+      'IQD': 'ع.د',
+      'KWD': 'د.ك',
+      'QAR': 'ر.ق',
+      // Asia
       'JPY': '¥',
-      'CAD': 'CA\$',
-      'AUD': 'A\$',
+      'CNY': '¥',
+      'KRW': '₩',
+      'INR': '₹',
+      'PKR': '₨',
+      'BDT': '৳',
+      'THB': '฿',
+      'VND': '₫',
+      'SGD': r'S$',
+      'HKD': r'HK$',
     };
-    return map[code] ?? '\$';
+    return map[code] ?? r'$';
   }
 
   void toggleDarkMode() {
@@ -73,12 +99,38 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   static const List<Map<String, String>> currencies = [
-    {'code': 'USD', 'label': 'US Dollar (\$)'},
-    {'code': 'EUR', 'label': 'Euro (€)'},
-    {'code': 'GBP', 'label': 'British Pound (£)'},
-    {'code': 'IRR', 'label': 'Iranian Rial (﷼)'},
-    {'code': 'JPY', 'label': 'Japanese Yen (¥)'},
-    {'code': 'CAD', 'label': 'Canadian Dollar (CA\$)'},
-    {'code': 'AUD', 'label': 'Australian Dollar (A\$)'},
+    // ── Americas ──────────────────────────────────
+    {'code': 'USD', 'label': 'US Dollar — \$'},
+    {'code': 'CAD', 'label': 'Canadian Dollar — CA\$'},
+    {'code': 'AUD', 'label': 'Australian Dollar — A\$'},
+    {'code': 'BRL', 'label': 'Brazilian Real — R\$'},
+    {'code': 'MXN', 'label': 'Mexican Peso — MX\$'},
+    // ── Europe ────────────────────────────────────
+    {'code': 'EUR', 'label': 'Euro — €'},
+    {'code': 'GBP', 'label': 'British Pound — £'},
+    {'code': 'CHF', 'label': 'Swiss Franc — Fr'},
+    {'code': 'RUB', 'label': 'Russian Ruble — ₽'},
+    {'code': 'TRY', 'label': 'Turkish Lira — ₺'},
+    {'code': 'SEK', 'label': 'Swedish Krona — kr'},
+    {'code': 'NOK', 'label': 'Norwegian Krone — kr'},
+    // ── Middle East & Africa ──────────────────────
+    {'code': 'AED', 'label': 'UAE Dirham — د.إ'},
+    {'code': 'SAR', 'label': 'Saudi Riyal — ﷼'},
+    {'code': 'IRR', 'label': 'Iranian Rial — ﷼'},
+    {'code': 'AFN', 'label': 'Afghan Afghani — ؋'},
+    {'code': 'IQD', 'label': 'Iraqi Dinar — ع.د'},
+    {'code': 'KWD', 'label': 'Kuwaiti Dinar — د.ك'},
+    {'code': 'QAR', 'label': 'Qatari Riyal — ر.ق'},
+    // ── Asia ──────────────────────────────────────
+    {'code': 'JPY', 'label': 'Japanese Yen — ¥'},
+    {'code': 'CNY', 'label': 'Chinese Yuan — ¥'},
+    {'code': 'KRW', 'label': 'South Korean Won — ₩'},
+    {'code': 'INR', 'label': 'Indian Rupee — ₹'},
+    {'code': 'PKR', 'label': 'Pakistani Rupee — ₨'},
+    {'code': 'BDT', 'label': 'Bangladeshi Taka — ৳'},
+    {'code': 'THB', 'label': 'Thai Baht — ฿'},
+    {'code': 'VND', 'label': 'Vietnamese Dong — ₫'},
+    {'code': 'SGD', 'label': 'Singapore Dollar — S\$'},
+    {'code': 'HKD', 'label': 'Hong Kong Dollar — HK\$'},
   ];
 }

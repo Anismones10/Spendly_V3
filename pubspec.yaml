@@ -1,9 +1,9 @@
 name: expense_tracker
-description: How MUCH? — A calm and confident expense tracker
+description: Spendly — Track. Save. Grow.
 version: 1.0.0+1
 
 environment:
-  sdk: ">=3.0.0 <4.0.0"
+  sdk: '>=3.0.0 <4.0.0'
 
 dependencies:
   flutter:
@@ -30,19 +30,11 @@ dev_dependencies:
   hive_generator: ^2.0.1
   build_runner: ^2.4.9
   flutter_lints: ^3.0.0
-  flutter_launcher_icons: ^0.13.1
-
-flutter_launcher_icons:
-  android: true
-  ios: true
-  image_path: "assets/app_icon.png"
-  min_sdk_android: 21
-  adaptive_icon_background: "assets/app_icon.png"
-  adaptive_icon_foreground: "assets/app_icon.png"
 
 flutter:
   uses-material-design: true
   assets:
     - assets/lottie/
     - assets/sounds/
-    - assets/app_icon.png
+    - assets/images/
+

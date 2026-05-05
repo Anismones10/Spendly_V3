@@ -5,12 +5,17 @@ import 'models/expense_model.dart';
 import 'models/category_model.dart';
 import 'models/goal_model.dart';
 import 'models/savings_model.dart';
+import 'models/income_model.dart';
+import 'models/loan_model.dart';
 import 'providers/expense_provider.dart';
 import 'providers/category_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/savings_provider.dart';
 import 'providers/goal_provider.dart';
+import 'providers/income_provider.dart';
+import 'providers/loan_provider.dart';
 import 'screens/main_shell.dart';
+import 'screens/splash_screen.dart';
 import 'utils/app_theme.dart';
 
 void main() async {
@@ -21,11 +26,15 @@ void main() async {
   Hive.registerAdapter(CategoryModelAdapter());
   Hive.registerAdapter(GoalModelAdapter());
   Hive.registerAdapter(SavingsModelAdapter());
+  Hive.registerAdapter(IncomeModelAdapter());
+  Hive.registerAdapter(LoanModelAdapter());
 
   await Hive.openBox<ExpenseModel>('expenses');
   await Hive.openBox<CategoryModel>('categories');
   await Hive.openBox<GoalModel>('goals');
   await Hive.openBox<SavingsModel>('savings');
+  await Hive.openBox<IncomeModel>('income');
+  await Hive.openBox<LoanModel>('loans');
   await Hive.openBox('settings');
 
   runApp(
@@ -36,6 +45,8 @@ void main() async {
         ChangeNotifierProvider(create: (_) => ExpenseProvider()),
         ChangeNotifierProvider(create: (_) => SavingsProvider()),
         ChangeNotifierProvider(create: (_) => GoalProvider()),
+        ChangeNotifierProvider(create: (_) => IncomeProvider()),
+        ChangeNotifierProvider(create: (_) => LoanProvider()),
       ],
       child: const MyApp(),
     ),
@@ -49,12 +60,12 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
     return MaterialApp(
-      title: 'How MUCH?',
+      title: 'Spendly',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: settings.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-      home: const MainShell(),
+      home: const SplashScreen(),
     );
   }
 }

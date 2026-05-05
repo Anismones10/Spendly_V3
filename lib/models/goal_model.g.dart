@@ -19,13 +19,14 @@ class GoalModelAdapter extends TypeAdapter<GoalModel> {
       savedAmount: fields[3] as double,
       deadline: fields[4] as DateTime?,
       isCompleted: fields[5] as bool,
+      iconKey: fields[6] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, GoalModel obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(7)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -37,7 +38,9 @@ class GoalModelAdapter extends TypeAdapter<GoalModel> {
       ..writeByte(4)
       ..write(obj.deadline)
       ..writeByte(5)
-      ..write(obj.isCompleted);
+      ..write(obj.isCompleted)
+      ..writeByte(6)
+      ..write(obj.iconKey);
   }
 
   @override

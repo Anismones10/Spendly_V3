@@ -4,6 +4,7 @@ import '../models/category_model.dart';
 
 class CategoryProvider extends ChangeNotifier {
   final Box<CategoryModel> _box = Hive.box<CategoryModel>('categories');
+  final Box _settingsBox = Hive.box('settings');
 
   static final List<CategoryModel> _defaults = [
     CategoryModel(id: 'food', name: 'Food', colorValue: 0xFFFF6B6B, icon: 'food'),
@@ -26,12 +27,63 @@ class CategoryProvider extends ChangeNotifier {
     }
   }
 
-  List<CategoryModel> get categories => _box.values.toList();
+  // ── Order management ──────────────────────────────────────────────────────
+
+  List<String> get _savedOrder {
+    final saved = _settingsBox.get('categoryOrder') as List?;
+    return saved != null ? List<String>.from(saved) : [];
+  }
+
+  void _saveOrder(List<String> order) {
+    _settingsBox.put('categoryOrder', order);
+  }
+
+  /// Returns categories in the user-defined order
+  List<CategoryModel> get categories {
+    final all = _box.values.toList();
+    final order = _savedOrder;
+
+    if (order.isEmpty) return all;
+
+    // Sort by saved order, put unknown ones at end
+    final ordered = <CategoryModel>[];
+    for (final id in order) {
+      final cat = all.firstWhere((c) => c.id == id,
+          orElse: () => CategoryModel(
+              id: '', name: '', colorValue: 0, icon: ''));
+      if (cat.id.isNotEmpty) ordered.add(cat);
+    }
+
+    // Add any categories not in saved order (newly added)
+    for (final cat in all) {
+      if (!order.contains(cat.id)) {
+        ordered.add(cat);
+      }
+    }
+
+    return ordered;
+  }
 
   CategoryModel? getById(String id) => _box.get(id);
 
+  /// Reorder categories — called when user drags
+  void reorderCategories(int oldIndex, int newIndex) {
+    final current = categories;
+    if (oldIndex < newIndex) newIndex -= 1;
+    final item = current.removeAt(oldIndex);
+    current.insert(newIndex, item);
+    _saveOrder(current.map((c) => c.id).toList());
+    notifyListeners();
+  }
+
   void addCustomCategory(CategoryModel category) {
     _box.put(category.id, category);
+    // Add to end of order
+    final order = _savedOrder;
+    if (!order.contains(category.id)) {
+      order.add(category.id);
+      _saveOrder(order);
+    }
     notifyListeners();
   }
 
@@ -39,13 +91,16 @@ class CategoryProvider extends ChangeNotifier {
     final cat = _box.get(id);
     if (cat != null && cat.isCustom) {
       _box.delete(id);
+      final order = _savedOrder..remove(id);
+      _saveOrder(order);
       notifyListeners();
     }
   }
 
   void clearAll() {
     _box.clear();
-    _seedDefaults(); // re-add defaults after clearing
+    _settingsBox.delete('categoryOrder');
+    _seedDefaults();
     notifyListeners();
   }
 }

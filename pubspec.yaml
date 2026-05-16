@@ -23,6 +23,7 @@ dependencies:
   share_plus: ^9.0.0
   flutter_animate: ^4.5.0
   cupertino_icons: ^1.0.6
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:
@@ -30,6 +31,7 @@ dev_dependencies:
   hive_generator: ^2.0.1
   build_runner: ^2.4.9
   flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
@@ -38,3 +40,14 @@ flutter:
     - assets/sounds/
     - assets/images/
 
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/app_icon.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#1E3A5F"
+  adaptive_icon_foreground: "assets/app_icon.png"
+  dependencies:
+    url_launcher: ^6.3.0
+    flutter:
+      sdk: flutter

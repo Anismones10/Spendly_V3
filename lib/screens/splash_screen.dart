@@ -60,11 +60,14 @@ class _SplashScreenState extends State<SplashScreen> {
                 border: Border.all(
                     color: Colors.white.withOpacity(0.2), width: 1.5),
               ),
-              child: const Icon(
-                Icons.account_balance_wallet_rounded,
-                size: 56,
-                color: Colors.white,
-              ),
+                child: Image.asset(
+                  isDark
+                      ? 'assets/images/logo_dark.png'
+                      : 'assets/images/logo_light.png',
+                  width: 70,
+                  height: 70,
+                  fit: BoxFit.contain,
+                ),
             )
                 .animate()
                 .scale(

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../providers/expense_provider.dart';
 import '../providers/settings_provider.dart';
+import '../providers/wallet_provider.dart';
 import '../utils/app_utils.dart';
 
 class DailySummaryCard extends StatelessWidget {
@@ -12,13 +13,21 @@ class DailySummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final expenses = context.watch<ExpenseProvider>();
     final settings = context.watch<SettingsProvider>();
+    final wallets = context.watch<WalletProvider>();
     final now = DateTime.now();
     final symbol = settings.currencySymbol;
 
     final todayTotal = expenses.getTotalForDay(now);
-    final yesterdayTotal = expenses.getTotalForDay(
-        now.subtract(const Duration(days: 1)));
+    final yesterdayTotal =
+        expenses.getTotalForDay(now.subtract(const Duration(days: 1)));
     final diff = todayTotal - yesterdayTotal;
+
+    // Total remaining across all wallets
+    final allExpenses = expenses.allExpenses;
+    final totalRemaining = wallets.wallets.isEmpty
+        ? 0.0
+        : wallets.getTotalRemaining(allExpenses);
+
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
@@ -28,7 +37,8 @@ class DailySummaryCard extends StatelessWidget {
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12)
+          BoxShadow(
+              color: Colors.black.withOpacity(0.06), blurRadius: 12)
         ],
       ),
       child: Column(
@@ -40,7 +50,8 @@ class DailySummaryCard extends StatelessWidget {
                   color: theme.colorScheme.primary, size: 20),
               const SizedBox(width: 8),
               const Text('Daily Summary',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                  style:
+                      TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
             ],
           ),
           const SizedBox(height: 16),
@@ -53,7 +64,9 @@ class DailySummaryCard extends StatelessWidget {
                 color: theme.colorScheme.primary,
               ),
               Container(
-                  width: 1, height: 40, color: Colors.grey.withOpacity(0.2)),
+                  width: 1,
+                  height: 40,
+                  color: Colors.grey.withOpacity(0.2)),
               _DailyStat(
                 label: 'vs Yesterday',
                 value: diff == 0
@@ -71,14 +84,15 @@ class DailySummaryCard extends StatelessWidget {
                         : null,
               ),
               Container(
-                  width: 1, height: 40, color: Colors.grey.withOpacity(0.2)),
+                  width: 1,
+                  height: 40,
+                  color: Colors.grey.withOpacity(0.2)),
               _DailyStat(
-                label: 'Remaining',
-                value: AppUtils.formatAmount(
-                    (settings.monthlyBudget - expenses.getTotalForMonth(now.year, now.month))
-                        .abs(),
-                    symbol),
-                color: Colors.green,
+                label: wallets.wallets.isEmpty ? 'Wallets' : 'Remaining',
+                value: wallets.wallets.isEmpty
+                    ? 'Add wallets'
+                    : AppUtils.formatAmount(totalRemaining, symbol),
+                color: totalRemaining >= 0 ? Colors.green : Colors.red,
               ),
             ],
           ),
@@ -112,14 +126,21 @@ class _DailyStat extends StatelessWidget {
             if (icon != null) const SizedBox(width: 4),
             Text(value,
                 style: TextStyle(
-                    fontWeight: FontWeight.w700, color: color, fontSize: 15)),
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                    fontSize: 14),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
           ],
         ),
         const SizedBox(height: 4),
         Text(label,
             style: TextStyle(
                 fontSize: 11,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5))),
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withOpacity(0.5))),
       ],
     );
   }

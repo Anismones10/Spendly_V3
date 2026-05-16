@@ -50,6 +50,34 @@ class ExpenseProvider extends ChangeNotifier {
     return list;
   }
 
+  // ── Wallet filtering ────────────────────────────────────────────────────────
+
+  /// All expenses paid from a specific wallet
+  List<ExpenseModel> getExpensesForWallet(String walletId) {
+    return _box.values
+        .where((e) => e.walletId == walletId)
+        .toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+  }
+
+  /// Total spent from a specific wallet
+  double getTotalForWallet(String walletId) {
+    return getExpensesForWallet(walletId)
+        .fold(0, (sum, e) => sum + e.amount);
+  }
+
+  /// Total spent from a wallet in a specific month
+  double getWalletTotalForMonth(String walletId, int year, int month) {
+    return _box.values
+        .where((e) =>
+            e.walletId == walletId &&
+            e.date.year == year &&
+            e.date.month == month)
+        .fold(0, (sum, e) => sum + e.amount);
+  }
+
+  // ── Existing methods ────────────────────────────────────────────────────────
+
   List<ExpenseModel> getExpensesForMonth(int year, int month) {
     return _box.values.where((e) => e.date.year == year && e.date.month == month).toList();
   }
@@ -61,8 +89,7 @@ class ExpenseProvider extends ChangeNotifier {
   }
 
   double getTotalForMonth(int year, int month) {
-    return getExpensesForMonth(year, month)
-        .fold(0, (sum, e) => sum + e.amount);
+    return getExpensesForMonth(year, month).fold(0, (sum, e) => sum + e.amount);
   }
 
   double getTotalForDay(DateTime day) {
@@ -143,7 +170,6 @@ class ExpenseProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Smart insights
   List<String> getInsights({Map<String, String> categoryNames = const {}}) {
     final now = DateTime.now();
     final insights = <String>[];
@@ -166,7 +192,6 @@ class ExpenseProvider extends ChangeNotifier {
     final catTotals = getCategoryTotals(now.year, now.month);
     if (catTotals.isNotEmpty) {
       final topCat = catTotals.entries.reduce((a, b) => a.value > b.value ? a : b);
-      // Use the category names map passed in from the UI layer
       final catName = categoryNames[topCat.key] ?? topCat.key;
       insights.add('Your biggest expense this month was "$catName".');
     }

@@ -22,6 +22,9 @@ class IncomeModel extends HiveObject {
   @HiveField(5)
   String source; // 'salary', 'freelance', 'gift', 'sale', 'other'
 
+  @HiveField(6)
+  String? walletId; // NEW — which wallet receives this income
+
   IncomeModel({
     required this.id,
     required this.name,
@@ -29,5 +32,6 @@ class IncomeModel extends HiveObject {
     required this.date,
     this.note,
     this.source = 'other',
+    this.walletId,
   });
 }

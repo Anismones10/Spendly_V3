@@ -2,6 +2,10 @@
 
 part of 'goal_model.dart';
 
+// **************************************************************************
+// TypeAdapterGenerator
+// **************************************************************************
+
 class GoalModelAdapter extends TypeAdapter<GoalModel> {
   @override
   final int typeId = 2;

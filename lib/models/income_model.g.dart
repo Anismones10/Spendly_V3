@@ -2,6 +2,10 @@
 
 part of 'income_model.dart';
 
+// **************************************************************************
+// TypeAdapterGenerator
+// **************************************************************************
+
 class IncomeModelAdapter extends TypeAdapter<IncomeModel> {
   @override
   final int typeId = 4;
@@ -19,13 +23,14 @@ class IncomeModelAdapter extends TypeAdapter<IncomeModel> {
       date: fields[3] as DateTime,
       note: fields[4] as String?,
       source: fields[5] as String,
+      walletId: fields[6] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, IncomeModel obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(7)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -37,7 +42,9 @@ class IncomeModelAdapter extends TypeAdapter<IncomeModel> {
       ..writeByte(4)
       ..write(obj.note)
       ..writeByte(5)
-      ..write(obj.source);
+      ..write(obj.source)
+      ..writeByte(6)
+      ..write(obj.walletId);
   }
 
   @override

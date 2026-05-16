@@ -4,6 +4,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../models/loan_model.dart';
 import '../providers/loan_provider.dart';
 import '../providers/settings_provider.dart';
+import '../providers/wallet_provider.dart';
+import '../providers/expense_provider.dart';
 import '../utils/app_utils.dart';
 import '../widgets/empty_state.dart';
 
@@ -34,6 +36,7 @@ class _LoansScreenState extends State<LoansScreen>
   Widget build(BuildContext context) {
     final loans = context.watch<LoanProvider>();
     final settings = context.watch<SettingsProvider>();
+    final wallets = context.watch<WalletProvider>();
     final symbol = settings.currencySymbol;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
@@ -51,7 +54,7 @@ class _LoansScreenState extends State<LoansScreen>
       ),
       body: Column(
         children: [
-          // ── Net balance summary card ────────────────────────────────────────
+          // ── Net balance summary card ──────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
             child: Container(
@@ -60,7 +63,10 @@ class _LoansScreenState extends State<LoansScreen>
                 gradient: LinearGradient(
                   colors: isNetPositive
                       ? [const Color(0xFF1E3A5F), const Color(0xFF0F2440)]
-                      : [const Color(0xFFB71C1C), const Color(0xFF7F0000)],
+                      : [
+                          const Color(0xFFB71C1C),
+                          const Color(0xFF7F0000)
+                        ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -85,25 +91,24 @@ class _LoansScreenState extends State<LoansScreen>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.arrow_upward_rounded,
-                                    color: Color(0xFF2ECC71), size: 14),
-                                const SizedBox(width: 4),
-                                Text('Lending',
-                                    style: TextStyle(
-                                        color: Colors.white.withOpacity(0.6),
-                                        fontSize: 12)),
-                              ],
-                            ),
+                            Row(children: [
+                              const Icon(Icons.arrow_upward_rounded,
+                                  color: Color(0xFF2ECC71), size: 14),
+                              const SizedBox(width: 4),
+                              Text('Lending',
+                                  style: TextStyle(
+                                      color:
+                                          Colors.white.withOpacity(0.6),
+                                      fontSize: 12)),
+                            ]),
                             const SizedBox(height: 4),
                             Text(
-                              AppUtils.formatAmount(loans.totalLending, symbol),
+                              AppUtils.formatAmount(
+                                  loans.totalLending, symbol),
                               style: const TextStyle(
-                                color: Color(0xFF2ECC71),
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                              ),
+                                  color: Color(0xFF2ECC71),
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700),
                             ),
                           ],
                         ),
@@ -118,26 +123,24 @@ class _LoansScreenState extends State<LoansScreen>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                children: [
-                                  const Icon(Icons.arrow_downward_rounded,
-                                      color: Color(0xFFE57373), size: 14),
-                                  const SizedBox(width: 4),
-                                  Text('Borrowing',
-                                      style: TextStyle(
-                                          color: Colors.white.withOpacity(0.6),
-                                          fontSize: 12)),
-                                ],
-                              ),
+                              Row(children: [
+                                const Icon(Icons.arrow_downward_rounded,
+                                    color: Color(0xFFE57373), size: 14),
+                                const SizedBox(width: 4),
+                                Text('Borrowing',
+                                    style: TextStyle(
+                                        color:
+                                            Colors.white.withOpacity(0.6),
+                                        fontSize: 12)),
+                              ]),
                               const SizedBox(height: 4),
                               Text(
                                 AppUtils.formatAmount(
                                     loans.totalBorrowing, symbol),
                                 style: const TextStyle(
-                                  color: Color(0xFFE57373),
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                                    color: Color(0xFFE57373),
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700),
                               ),
                             ],
                           ),
@@ -155,22 +158,17 @@ class _LoansScreenState extends State<LoansScreen>
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          Text('Net Balance',
+                              style: TextStyle(
+                                  color: Colors.white.withOpacity(0.55),
+                                  fontSize: 12)),
                           Text(
-                            'Net Balance',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.55),
-                              fontSize: 12,
-                            ),
-                          ),
-                          Text(
-                            isNetPositive
-                                ? 'Others owe you more'
-                                : 'You owe others more',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.4),
-                              fontSize: 11,
-                            ),
-                          ),
+                              isNetPositive
+                                  ? 'Others owe you more'
+                                  : 'You owe others more',
+                              style: TextStyle(
+                                  color: Colors.white.withOpacity(0.4),
+                                  fontSize: 11)),
                         ],
                       ),
                       Text(
@@ -185,6 +183,91 @@ class _LoansScreenState extends State<LoansScreen>
                       ),
                     ],
                   ),
+
+                  // ── Wallet net breakdown ────────────────────────────────
+                  if (wallets.wallets.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Divider(color: Colors.white.withOpacity(0.1)),
+                    const SizedBox(height: 8),
+                    ...wallets.wallets.map((wallet) {
+                      // Net effect of loans on this wallet
+                      final borrowed = loans.borrowing
+                          .where((l) =>
+                              l.walletId == wallet.id &&
+                              l.status != 'paid')
+                          .fold(0.0, (s, l) => s + l.remaining);
+                      final lent = loans.lending
+                          .where((l) =>
+                              l.walletId == wallet.id &&
+                              l.status != 'paid')
+                          .fold(0.0, (s, l) => s + l.remaining);
+
+                      if (borrowed == 0 && lent == 0) {
+                        return const SizedBox.shrink();
+                      }
+
+                      final net = borrowed - lent;
+                      final walletColor = Color(wallet.colorValue);
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Row(
+                          children: [
+                            Icon(
+                                WalletProvider.resolveIcon(wallet.type),
+                                color: walletColor,
+                                size: 12),
+                            const SizedBox(width: 6),
+                            Text(
+                              wallet.name,
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.white.withOpacity(0.55)),
+                            ),
+                            const Spacer(),
+                            if (borrowed > 0)
+                              Text(
+                                '+${AppUtils.formatAmount(borrowed, symbol)}',
+                                style: const TextStyle(
+                                    fontSize: 10,
+                                    color: Color(0xFF81C784)),
+                              ),
+                            if (borrowed > 0 && lent > 0)
+                              Text('  ',
+                                  style: TextStyle(
+                                      color:
+                                          Colors.white.withOpacity(0.3))),
+                            if (lent > 0)
+                              Text(
+                                '-${AppUtils.formatAmount(lent, symbol)}',
+                                style: const TextStyle(
+                                    fontSize: 10,
+                                    color: Color(0xFFEF9A9A)),
+                              ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '${net >= 0 ? '+' : ''}${AppUtils.formatAmount(net, symbol)}',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: net >= 0
+                                      ? const Color(0xFF81C784)
+                                      : const Color(0xFFEF9A9A),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
                 ],
               ),
             ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1),
@@ -192,7 +275,7 @@ class _LoansScreenState extends State<LoansScreen>
 
           const SizedBox(height: 16),
 
-          // ── Tab bar ─────────────────────────────────────────────────────────
+          // ── Tab bar ───────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Container(
@@ -219,7 +302,8 @@ class _LoansScreenState extends State<LoansScreen>
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.arrow_upward_rounded, size: 16),
+                        const Icon(Icons.arrow_upward_rounded,
+                            size: 16),
                         const SizedBox(width: 6),
                         const Text('Lending'),
                         if (loans.lending.isNotEmpty) ...[
@@ -242,7 +326,8 @@ class _LoansScreenState extends State<LoansScreen>
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.arrow_downward_rounded, size: 16),
+                        const Icon(Icons.arrow_downward_rounded,
+                            size: 16),
                         const SizedBox(width: 6),
                         const Text('Borrowing'),
                         if (loans.borrowing.isNotEmpty) ...[
@@ -268,12 +353,15 @@ class _LoansScreenState extends State<LoansScreen>
 
           const SizedBox(height: 8),
 
-          // ── Loan lists ──────────────────────────────────────────────────────
+          // ── Loan lists ────────────────────────────────────────────────
           Expanded(
             child: TabBarView(
               controller: _tabController,
               children: [
-                _LoanList(loans: loans.lending, symbol: symbol, type: 'lending'),
+                _LoanList(
+                    loans: loans.lending,
+                    symbol: symbol,
+                    type: 'lending'),
                 _LoanList(
                     loans: loans.borrowing,
                     symbol: symbol,
@@ -284,9 +372,9 @@ class _LoansScreenState extends State<LoansScreen>
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddLoan(context, _tabController.index == 0
-            ? 'lending'
-            : 'borrowing'),
+        onPressed: () => _showAddLoan(
+            context,
+            _tabController.index == 0 ? 'lending' : 'borrowing'),
         icon: const Icon(Icons.add_rounded),
         label: Text(_tabController.index == 0
             ? 'Add Lending'
@@ -325,7 +413,8 @@ class _LoanList extends StatelessWidget {
         icon: type == 'lending'
             ? Icons.arrow_upward_rounded
             : Icons.arrow_downward_rounded,
-        title: type == 'lending' ? 'No Lending' : 'No Borrowing',
+        title:
+            type == 'lending' ? 'No Lending' : 'No Borrowing',
         subtitle: type == 'lending'
             ? 'Track money you lent to others'
             : 'Track money you borrowed from others',
@@ -338,10 +427,7 @@ class _LoanList extends StatelessWidget {
       itemBuilder: (ctx, i) => _LoanTile(
         loan: loans[i],
         symbol: symbol,
-      )
-          .animate()
-          .fadeIn(delay: (i * 50).ms)
-          .slideX(begin: 0.08),
+      ).animate().fadeIn(delay: (i * 50).ms).slideX(begin: 0.08),
     );
   }
 }
@@ -373,6 +459,9 @@ class _LoanTile extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final isLending = loan.type == 'lending';
+    final wallets = context.watch<WalletProvider>();
+    final wallet =
+        loan.walletId != null ? wallets.getById(loan.walletId!) : null;
 
     return Dismissible(
       key: ValueKey(loan.id),
@@ -424,12 +513,14 @@ class _LoanTile extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             border: loan.isOverdue
                 ? Border.all(
-                    color: const Color(0xFFE57373).withOpacity(0.4),
+                    color:
+                        const Color(0xFFE57373).withOpacity(0.4),
                     width: 1.5)
                 : null,
             boxShadow: [
               BoxShadow(
-                  color: Colors.black.withOpacity(0.05), blurRadius: 8)
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 8)
             ],
           ),
           child: Column(
@@ -470,47 +561,83 @@ class _LoanTile extends StatelessWidget {
                         Text(
                           loan.personName,
                           style: const TextStyle(
-                              fontWeight: FontWeight.w700, fontSize: 15),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15),
                         ),
                         const SizedBox(height: 2),
                         Row(
                           children: [
-                            if (loan.dueDate != null) ...[
-                              Icon(Icons.calendar_today_rounded,
-                                  size: 11,
-                                  color: loan.isOverdue
-                                      ? const Color(0xFFE57373)
-                                      : theme.colorScheme.onSurface
-                                          .withOpacity(0.4)),
-                              const SizedBox(width: 3),
-                              Text(
-                                AppUtils.formatDate(loan.dueDate!),
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: loan.isOverdue
-                                      ? const Color(0xFFE57373)
-                                      : theme.colorScheme.onSurface
-                                          .withOpacity(0.4),
+                            // Wallet badge
+                            if (wallet != null) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Color(wallet.colorValue)
+                                      .withOpacity(0.12),
+                                  borderRadius:
+                                      BorderRadius.circular(6),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                        WalletProvider.resolveIcon(
+                                            wallet.type),
+                                        size: 10,
+                                        color: Color(
+                                            wallet.colorValue)),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      wallet.name,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color:
+                                            Color(wallet.colorValue),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              const SizedBox(width: 8),
+                              const SizedBox(width: 6),
                             ],
-                            if (loan.note != null &&
-                                loan.note!.isNotEmpty)
-                              Expanded(
-                                child: Text(
-                                  loan.note!,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: theme.colorScheme.onSurface
-                                        .withOpacity(0.4),
+                            if (loan.dueDate != null)
+                              Row(
+                                children: [
+                                  Icon(Icons.calendar_today_rounded,
+                                      size: 11,
+                                      color: loan.isOverdue
+                                          ? const Color(0xFFE57373)
+                                          : theme.colorScheme.onSurface
+                                              .withOpacity(0.4)),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    AppUtils.formatDate(
+                                        loan.dueDate!),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: loan.isOverdue
+                                          ? const Color(0xFFE57373)
+                                          : theme.colorScheme.onSurface
+                                              .withOpacity(0.4),
+                                    ),
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                                ],
                               ),
                           ],
                         ),
+                        if (loan.note != null && loan.note!.isNotEmpty)
+                          Text(
+                            loan.note!,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: theme.colorScheme.onSurface
+                                  .withOpacity(0.4),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                       ],
                     ),
                   ),
@@ -550,7 +677,7 @@ class _LoanTile extends StatelessWidget {
                 ],
               ),
 
-              // Progress bar if partial
+              // Progress bar
               if (loan.status == 'partial' || loan.paidAmount > 0) ...[
                 const SizedBox(height: 10),
                 Row(
@@ -560,7 +687,8 @@ class _LoanTile extends StatelessWidget {
                       'Paid ${AppUtils.formatAmount(loan.paidAmount, symbol)} of ${AppUtils.formatAmount(loan.amount, symbol)}',
                       style: TextStyle(
                         fontSize: 11,
-                        color: theme.colorScheme.onSurface.withOpacity(0.4),
+                        color: theme.colorScheme.onSurface
+                            .withOpacity(0.4),
                       ),
                     ),
                     Text(
@@ -624,7 +752,9 @@ class _LoanTile extends StatelessWidget {
                     fontSize: 18, fontWeight: FontWeight.w700)),
             const SizedBox(height: 4),
             Text(
-              AppUtils.formatAmount(loan.remaining, symbol) + ' remaining',
+              AppUtils.formatAmount(loan.remaining,
+                      context.read<SettingsProvider>().currencySymbol) +
+                  ' remaining',
               style: TextStyle(
                   color: theme.colorScheme.onSurface.withOpacity(0.5)),
             ),
@@ -661,8 +791,9 @@ class _LoanTile extends StatelessWidget {
                   style: TextStyle(fontWeight: FontWeight.w600)),
               onTap: () {
                 Navigator.pop(ctx);
-                context.read<LoanProvider>().markPayment(
-                    loan.id, loan.remaining);
+                ctx
+                    .read<LoanProvider>()
+                    .markPayment(loan.id, loan.remaining);
               },
             ),
             ListTile(
@@ -684,6 +815,8 @@ class _LoanTile extends StatelessWidget {
 
   void _showPayment(BuildContext context) {
     final ctrl = TextEditingController();
+    final symbol =
+        context.read<SettingsProvider>().currencySymbol;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -709,9 +842,7 @@ class _LoanTile extends StatelessWidget {
             onPressed: () {
               final amount = double.tryParse(ctrl.text);
               if (amount != null && amount > 0) {
-                ctx
-                    .read<LoanProvider>()
-                    .markPayment(loan.id, amount);
+                ctx.read<LoanProvider>().markPayment(loan.id, amount);
               }
               Navigator.pop(ctx);
             },
@@ -741,6 +872,7 @@ class _LoanSheetState extends State<_LoanSheet> {
   final _noteCtrl = TextEditingController();
   DateTime _date = DateTime.now();
   DateTime? _dueDate;
+  String? _selectedWalletId;
 
   @override
   void initState() {
@@ -752,6 +884,15 @@ class _LoanSheetState extends State<_LoanSheet> {
       _noteCtrl.text = l.note ?? '';
       _date = l.date;
       _dueDate = l.dueDate;
+      _selectedWalletId = l.walletId;
+    } else {
+      // Default to first wallet
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final wallets = context.read<WalletProvider>().wallets;
+        if (wallets.isNotEmpty && _selectedWalletId == null) {
+          setState(() => _selectedWalletId = wallets.first.id);
+        }
+      });
     }
   }
 
@@ -768,6 +909,40 @@ class _LoanSheetState extends State<_LoanSheet> {
     final amount = double.tryParse(_amountCtrl.text);
     if (name.isEmpty || amount == null || amount <= 0) return;
 
+    // Block lending if selected wallet doesn't have enough funds
+    if (widget.type == 'lending' && _selectedWalletId != null) {
+      final walletProvider = context.read<WalletProvider>();
+      final expenses = context.read<ExpenseProvider>().allExpenses;
+      final available = walletProvider.getRemaining(_selectedWalletId!, expenses);
+      if (amount > available) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Row(
+              children: [
+                Text('⚠️', style: TextStyle(fontSize: 22)),
+                SizedBox(width: 10),
+                Text('Insufficient Funds',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+              ],
+            ),
+            content: Text(
+              'You only have ${context.read<SettingsProvider>().currencySymbol}${available.toStringAsFixed(2)} available in this wallet.\n\nYou cannot lend more than you have.',
+              style: const TextStyle(fontSize: 14, height: 1.5),
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+    }
+
     final loan = LoanModel(
       id: widget.existing?.id ?? AppUtils.generateId(),
       personName: name,
@@ -776,8 +951,11 @@ class _LoanSheetState extends State<_LoanSheet> {
       date: _date,
       dueDate: _dueDate,
       type: widget.type,
-      note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
+      note: _noteCtrl.text.trim().isEmpty
+          ? null
+          : _noteCtrl.text.trim(),
       status: widget.existing?.status ?? 'pending',
+      walletId: _selectedWalletId,
     );
 
     final provider = context.read<LoanProvider>();
@@ -794,10 +972,13 @@ class _LoanSheetState extends State<_LoanSheet> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final isLending = widget.type == 'lending';
+    final wallets = context.watch<WalletProvider>().wallets;
+    final settings = context.read<SettingsProvider>();
+    final symbol = settings.currencySymbol;
 
     return Padding(
-      padding:
-          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
@@ -820,6 +1001,8 @@ class _LoanSheetState extends State<_LoanSheet> {
                 ),
               ),
               const SizedBox(height: 20),
+
+              // Title row
               Row(
                 children: [
                   Container(
@@ -885,6 +1068,222 @@ class _LoanSheetState extends State<_LoanSheet> {
                   prefixIcon: Icon(Icons.notes_rounded),
                 ),
               ),
+              const SizedBox(height: 16),
+
+              // ── Wallet picker ───────────────────────────────────────────
+              Text(
+                isLending
+                    ? 'Pay From Wallet'
+                    : 'Receive Into Wallet',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color:
+                      theme.colorScheme.onSurface.withOpacity(0.7),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                isLending
+                    ? 'Money will be deducted from this wallet'
+                    : 'Money will be added to this wallet',
+                style: TextStyle(
+                  fontSize: 11,
+                  color:
+                      theme.colorScheme.onSurface.withOpacity(0.4),
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              if (wallets.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFF2A2A2A)
+                        : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(children: [
+                    Icon(Icons.info_outline_rounded,
+                        color: theme.colorScheme.primary, size: 16),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                          'Add wallets in Settings → Wallets first.',
+                          style: TextStyle(fontSize: 12)),
+                    ),
+                  ]),
+                )
+              else
+                Column(
+                  children: [
+                    // No wallet option
+                    GestureDetector(
+                      onTap: () =>
+                          setState(() => _selectedWalletId = null),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                        margin: const EdgeInsets.only(bottom: 8),
+                        decoration: BoxDecoration(
+                          color: _selectedWalletId == null
+                              ? theme.colorScheme.primary
+                                  .withOpacity(0.1)
+                              : (isDark
+                                  ? const Color(0xFF2A2A2A)
+                                  : Colors.grey.shade50),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _selectedWalletId == null
+                                ? theme.colorScheme.primary
+                                : Colors.transparent,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Row(children: [
+                          Icon(Icons.money_off_rounded,
+                              color: _selectedWalletId == null
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.onSurface
+                                      .withOpacity(0.4),
+                              size: 18),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Just track (no wallet)',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: _selectedWalletId == null
+                                  ? theme.colorScheme.primary
+                                  : null,
+                            ),
+                          ),
+                        ]),
+                      ),
+                    ),
+
+                    // Wallet list
+                    ...wallets.map((wallet) {
+                      final isSelected =
+                          _selectedWalletId == wallet.id;
+                      final walletColor = Color(wallet.colorValue);
+
+                      return GestureDetector(
+                        onTap: () => setState(
+                            () => _selectedWalletId = wallet.id),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12),
+                          margin: const EdgeInsets.only(bottom: 8),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? walletColor.withOpacity(0.12)
+                                : (isDark
+                                    ? const Color(0xFF2A2A2A)
+                                    : Colors.grey.shade50),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isSelected
+                                  ? walletColor
+                                  : Colors.transparent,
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: walletColor.withOpacity(0.15),
+                                  borderRadius:
+                                      BorderRadius.circular(10),
+                                ),
+                                child: Icon(
+                                    WalletProvider.resolveIcon(
+                                        wallet.type),
+                                    color: walletColor,
+                                    size: 18),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text(wallet.name,
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 13,
+                                            color: isSelected
+                                                ? walletColor
+                                                : null)),
+                                    Text(
+                                      'Available: ${AppUtils.formatAmount(context.read<WalletProvider>().getRemaining(wallet.id, context.read<ExpenseProvider>().allExpenses), symbol)}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: isSelected
+                                            ? walletColor
+                                                .withOpacity(0.7)
+                                            : theme.colorScheme.onSurface
+                                                .withOpacity(0.4),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // Effect indicator
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: (isLending
+                                          ? const Color(0xFFE57373)
+                                          : const Color(0xFF2ECC71))
+                                      .withOpacity(0.12),
+                                  borderRadius:
+                                      BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      isLending
+                                          ? Icons.arrow_upward_rounded
+                                          : Icons
+                                              .arrow_downward_rounded,
+                                      size: 11,
+                                      color: isLending
+                                          ? const Color(0xFFE57373)
+                                          : const Color(0xFF2ECC71),
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      isLending ? 'Out' : 'In',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: isLending
+                                            ? const Color(0xFFE57373)
+                                            : const Color(0xFF2ECC71),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+
               const SizedBox(height: 12),
 
               // Date
@@ -914,11 +1313,13 @@ class _LoanSheetState extends State<_LoanSheet> {
                   final picked = await showDatePicker(
                     context: context,
                     initialDate: _dueDate ??
-                        DateTime.now().add(const Duration(days: 30)),
+                        DateTime.now()
+                            .add(const Duration(days: 30)),
                     firstDate: DateTime.now(),
                     lastDate: DateTime(2035),
                   );
-                  if (picked != null) setState(() => _dueDate = picked);
+                  if (picked != null)
+                    setState(() => _dueDate = picked);
                 },
                 child: _DateTile(
                   icon: Icons.alarm_rounded,
@@ -930,8 +1331,10 @@ class _LoanSheetState extends State<_LoanSheet> {
                   theme: theme,
                   trailing: _dueDate != null
                       ? GestureDetector(
-                          onTap: () => setState(() => _dueDate = null),
-                          child: const Icon(Icons.close_rounded, size: 16),
+                          onTap: () =>
+                              setState(() => _dueDate = null),
+                          child: const Icon(Icons.close_rounded,
+                              size: 16),
                         )
                       : null,
                 ),
@@ -947,7 +1350,8 @@ class _LoanSheetState extends State<_LoanSheet> {
                         ? const Color(0xFF2ECC71)
                         : const Color(0xFFE57373),
                   ),
-                  child: Text(widget.existing != null ? 'Save' : 'Add'),
+                  child: Text(
+                      widget.existing != null ? 'Save' : 'Add'),
                 ),
               ),
               const SizedBox(height: 8),
@@ -958,6 +1362,8 @@ class _LoanSheetState extends State<_LoanSheet> {
     );
   }
 }
+
+// ── Date tile ─────────────────────────────────────────────────────────────────
 
 class _DateTile extends StatelessWidget {
   final IconData icon;
@@ -979,9 +1385,12 @@ class _DateTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade100,
+        color: isDark
+            ? const Color(0xFF2A2A2A)
+            : Colors.grey.shade100,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -995,8 +1404,8 @@ class _DateTile extends StatelessWidget {
                 Text(label,
                     style: TextStyle(
                         fontSize: 11,
-                        color:
-                            theme.colorScheme.onSurface.withOpacity(0.45))),
+                        color: theme.colorScheme.onSurface
+                            .withOpacity(0.45))),
                 Text(value,
                     style: const TextStyle(
                         fontSize: 14, fontWeight: FontWeight.w500)),
@@ -1005,7 +1414,8 @@ class _DateTile extends StatelessWidget {
           ),
           trailing ??
               Icon(Icons.chevron_right_rounded,
-                  color: theme.colorScheme.onSurface.withOpacity(0.3)),
+                  color:
+                      theme.colorScheme.onSurface.withOpacity(0.3)),
         ],
       ),
     );

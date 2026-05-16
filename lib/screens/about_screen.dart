@@ -1,9 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
+
+  // ── URL launchers ─────────────────────────────────────────────────────────
+
+  Future<void> _launch(BuildContext context, String url) async {
+    try {
+      final uri = Uri.parse(url);
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      await Clipboard.setData(ClipboardData(text: url));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Copied to clipboard!'),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,8 +86,8 @@ class AboutScreen extends StatelessWidget {
                     color: const Color(0xFFE57373),
                     label: 'Email',
                     value: 'anisniazi2018@gmail.com',
-                    onTap: () => _copyToClipboard(
-                        context, 'anisniazi2018@gmail.com', 'Email copied!'),
+                    onTap: () => _launch(
+                        context, 'mailto:anisniazi2018@gmail.com'),
                   ),
                   const SizedBox(height: 10),
                   _ContactTile(
@@ -73,8 +95,8 @@ class AboutScreen extends StatelessWidget {
                     color: const Color(0xFFE91E8C),
                     label: 'Instagram',
                     value: '@anis_mones10',
-                    onTap: () => _copyToClipboard(
-                        context, 'anis_mones10', 'Instagram handle copied!'),
+                    onTap: () => _launch(
+                        context, 'https://www.instagram.com/anis_mones10'),
                   ),
                   const SizedBox(height: 10),
                   _ContactTile(
@@ -82,8 +104,9 @@ class AboutScreen extends StatelessWidget {
                     color: const Color(0xFF0077B5),
                     label: 'LinkedIn',
                     value: 'Anis Mones',
-                    onTap: () => _copyToClipboard(context,
-                        'linkedin.com/in/anis-mones-325571399', 'LinkedIn URL copied!'),
+                    onTap: () => _launch(
+                        context,
+                        'https://linkedin.com/in/anis-mones-325571399'),
                   ),
                   const SizedBox(height: 10),
                   _ContactTile(
@@ -91,8 +114,17 @@ class AboutScreen extends StatelessWidget {
                     color: const Color(0xFF2AABEE),
                     label: 'Telegram',
                     value: '@Mones_Anis',
-                    onTap: () => _copyToClipboard(
-                        context, '@Mones_Anis', 'Telegram handle copied!'),
+                    onTap: () => _launch(
+                        context, 'https://t.me/Mones_Anis'),
+                  ),
+                  const SizedBox(height: 10),
+                  _ContactTile(
+                    icon: Icons.code_rounded,
+                    color: const Color(0xFF8E8E93),
+                    label: 'GitHub',
+                    value: 'Anismones10',
+                    onTap: () => _launch(
+                        context, 'https://github.com/Anismones10'),
                   ),
                 ],
               ),
@@ -129,7 +161,6 @@ class AboutScreen extends StatelessWidget {
             // ── Made with love ────────────────────────────────────────
             Column(
               children: [
-                // Blaze Fang logo
                 Container(
                   width: 100,
                   height: 100,
@@ -152,8 +183,6 @@ class AboutScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-
-                // Made with love
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -322,18 +351,6 @@ class AboutScreen extends StatelessWidget {
       ],
     );
   }
-
-  void _copyToClipboard(BuildContext context, String text, String message) {
-    Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
 }
 
 // ── Contact Tile ──────────────────────────────────────────────────────────────
@@ -405,10 +422,11 @@ class _ContactTile extends StatelessWidget {
                 ],
               ),
             ),
+            // Open link icon instead of copy icon
             Icon(
-              Icons.copy_rounded,
+              Icons.open_in_new_rounded,
               size: 16,
-              color: theme.colorScheme.onSurface.withOpacity(0.3),
+              color: color.withOpacity(0.6),
             ),
           ],
         ),

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:hive/hive.dart';
+import 'package:provider/provider.dart';
+import '../providers/settings_provider.dart';
 import 'dashboard_screen.dart';
 import 'expenses_screen.dart';
 import 'goals_screen.dart';
@@ -10,7 +12,6 @@ import 'statistics_screen.dart';
 import 'income_screen.dart';
 import 'loans_screen.dart';
 
-// All available tabs definition
 class _TabDef {
   final String id;
   final String label;
@@ -79,7 +80,6 @@ final List<_TabDef> _allTabs = [
   ),
 ];
 
-// Tab order: Home | Expenses | Stats | Goals
 const List<String> _defaultTabOrder = [
   'home',
   'expenses',
@@ -109,19 +109,16 @@ class _MainShellState extends State<MainShell> {
   void _loadTabPrefs() {
     final saved = _settingsBox.get('visibleTabs') as List?;
     if (saved != null && saved.length >= 2) {
-      _visibleTabIds = List<String>.from(saved)
-          ..remove('settings'); // settings NEVER appears in main bar
+      _visibleTabIds = List<String>.from(saved)..remove('settings');
     } else {
       _visibleTabIds = List<String>.from(_defaultTabOrder);
     }
-    // Extra safety: always remove settings
     _visibleTabIds.remove('settings');
-    // Always ensure 'home' is present and first (leftmost)
+    // home always first
     _visibleTabIds.remove('home');
     _visibleTabIds.insert(0, 'home');
-    _currentIndex = 0; // home is always index 0
-    if (_currentIndex < 0) _currentIndex = 0;
-    _previousIndex = _currentIndex;
+    _currentIndex = 0;
+    _previousIndex = 0;
   }
 
   void _saveTabPrefs() {
@@ -132,17 +129,15 @@ class _MainShellState extends State<MainShell> {
   List<_TabDef> get _visibleTabs =>
       _visibleTabIds.map((id) => _allTabs.firstWhere((t) => t.id == id)).toList();
 
-  int get _centerIndex => _visibleTabs.indexWhere((t) => t.id == 'home');
-
   void _goTo(int index) {
     if (index == _currentIndex) return;
-    HapticFeedback.lightImpact();
+    final haptic = _settingsBox.get('hapticEnabled', defaultValue: true) as bool;
+    if (haptic) HapticFeedback.lightImpact();
     setState(() {
       _previousIndex = _currentIndex;
       _currentIndex = index;
     });
   }
-
 
   void _showMoreMenu() {
     final theme = Theme.of(context);
@@ -154,14 +149,21 @@ class _MainShellState extends State<MainShell> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
+      isScrollControlled: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.5,
+        minChildSize: 0.3,
+        maxChildSize: 0.85,
+        builder: (_, scrollController) => Container(
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         ),
         padding: EdgeInsets.fromLTRB(
             24, 16, 24, MediaQuery.of(ctx).padding.bottom + 24),
-        child: Column(
+        child: SingleChildScrollView(
+          controller: scrollController,
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -175,17 +177,17 @@ class _MainShellState extends State<MainShell> {
               ),
             ),
             const SizedBox(height: 20),
-            const Text('More', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            const Text('More',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
             const SizedBox(height: 16),
 
-            // Settings always in More
             _MoreTile(
               icon: Icons.settings_rounded,
               label: 'Settings',
               onTap: () {
                 Navigator.pop(ctx);
                 Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const SettingsScreen()));
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()));
               },
             ),
 
@@ -205,13 +207,11 @@ class _MainShellState extends State<MainShell> {
                 onTap: () {
                   Navigator.pop(ctx);
                   if (tab.id == 'settings') return;
-                  setState(() {
-                    if (!_visibleTabIds.contains(tab.id)) {
-                      _visibleTabIds.add(tab.id);
-                    }
-                    _currentIndex = _visibleTabIds.indexOf(tab.id);
-                    _previousIndex = _currentIndex;
-                  });
+                  // Just navigate — do NOT add to nav bar permanently
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => tab.screen),
+                  );
                 },
               )),
             ],
@@ -220,7 +220,6 @@ class _MainShellState extends State<MainShell> {
             Divider(color: Colors.grey.withOpacity(0.15)),
             const SizedBox(height: 8),
 
-            // Customize tabs
             _MoreTile(
               icon: Icons.tune_rounded,
               label: 'Customize Tabs',
@@ -231,6 +230,8 @@ class _MainShellState extends State<MainShell> {
             ),
           ],
         ),
+        ),
+      ),
       ),
     );
   }
@@ -241,7 +242,7 @@ class _MainShellState extends State<MainShell> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _TabCustomizerSheet(
-        allTabs: _allTabs.where((t) => t.id != 'settings').toList(), // settings never in customizer
+        allTabs: _allTabs.where((t) => t.id != 'settings').toList(),
         visibleTabIds: List<String>.from(_visibleTabIds),
         onSave: (newIds) {
           setState(() {
@@ -266,35 +267,41 @@ class _MainShellState extends State<MainShell> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final tabs = _visibleTabs;
-    final centerIdx = _centerIndex;
+
+    // For home tab (index 0), pass the More callback so ... appears in AppBar
+    Widget currentScreen;
+    if (_currentIndex == 0) {
+      currentScreen = DashboardScreen(onMoreTap: _showMoreMenu);
+    } else if (_currentIndex < tabs.length) {
+      currentScreen = tabs[_currentIndex].screen;
+    } else {
+      currentScreen = DashboardScreen(onMoreTap: _showMoreMenu);
+    }
 
     return Scaffold(
       body: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 260),
-          transitionBuilder: (child, animation) {
-            final goRight = _currentIndex >= _previousIndex;
-            return FadeTransition(
-              opacity: animation,
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: Offset(goRight ? 0.06 : -0.06, 0),
-                  end: Offset.zero,
-                ).animate(CurvedAnimation(
-                    parent: animation, curve: Curves.easeOut)),
-                child: child,
-              ),
-            );
-          },
-          child: KeyedSubtree(
-            key: ValueKey(_currentIndex),
-            child: _currentIndex < tabs.length
-                ? tabs[_currentIndex].screen
-                : const DashboardScreen(),
-          ),
+        duration: const Duration(milliseconds: 260),
+        transitionBuilder: (child, animation) {
+          final goRight = _currentIndex >= _previousIndex;
+          return FadeTransition(
+            opacity: animation,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: Offset(goRight ? 0.06 : -0.06, 0),
+                end: Offset.zero,
+              ).animate(CurvedAnimation(
+                  parent: animation, curve: Curves.easeOut)),
+              child: child,
+            ),
+          );
+        },
+        child: KeyedSubtree(
+          key: ValueKey(_currentIndex),
+          child: currentScreen,
+        ),
       ),
 
       bottomNavigationBar: Container(
-        // Bottom margin so nav bar floats above device edge
         margin: const EdgeInsets.fromLTRB(12, 0, 12, 16),
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
@@ -310,23 +317,14 @@ class _MainShellState extends State<MainShell> {
         child: SafeArea(
           top: false,
           child: Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
+                // All visible tabs including Home
                 ...List.generate(tabs.length, (i) {
                   final tab = tabs[i];
                   final isSelected = i == _currentIndex;
-                  final isCenter = false; // home is leftmost, no floating center button
-
-                  if (isCenter) {
-                    return _CenterButton(
-                      icon: tab.activeIcon,
-                      isSelected: isSelected,
-                      onTap: () => _goTo(i),
-                    );
-                  }
                   return _NavButton(
                     icon: isSelected ? tab.activeIcon : tab.icon,
                     label: tab.label,
@@ -334,58 +332,11 @@ class _MainShellState extends State<MainShell> {
                     onTap: () => _goTo(i),
                   );
                 }),
-                // Customize tabs button
-                _CustomizeButton(onTap: _showMoreMenu),
               ],
             ),
           ),
         ),
       ),
-    );
-  }
-}
-
-// ── Center Home Button ────────────────────────────────────────────────────────
-
-class _CenterButton extends StatelessWidget {
-  final IconData icon;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _CenterButton({
-    required this.icon,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        width: 54,
-        height: 54,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: theme.colorScheme.primary,
-          boxShadow: [
-            BoxShadow(
-              color: theme.colorScheme.primary
-                  .withOpacity(isSelected ? 0.5 : 0.3),
-              blurRadius: isSelected ? 18 : 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Icon(icon, color: Colors.white, size: 24),
-      )
-          .animate(target: isSelected ? 1 : 0)
-          .scale(
-              begin: const Offset(0.93, 0.93),
-              end: const Offset(1.0, 1.0),
-              duration: 200.ms),
     );
   }
 }
@@ -435,8 +386,7 @@ class _NavButton extends StatelessWidget {
               duration: const Duration(milliseconds: 200),
               style: TextStyle(
                 fontSize: 10,
-                fontWeight:
-                    isSelected ? FontWeight.w700 : FontWeight.w400,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
                 color: isSelected
                     ? theme.colorScheme.primary
                     : theme.colorScheme.onSurface.withOpacity(0.38),
@@ -450,7 +400,7 @@ class _NavButton extends StatelessWidget {
   }
 }
 
-// ── Customize Button ──────────────────────────────────────────────────────────
+// ── More / Customize Button ───────────────────────────────────────────────────
 
 class _CustomizeButton extends StatelessWidget {
   final VoidCallback onTap;
@@ -514,13 +464,13 @@ class _TabCustomizerSheetState extends State<_TabCustomizerSheet> {
   }
 
   void _toggle(String id) {
-    if (id == 'home') return; // home is always visible
+    if (id == 'home') return;
     setState(() {
       if (_selected.contains(id)) {
-        if (_selected.length <= 3) return; // minimum 3 tabs
+        if (_selected.length <= 3) return;
         _selected.remove(id);
       } else {
-        if (_selected.length >= 5) return; // maximum 5 tabs
+        if (_selected.length >= 5) return;
         _selected.add(id);
       }
     });
@@ -546,7 +496,6 @@ class _TabCustomizerSheetState extends State<_TabCustomizerSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Handle
           Center(
             child: Container(
               width: 40, height: 4,
@@ -556,16 +505,13 @@ class _TabCustomizerSheetState extends State<_TabCustomizerSheet> {
             ),
           ),
           const SizedBox(height: 20),
-
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text('Customize Tabs',
-                  style: TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.w700)),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
               TextButton(
-                  onPressed: _resetToDefault,
-                  child: const Text('Reset')),
+                  onPressed: _resetToDefault, child: const Text('Reset')),
             ],
           ),
           const SizedBox(height: 6),
@@ -577,7 +523,6 @@ class _TabCustomizerSheetState extends State<_TabCustomizerSheet> {
           ),
           const SizedBox(height: 20),
 
-          // Tab toggle list
           ...widget.allTabs.map((tab) {
             final isSelected = _selected.contains(tab.id);
             final isHome = tab.id == 'home';
@@ -587,14 +532,11 @@ class _TabCustomizerSheetState extends State<_TabCustomizerSheet> {
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
                   color: isSelected
                       ? theme.colorScheme.primary.withOpacity(0.08)
-                      : (isDark
-                          ? const Color(0xFF2A2A2A)
-                          : Colors.grey.shade50),
+                      : (isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade50),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: isSelected
@@ -619,9 +561,7 @@ class _TabCustomizerSheetState extends State<_TabCustomizerSheet> {
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 15,
-                          color: isSelected
-                              ? theme.colorScheme.primary
-                              : null,
+                          color: isSelected ? theme.colorScheme.primary : null,
                         ),
                       ),
                     ),
@@ -644,8 +584,7 @@ class _TabCustomizerSheetState extends State<_TabCustomizerSheet> {
                     else
                       AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
-                        width: 22,
-                        height: 22,
+                        width: 22, height: 22,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: isSelected
@@ -654,8 +593,7 @@ class _TabCustomizerSheetState extends State<_TabCustomizerSheet> {
                           border: Border.all(
                             color: isSelected
                                 ? theme.colorScheme.primary
-                                : theme.colorScheme.onSurface
-                                    .withOpacity(0.3),
+                                : theme.colorScheme.onSurface.withOpacity(0.3),
                             width: 2,
                           ),
                         ),
@@ -671,8 +609,6 @@ class _TabCustomizerSheetState extends State<_TabCustomizerSheet> {
           }),
 
           const SizedBox(height: 8),
-
-          // Tab count indicator
           Center(
             child: Text(
               '${_selected.length} / 5 tabs selected',
@@ -682,7 +618,6 @@ class _TabCustomizerSheetState extends State<_TabCustomizerSheet> {
             ),
           ),
           const SizedBox(height: 16),
-
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -718,8 +653,7 @@ class _MoreTile extends StatelessWidget {
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 4),
       leading: Container(
-        width: 42,
-        height: 42,
+        width: 42, height: 42,
         decoration: BoxDecoration(
           color: theme.colorScheme.primary.withOpacity(0.1),
           borderRadius: BorderRadius.circular(12),

@@ -28,6 +28,9 @@ class ExpenseModel extends HiveObject {
   @HiveField(7)
   String? recurringType; // 'daily', 'weekly', 'monthly'
 
+  @HiveField(8)
+  String? walletId; // NEW — which wallet was used
+
   ExpenseModel({
     required this.id,
     required this.name,
@@ -37,5 +40,6 @@ class ExpenseModel extends HiveObject {
     this.note,
     this.isRecurring = false,
     this.recurringType,
+    this.walletId,
   });
 }

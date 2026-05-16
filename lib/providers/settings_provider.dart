@@ -6,10 +6,11 @@ class SettingsProvider extends ChangeNotifier {
 
   bool get isDarkMode => _box.get('darkMode', defaultValue: false);
   bool get soundEnabled => _box.get('soundEnabled', defaultValue: true);
+  bool get hapticEnabled => _box.get('hapticEnabled', defaultValue: true);
   String get currency => _box.get('currency', defaultValue: 'USD');
   String get currencySymbol => _getCurrencySymbol(currency);
-  double get monthlyBudget => _box.get('monthlyBudget', defaultValue: 0.0);
-  int get streak => _box.get('streak', defaultValue: 0);
+  double get monthlyBudget => (_box.get('monthlyBudget', defaultValue: 0.0) as num).toDouble();
+  int get streak => (_box.get('streak', defaultValue: 0) as num).toInt();
   String? get lastStreakDate => _box.get('lastStreakDate');
 
   String _getCurrencySymbol(String code) {
@@ -58,6 +59,11 @@ class SettingsProvider extends ChangeNotifier {
 
   void toggleSound() {
     _box.put('soundEnabled', !soundEnabled);
+    notifyListeners();
+  }
+
+  void toggleHaptic() {
+    _box.put('hapticEnabled', !hapticEnabled);
     notifyListeners();
   }
 

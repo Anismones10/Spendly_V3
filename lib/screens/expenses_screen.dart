@@ -6,6 +6,7 @@ import '../models/expense_model.dart';
 import '../providers/expense_provider.dart';
 import '../providers/category_provider.dart';
 import '../providers/settings_provider.dart';
+import '../providers/wallet_provider.dart';
 import '../widgets/expense_tile.dart';
 import '../widgets/empty_state.dart';
 import '../utils/app_utils.dart';
@@ -22,14 +23,13 @@ class ExpensesScreen extends StatefulWidget {
 class _ExpensesScreenState extends State<ExpensesScreen> {
   final _searchController = TextEditingController();
   String _periodFilter = 'all';
+  String? _walletFilter;
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
   }
-
-  // ── Grouping ────────────────────────────────────────────────────────────────
 
   Map<DateTime, List<ExpenseModel>> _groupByDay(List<ExpenseModel> list) {
     final Map<DateTime, List<ExpenseModel>> grouped = {};
@@ -63,8 +63,6 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     }
     return '$month $d$suffix';
   }
-
-  // ── Period filter ───────────────────────────────────────────────────────────
 
   void _applyPeriodFilter(String period, ExpenseProvider expenses) {
     final now = DateTime.now();
@@ -109,7 +107,10 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     }
   }
 
-  // ── Sort & Filter sheet ─────────────────────────────────────────────────────
+  List<ExpenseModel> _applyWalletFilter(List<ExpenseModel> list) {
+    if (_walletFilter == null) return list;
+    return list.where((e) => e.walletId == _walletFilter).toList();
+  }
 
   void _showSortFilter(BuildContext context) {
     showModalBottomSheet(
@@ -118,35 +119,44 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       backgroundColor: Colors.transparent,
       builder: (_) => _FilterSheet(
         periodFilter: _periodFilter,
+        walletFilter: _walletFilter,
         onPeriodChanged: (p) =>
             _applyPeriodFilter(p, context.read<ExpenseProvider>()),
         onPickCustomRange: () =>
             _pickCustomRange(context, context.read<ExpenseProvider>()),
+        onWalletChanged: (id) => setState(() => _walletFilter = id),
         onClearAll: () {
           context.read<ExpenseProvider>().clearFilters();
           _searchController.clear();
-          setState(() => _periodFilter = 'all');
+          setState(() {
+            _periodFilter = 'all';
+            _walletFilter = null;
+          });
         },
       ),
     );
   }
-
-  // ── Build ───────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     final expenses = context.watch<ExpenseProvider>();
     final settings = context.watch<SettingsProvider>();
     final symbol = settings.currencySymbol;
-    final list = expenses.filteredExpenses;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+
+    final list = _applyWalletFilter(expenses.filteredExpenses);
     final grouped = _groupByDay(list);
-    final days = grouped.keys.toList();
+    final days = grouped.keys.toList()
+      ..sort((a, b) => expenses.sortBy == 'dateAsc'
+          ? a.compareTo(b)   // oldest first
+          : b.compareTo(a)); // newest first (default)
     final totalFiltered = list.fold(0.0, (s, e) => s + e.amount);
+
     final hasActiveFilter = _periodFilter != 'all' ||
         expenses.filterCategory != null ||
-        expenses.searchQuery.isNotEmpty;
+        expenses.searchQuery.isNotEmpty ||
+        _walletFilter != null;
 
     return Scaffold(
       backgroundColor:
@@ -182,7 +192,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       ),
       body: Column(
         children: [
-          // ── Search ──────────────────────────────────────────────────────────
+          // ── Search ────────────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
             child: TextField(
@@ -204,34 +214,45 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             ),
           ),
 
-          // ── Quick period chips ───────────────────────────────────────────────
+          // ── Period chips ──────────────────────────────────────────────────
           SizedBox(
             height: 36,
             child: ListView(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               children: [
-                _PeriodChip(label: 'All', selected: _periodFilter == 'all',
+                _PeriodChip(
+                    label: 'All',
+                    selected: _periodFilter == 'all',
                     onTap: () => _applyPeriodFilter('all', expenses)),
                 const SizedBox(width: 8),
-                _PeriodChip(label: 'Today', selected: _periodFilter == 'today',
+                _PeriodChip(
+                    label: 'Today',
+                    selected: _periodFilter == 'today',
                     onTap: () => _applyPeriodFilter('today', expenses)),
                 const SizedBox(width: 8),
-                _PeriodChip(label: 'This Week', selected: _periodFilter == 'week',
+                _PeriodChip(
+                    label: 'This Week',
+                    selected: _periodFilter == 'week',
                     onTap: () => _applyPeriodFilter('week', expenses)),
                 const SizedBox(width: 8),
-                _PeriodChip(label: 'This Month', selected: _periodFilter == 'month',
+                _PeriodChip(
+                    label: 'This Month',
+                    selected: _periodFilter == 'month',
                     onTap: () => _applyPeriodFilter('month', expenses)),
                 const SizedBox(width: 8),
-                _PeriodChip(label: 'Custom Range', selected: _periodFilter == 'custom',
+                _PeriodChip(
+                    label: 'Custom Range',
+                    selected: _periodFilter == 'custom',
                     onTap: () => _pickCustomRange(context, expenses)),
               ],
             ),
           ),
           const SizedBox(height: 8),
 
-          // ── Active filter chips ──────────────────────────────────────────────
+          // ── Active filter chips ───────────────────────────────────────────
           if (expenses.filterCategory != null ||
+              _walletFilter != null ||
               (_periodFilter == 'custom' && expenses.dateRange != null))
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
@@ -240,7 +261,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 children: [
                   if (expenses.filterCategory != null)
                     Builder(builder: (ctx) {
-                      final cat = context.read<CategoryProvider>()
+                      final cat = context
+                          .read<CategoryProvider>()
                           .getById(expenses.filterCategory!);
                       return Chip(
                         avatar: cat != null
@@ -249,11 +271,31 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                             : null,
                         label: Text(cat?.name ?? ''),
                         deleteIcon: const Icon(Icons.close, size: 14),
-                        onDeleted: () => expenses.setFilterCategory(null),
+                        onDeleted: () =>
+                            expenses.setFilterCategory(null),
                         visualDensity: VisualDensity.compact,
                       );
                     }),
-                  if (_periodFilter == 'custom' && expenses.dateRange != null)
+                  if (_walletFilter != null)
+                    Builder(builder: (ctx) {
+                      final wallet = context
+                          .read<WalletProvider>()
+                          .getById(_walletFilter!);
+                      if (wallet == null) return const SizedBox.shrink();
+                      return Chip(
+                        avatar: Icon(
+                            WalletProvider.resolveIcon(wallet.type),
+                            size: 14,
+                            color: Color(wallet.colorValue)),
+                        label: Text(wallet.name),
+                        deleteIcon: const Icon(Icons.close, size: 14),
+                        onDeleted: () =>
+                            setState(() => _walletFilter = null),
+                        visualDensity: VisualDensity.compact,
+                      );
+                    }),
+                  if (_periodFilter == 'custom' &&
+                      expenses.dateRange != null)
                     Chip(
                       label: Text(
                         '${AppUtils.formatShortDate(expenses.dateRange!.start)} – ${AppUtils.formatShortDate(expenses.dateRange!.end)}',
@@ -269,11 +311,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               ),
             ),
 
-          // ── Summary bar ──────────────────────────────────────────────────────
+          // ── Summary bar ───────────────────────────────────────────────────
           if (hasActiveFilter && list.isNotEmpty)
             Container(
               margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
                 color: theme.colorScheme.primary.withOpacity(0.08),
                 borderRadius: BorderRadius.circular(12),
@@ -285,7 +328,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                     '${list.length} expense${list.length == 1 ? '' : 's'}',
                     style: TextStyle(
                       fontSize: 13,
-                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      color:
+                          theme.colorScheme.onSurface.withOpacity(0.6),
                     ),
                   ),
                   Text(
@@ -300,7 +344,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               ),
             ),
 
-          // ── Swipe hint ───────────────────────────────────────────────────────
+          // ── Swipe hint ────────────────────────────────────────────────────
           if (list.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
@@ -308,31 +352,34 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 children: [
                   Icon(Icons.swipe_left_rounded,
                       size: 14,
-                      color: theme.colorScheme.onSurface.withOpacity(0.3)),
+                      color:
+                          theme.colorScheme.onSurface.withOpacity(0.3)),
                   const SizedBox(width: 4),
                   Text(
                     'Swipe left to delete an expense',
                     style: TextStyle(
                       fontSize: 11,
-                      color: theme.colorScheme.onSurface.withOpacity(0.3),
+                      color:
+                          theme.colorScheme.onSurface.withOpacity(0.3),
                     ),
                   ),
                 ],
               ),
             ),
 
-          // ── Smart list — grouped by day OR flat ranked list ────────────────
+          // ── Expense list ──────────────────────────────────────────────────
           Expanded(
             child: list.isEmpty
                 ? const EmptyState(
                     icon: Icons.receipt_long_rounded,
                     title: 'No Expenses Found',
-                    subtitle: 'Add your first expense using the + button below.',
+                    subtitle:
+                        'Add your first expense using the + button below.',
                   )
                 : expenses.sortBy.startsWith('amount')
-                    // ── Flat ranked list (when sorting by amount) ─────────────
                     ? ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
+                        padding:
+                            const EdgeInsets.fromLTRB(16, 4, 16, 100),
                         itemCount: list.length,
                         itemBuilder: (ctx, i) {
                           final expense = list[i];
@@ -341,12 +388,14 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                             children: [
                               if (i == 0)
                                 Padding(
-                                  padding: const EdgeInsets.only(bottom: 8, top: 4),
+                                  padding: const EdgeInsets.only(
+                                      bottom: 8, top: 4),
                                   child: Row(
                                     children: [
                                       Icon(Icons.sort_rounded,
                                           size: 14,
-                                          color: theme.colorScheme.primary),
+                                          color:
+                                              theme.colorScheme.primary),
                                       const SizedBox(width: 4),
                                       Text(
                                         expenses.sortBy == 'amountDesc'
@@ -355,7 +404,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                                         style: TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w600,
-                                          color: theme.colorScheme.primary,
+                                          color:
+                                              theme.colorScheme.primary,
                                         ),
                                       ),
                                     ],
@@ -364,10 +414,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                               Stack(
                                 children: [
                                   ExpenseTile(
-                                    expense: expense,
-                                    symbol: symbol,
-                                  ),
-                                  // Rank badge
+                                      expense: expense, symbol: symbol),
                                   Positioned(
                                     top: 8,
                                     right: 8,
@@ -379,7 +426,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                                             ? theme.colorScheme.primary
                                             : theme.colorScheme.primary
                                                 .withOpacity(0.08),
-                                        borderRadius: BorderRadius.circular(10),
+                                        borderRadius:
+                                            BorderRadius.circular(10),
                                       ),
                                       child: Text(
                                         '#${i + 1}',
@@ -402,21 +450,22 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                               .slideX(begin: 0.08);
                         },
                       )
-                    // ── Grouped by day (when sorting by date) ─────────────────
                     : ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
+                        padding:
+                            const EdgeInsets.fromLTRB(16, 4, 16, 100),
                         itemCount: days.length,
                         itemBuilder: (ctx, i) {
                           final day = days[i];
                           final dayExpenses = grouped[day]!;
-                          final dayTotal =
-                              dayExpenses.fold(0.0, (s, e) => s + e.amount);
+                          final dayTotal = dayExpenses.fold(
+                              0.0, (s, e) => s + e.amount);
 
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Padding(
-                                padding: const EdgeInsets.only(top: 16, bottom: 8),
+                                padding: const EdgeInsets.only(
+                                    top: 16, bottom: 8),
                                 child: Row(
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
@@ -426,7 +475,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                                       style: TextStyle(
                                         fontSize: 17,
                                         fontWeight: FontWeight.w700,
-                                        color: theme.colorScheme.onSurface,
+                                        color:
+                                            theme.colorScheme.onSurface,
                                       ),
                                     ),
                                     Container(
@@ -435,10 +485,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                                       decoration: BoxDecoration(
                                         color: theme.colorScheme.primary
                                             .withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(20),
+                                        borderRadius:
+                                            BorderRadius.circular(20),
                                       ),
                                       child: Text(
-                                        AppUtils.formatAmount(dayTotal, symbol),
+                                        AppUtils.formatAmount(
+                                            dayTotal, symbol),
                                         style: TextStyle(
                                           fontSize: 13,
                                           fontWeight: FontWeight.w700,
@@ -455,7 +507,10 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                                   symbol: symbol,
                                 )
                                     .animate()
-                                    .fadeIn(delay: ((i * 40) + (entry.key * 25)).ms)
+                                    .fadeIn(
+                                        delay: ((i * 40) +
+                                                (entry.key * 25))
+                                            .ms)
                                     .slideX(begin: 0.08);
                               }),
                             ],
@@ -496,7 +551,8 @@ class _PeriodChip extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
           color: selected
               ? theme.colorScheme.primary
@@ -516,18 +572,22 @@ class _PeriodChip extends StatelessWidget {
   }
 }
 
-// ── Filter Bottom Sheet ───────────────────────────────────────────────────────
+// ── Filter Sheet ──────────────────────────────────────────────────────────────
 
 class _FilterSheet extends StatefulWidget {
   final String periodFilter;
+  final String? walletFilter;
   final ValueChanged<String> onPeriodChanged;
   final VoidCallback onPickCustomRange;
+  final ValueChanged<String?> onWalletChanged;
   final VoidCallback onClearAll;
 
   const _FilterSheet({
     required this.periodFilter,
+    required this.walletFilter,
     required this.onPeriodChanged,
     required this.onPickCustomRange,
+    required this.onWalletChanged,
     required this.onClearAll,
   });
 
@@ -538,6 +598,7 @@ class _FilterSheet extends StatefulWidget {
 class _FilterSheetState extends State<_FilterSheet> {
   late String _sort;
   late String? _category;
+  late String? _wallet;
 
   @override
   void initState() {
@@ -545,18 +606,45 @@ class _FilterSheetState extends State<_FilterSheet> {
     final ep = context.read<ExpenseProvider>();
     _sort = ep.sortBy;
     _category = ep.filterCategory;
+    _wallet = widget.walletFilter;
   }
 
   @override
   Widget build(BuildContext context) {
     final categories = context.read<CategoryProvider>();
+    final wallets = context.read<WalletProvider>().wallets;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+
+    // Sort options with icons
+    final sortOptions = [
+      {
+        'key': 'dateDesc',
+        'label': 'Newest First',
+        'icon': Icons.arrow_downward_rounded,
+      },
+      {
+        'key': 'dateAsc',
+        'label': 'Oldest First',
+        'icon': Icons.arrow_upward_rounded,
+      },
+      {
+        'key': 'amountDesc',
+        'label': 'Highest Amount',
+        'icon': Icons.keyboard_double_arrow_up_rounded,
+      },
+      {
+        'key': 'amountAsc',
+        'label': 'Lowest Amount',
+        'icon': Icons.keyboard_double_arrow_down_rounded,
+      },
+    ];
 
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius:
+            const BorderRadius.vertical(top: Radius.circular(28)),
       ),
       padding: EdgeInsets.fromLTRB(
           24, 16, 24, MediaQuery.of(context).padding.bottom + 24),
@@ -565,10 +653,11 @@ class _FilterSheetState extends State<_FilterSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Handle bar
+            // Handle
             Center(
               child: Container(
-                width: 40, height: 4,
+                width: 40,
+                height: 4,
                 decoration: BoxDecoration(
                   color: Colors.grey.withOpacity(0.3),
                   borderRadius: BorderRadius.circular(2),
@@ -589,6 +678,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                     setState(() {
                       _sort = 'dateDesc';
                       _category = null;
+                      _wallet = null;
                     });
                     Navigator.pop(context);
                   },
@@ -598,7 +688,7 @@ class _FilterSheetState extends State<_FilterSheet> {
             ),
             const SizedBox(height: 16),
 
-            // ── Sort ────────────────────────────────────────────────────────
+            // ── Sort By ──────────────────────────────────────────────────────
             Text('Sort By',
                 style: theme.textTheme.labelLarge
                     ?.copyWith(fontWeight: FontWeight.w700)),
@@ -606,20 +696,145 @@ class _FilterSheetState extends State<_FilterSheet> {
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: [
-                _chip('Newest First', 'dateDesc', _sort == 'dateDesc',
-                    () => setState(() => _sort = 'dateDesc')),
-                _chip('Oldest First', 'dateAsc', _sort == 'dateAsc',
-                    () => setState(() => _sort = 'dateAsc')),
-                _chip('Highest Amount', 'amountDesc', _sort == 'amountDesc',
-                    () => setState(() => _sort = 'amountDesc')),
-                _chip('Lowest Amount', 'amountAsc', _sort == 'amountAsc',
-                    () => setState(() => _sort = 'amountAsc')),
-              ],
+              children: sortOptions.map((option) {
+                final key = option['key'] as String;
+                final label = option['label'] as String;
+                final icon = option['icon'] as IconData;
+                final isSelected = _sort == key;
+
+                return GestureDetector(
+                  onTap: () => setState(() => _sort = key),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 9),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.primary.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          icon,
+                          size: 15,
+                          color: isSelected
+                              ? Colors.white
+                              : theme.colorScheme.primary,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: isSelected
+                                ? Colors.white
+                                : theme.colorScheme.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
             ),
             const SizedBox(height: 20),
 
-            // ── Category ────────────────────────────────────────────────────
+            // ── Payment Method ───────────────────────────────────────────────
+            if (wallets.isNotEmpty) ...[
+              Text('Payment Method',
+                  style: theme.textTheme.labelLarge
+                      ?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  // All chip
+                  GestureDetector(
+                    onTap: () => setState(() => _wallet = null),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 9),
+                      decoration: BoxDecoration(
+                        color: _wallet == null
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.primary.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        'All',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: _wallet == null
+                              ? Colors.white
+                              : theme.colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+                  ...wallets.map((wallet) {
+                    final isSelected = _wallet == wallet.id;
+                    final color = Color(wallet.colorValue);
+                    return GestureDetector(
+                      onTap: () =>
+                          setState(() => _wallet = wallet.id),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 9),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? color.withOpacity(0.15)
+                              : theme.colorScheme.primary
+                                  .withOpacity(0.06),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: isSelected
+                                ? color
+                                : Colors.transparent,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              WalletProvider.resolveIcon(wallet.type),
+                              size: 15,
+                              color: isSelected
+                                  ? color
+                                  : theme.colorScheme.onSurface
+                                      .withOpacity(0.5),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              wallet.name,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: isSelected
+                                    ? color
+                                    : theme.colorScheme.onSurface
+                                        .withOpacity(0.6),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+              const SizedBox(height: 20),
+            ],
+
+            // ── Category ─────────────────────────────────────────────────────
             Text('Category',
                 style: theme.textTheme.labelLarge
                     ?.copyWith(fontWeight: FontWeight.w700)),
@@ -628,16 +843,80 @@ class _FilterSheetState extends State<_FilterSheet> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                _chip('All', null, _category == null,
-                    () => setState(() => _category = null)),
-                ...categories.categories.map((cat) => _catChip(
-                      cat.id,
-                      cat.name,
-                      cat.icon,
-                      cat.colorValue,
-                      _category == cat.id,
-                      () => setState(() => _category = cat.id),
-                    )),
+                GestureDetector(
+                  onTap: () => setState(() => _category = null),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 9),
+                    decoration: BoxDecoration(
+                      color: _category == null
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.primary.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      'All',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: _category == null
+                            ? Colors.white
+                            : theme.colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ),
+                ...categories.categories.map((cat) {
+                  final isSelected = _category == cat.id;
+                  final catColor = Color(cat.colorValue);
+                  return GestureDetector(
+                    onTap: () =>
+                        setState(() => _category = cat.id),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 9),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? catColor.withOpacity(0.15)
+                            : theme.colorScheme.primary.withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isSelected
+                              ? catColor
+                              : Colors.transparent,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            CategoryIcons.resolve(cat.icon),
+                            size: 14,
+                            color: isSelected
+                                ? catColor
+                                : theme.colorScheme.onSurface
+                                    .withOpacity(0.5),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            cat.name,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: isSelected
+                                  ? catColor
+                                  : theme.colorScheme.onSurface
+                                      .withOpacity(0.6),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
               ],
             ),
             const SizedBox(height: 28),
@@ -647,77 +926,13 @@ class _FilterSheetState extends State<_FilterSheet> {
               child: ElevatedButton(
                 onPressed: () {
                   context.read<ExpenseProvider>().setSortBy(_sort);
-                  context.read<ExpenseProvider>().setFilterCategory(_category);
+                  context
+                      .read<ExpenseProvider>()
+                      .setFilterCategory(_category);
+                  widget.onWalletChanged(_wallet);
                   Navigator.pop(context);
                 },
                 child: const Text('Apply'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _chip(String label, dynamic value, bool selected, VoidCallback onTap) {
-    final theme = Theme.of(context);
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected
-              ? theme.colorScheme.primary
-              : theme.colorScheme.primary.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: selected ? Colors.white : theme.colorScheme.primary,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _catChip(String id, String name, String iconKey, int colorValue,
-      bool selected, VoidCallback onTap) {
-    final theme = Theme.of(context);
-    final catColor = Color(colorValue);
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected
-              ? catColor.withOpacity(0.15)
-              : theme.colorScheme.primary.withOpacity(0.06),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? catColor : Colors.transparent,
-            width: 1.5,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              CategoryIcons.resolve(iconKey),
-              size: 14,
-              color: selected ? catColor : theme.colorScheme.onSurface.withOpacity(0.5),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              name,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: selected ? catColor : theme.colorScheme.onSurface.withOpacity(0.6),
               ),
             ),
           ],

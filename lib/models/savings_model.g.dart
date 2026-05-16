@@ -2,6 +2,10 @@
 
 part of 'savings_model.dart';
 
+// **************************************************************************
+// TypeAdapterGenerator
+// **************************************************************************
+
 class SavingsModelAdapter extends TypeAdapter<SavingsModel> {
   @override
   final int typeId = 3;

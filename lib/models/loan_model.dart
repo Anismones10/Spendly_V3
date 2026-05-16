@@ -31,6 +31,9 @@ class LoanModel extends HiveObject {
   @HiveField(8)
   String status; // 'pending', 'partial', 'paid'
 
+  @HiveField(9)
+  String? walletId; // NEW — which wallet is affected
+
   LoanModel({
     required this.id,
     required this.personName,
@@ -41,9 +44,14 @@ class LoanModel extends HiveObject {
     required this.type,
     this.note,
     this.status = 'pending',
+    this.walletId,
   });
 
   double get remaining => amount - paidAmount;
-  double get progress => amount > 0 ? (paidAmount / amount).clamp(0.0, 1.0) : 0.0;
-  bool get isOverdue => dueDate != null && dueDate!.isBefore(DateTime.now()) && status != 'paid';
+  double get progress =>
+      amount > 0 ? (paidAmount / amount).clamp(0.0, 1.0) : 0.0;
+  bool get isOverdue =>
+      dueDate != null &&
+      dueDate!.isBefore(DateTime.now()) &&
+      status != 'paid';
 }

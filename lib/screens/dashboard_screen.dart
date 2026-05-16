@@ -5,6 +5,7 @@ import '../providers/expense_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/income_provider.dart';
 import '../providers/category_provider.dart';
+import '../providers/category_budget_provider.dart';
 import '../providers/loan_provider.dart';
 import '../providers/wallet_provider.dart';
 import '../models/wallet_model.dart';
@@ -14,6 +15,7 @@ import '../widgets/daily_summary_card.dart';
 import '../widgets/streak_badge.dart';
 import '../utils/app_utils.dart';
 import '../utils/category_icons.dart';
+import '../widgets/hint_banner.dart';
 import 'add_expense_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -243,6 +245,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
 
+                // ── Hints ─────────────────────────────────────────────
+                const HintBanner(
+                  hintKey: 'hint_wallet_swipe',
+                  icon: Icons.swipe_rounded,
+                  title: 'Swipe to see your wallets',
+                  message: 'The card above shows all wallets combined. Swipe left to view Cash, Card, Bank individually.',
+                  color: Color(0xFF4A90E2),
+                ),
+                const HintBanner(
+                  hintKey: 'hint_more_button',
+                  icon: Icons.more_horiz_rounded,
+                  title: 'The ••• button is your shortcut',
+                  message: 'Tap ••• next to the date to access Settings, Loans, Goals, Income and Customize your tabs — all in one place.',
+                  color: Color(0xFF9C27B0),
+                ),
+                const HintBanner(
+                  hintKey: 'hint_add_expense',
+                  icon: Icons.add_circle_outline_rounded,
+                  title: 'Record your spending',
+                  message: 'Tap "+ Add Expense" to log what you spent, which wallet you paid from, and which category it belongs to.',
+                  color: Color(0xFF2ECC71),
+                ),
+                const HintBanner(
+                  hintKey: 'hint_budget_health',
+                  icon: Icons.monitor_heart_rounded,
+                  title: 'Budget Health tracks your limits',
+                  message: 'Go to Settings → Category Budgets to set monthly limits. Budget Health below will show how much you\'ve used.',
+                  color: Color(0xFFFF9800),
+                ),
+
                 // ── Quick Stats Row ───────────────────────────────────
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
@@ -460,27 +492,10 @@ class _WalletCard extends StatelessWidget {
                     Text(card.title,
                       style: TextStyle(color: Colors.white.withOpacity(0.7),
                         fontSize: 13, fontWeight: FontWeight.w500)),
-                    Row(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        // Eye toggle button
-                        GestureDetector(
-                          onTap: onToggleHide,
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              hideBalance
-                                  ? Icons.visibility_off_rounded
-                                  : Icons.visibility_rounded,
-                              color: Colors.white.withOpacity(0.8),
-                              size: 14,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
+                        // Yellow chip
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                           decoration: BoxDecoration(
@@ -493,6 +508,18 @@ class _WalletCard extends StatelessWidget {
                               style: const TextStyle(color: Colors.white,
                                 fontSize: 12, fontWeight: FontWeight.w700)),
                           ]),
+                        ),
+                        const SizedBox(height: 4),
+                        // Eye button below chip
+                        GestureDetector(
+                          onTap: onToggleHide,
+                          child: Icon(
+                            hideBalance
+                                ? Icons.visibility_off_rounded
+                                : Icons.visibility_rounded,
+                            color: Colors.white.withOpacity(0.55),
+                            size: 16,
+                          ),
                         ),
                       ],
                     ),
@@ -606,10 +633,26 @@ class _BudgetHealthCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cats = context.watch<CategoryProvider>();
+    final budgets = context.watch<CategoryBudgetProvider>();
     final catTotals = expenses.getCategoryTotals(now.year, now.month);
-    final budget = settings.monthlyBudget;
 
-    if (catTotals.isEmpty && budget <= 0) return const SizedBox.shrink();
+    // Only show categories that have a budget set
+    final budgetedEntries = catTotals.entries
+        .where((e) => budgets.hasBudget(e.key))
+        .toList()
+      ..sort((a, b) {
+            // Sort by % used descending (most critical first)
+            final pctA = (a.value / budgets.getLimitFor(a.key)).clamp(0.0, 9.0);
+            final pctB = (b.value / budgets.getLimitFor(b.key)).clamp(0.0, 9.0);
+            return pctB.compareTo(pctA);
+          });
+
+    // Also show budgeted categories with 0 spend
+    final allBudgetedCats = cats.categories
+        .where((c) => budgets.hasBudget(c.id))
+        .toList();
+
+    if (allBudgetedCats.isEmpty) return const SizedBox.shrink();
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -627,6 +670,7 @@ class _BudgetHealthCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header
           Row(
             children: [
               Container(
@@ -635,29 +679,50 @@ class _BudgetHealthCard extends StatelessWidget {
                   color: const Color(0xFFFF9800).withOpacity(0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.warning_amber_rounded,
+                child: const Icon(Icons.monitor_heart_rounded,
                     color: Color(0xFFFF9800), size: 18),
               ),
               const SizedBox(width: 10),
-              const Text('Budget Health',
-                  style: TextStyle(
-                      fontWeight: FontWeight.w700, fontSize: 15)),
+              const Expanded(
+                child: Text('Budget Health',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w700, fontSize: 15)),
+              ),
+              Text(
+                '${allBudgetedCats.length} categor${allBudgetedCats.length == 1 ? 'y' : 'ies'}',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: theme.colorScheme.onSurface.withOpacity(0.4),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 14),
-          ...catTotals.entries.take(3).map((e) {
-            final cat = cats.getById(e.key);
-            final catColor =
-                cat != null ? Color(cat.colorValue) : theme.colorScheme.primary;
-            final catBudget = budget > 0 ? budget / catTotals.length : 0.0;
-            final pct =
-                catBudget > 0 ? (e.value / catBudget).clamp(0.0, 1.0) : 0.0;
-            final remaining = catBudget - e.value;
+
+          // Category rows
+          ...allBudgetedCats.map((cat) {
+            final spent = catTotals[cat.id] ?? 0;
+            final limit = budgets.getLimitFor(cat.id);
+            final remaining = limit - spent;
+            final pct = (spent / limit).clamp(0.0, 1.0);
+            final isOver = spent > limit;
+            final catColor = Color(cat.colorValue);
+
+            // Color based on usage
+            Color barColor;
+            if (isOver) {
+              barColor = const Color(0xFFE57373);
+            } else if (pct >= 0.8) {
+              barColor = const Color(0xFFFF9800);
+            } else {
+              barColor = catColor;
+            }
 
             return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.only(bottom: 14),
               child: Row(
                 children: [
+                  // Category icon
                   Container(
                     width: 36, height: 36,
                     decoration: BoxDecoration(
@@ -665,7 +730,7 @@ class _BudgetHealthCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(
-                        CategoryIcons.resolve(cat?.icon ?? ''),
+                        CategoryIcons.resolve(cat.icon),
                         color: catColor,
                         size: 18),
                   ),
@@ -674,40 +739,61 @@ class _BudgetHealthCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Name + remaining/over label
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(cat?.name ?? e.key,
+                            Text(cat.name,
                                 style: const TextStyle(
                                     fontWeight: FontWeight.w600,
                                     fontSize: 13)),
                             Text(
-                              catBudget > 0
-                                  ? '${AppUtils.formatAmount(remaining.abs(), symbol)} ${remaining >= 0 ? 'left' : 'over'}'
-                                  : AppUtils.formatAmount(e.value, symbol),
+                              isOver
+                                  ? '${AppUtils.formatAmount(remaining.abs(), symbol)} over'
+                                  : '${AppUtils.formatAmount(remaining, symbol)} left',
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
-                                color: remaining < 0
+                                color: isOver
                                     ? const Color(0xFFE57373)
-                                    : catColor,
+                                    : theme.colorScheme.onSurface.withOpacity(0.5),
                               ),
                             ),
                           ],
                         ),
-                        if (catBudget > 0) ...[
-                          const SizedBox(height: 4),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: LinearProgressIndicator(
-                              value: pct,
-                              minHeight: 5,
-                              backgroundColor: catColor.withOpacity(0.12),
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(catColor),
-                            ),
+                        const SizedBox(height: 5),
+                        // Progress bar
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: pct,
+                            minHeight: 6,
+                            backgroundColor: barColor.withOpacity(0.12),
+                            valueColor: AlwaysStoppedAnimation<Color>(barColor),
                           ),
-                        ],
+                        ),
+                        const SizedBox(height: 4),
+                        // Spent / budget + percentage
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '${AppUtils.formatAmount(spent, symbol)} of ${AppUtils.formatAmount(limit, symbol)}',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: theme.colorScheme.onSurface.withOpacity(0.4),
+                              ),
+                            ),
+                            Text(
+                              '${(pct * 100).round()}% used',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: barColor,
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),

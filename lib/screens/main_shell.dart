@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:hive/hive.dart';
 import 'package:provider/provider.dart';
 import '../providers/settings_provider.dart';
+import '../widgets/hint_banner.dart';
 import 'dashboard_screen.dart';
 import 'expenses_screen.dart';
 import 'goals_screen.dart';
@@ -179,7 +180,17 @@ class _MainShellState extends State<MainShell> {
             const SizedBox(height: 20),
             const Text('More',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
+
+            // First-time hint inside More menu
+            const HintBanner(
+              hintKey: 'hint_more_menu',
+              icon: Icons.tips_and_updates_rounded,
+              title: 'Everything is here',
+              message: 'Access Settings, move between screens, and customize which tabs appear in your bottom bar.',
+              color: Color(0xFF9C27B0),
+            ),
+            const SizedBox(height: 8),
 
             _MoreTile(
               icon: Icons.settings_rounded,
@@ -207,11 +218,13 @@ class _MainShellState extends State<MainShell> {
                 onTap: () {
                   Navigator.pop(ctx);
                   if (tab.id == 'settings') return;
-                  // Just navigate — do NOT add to nav bar permanently
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => tab.screen),
-                  );
+                  setState(() {
+                    if (!_visibleTabIds.contains(tab.id)) {
+                      _visibleTabIds.add(tab.id);
+                    }
+                    _currentIndex = _visibleTabIds.indexOf(tab.id);
+                    _previousIndex = _currentIndex;
+                  });
                 },
               )),
             ],

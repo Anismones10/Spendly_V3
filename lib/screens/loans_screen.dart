@@ -8,6 +8,7 @@ import '../providers/wallet_provider.dart';
 import '../providers/expense_provider.dart';
 import '../utils/app_utils.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/hint_banner.dart';
 
 class LoansScreen extends StatefulWidget {
   const LoansScreen({super.key});
@@ -54,6 +55,15 @@ class _LoansScreenState extends State<LoansScreen>
       ),
       body: Column(
         children: [
+          // ── Onboarding hint ───────────────────────────────────────────
+          const HintBanner(
+            hintKey: 'hint_loans',
+            icon: Icons.handshake_rounded,
+            title: 'Track money in and out',
+            message: 'Lending = money you gave someone (they owe you).\nBorrowing = money someone gave you (you owe them).\nPick a wallet so your balance stays accurate.',
+            color: Color(0xFF4A90E2),
+          ),
+
           // ── Net balance summary card ──────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),

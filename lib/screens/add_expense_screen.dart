@@ -32,6 +32,27 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   String _recurringType = 'monthly';
   bool _reorderMode = false;
 
+  // Multi-item support
+  bool _useItems = false;
+  final List<_ExpenseItem> _items = [];
+
+  void _addItem() {
+    setState(() => _items.add(_ExpenseItem()));
+  }
+
+  void _removeItem(int index) {
+    setState(() => _items.removeAt(index));
+    _recalcTotal();
+  }
+
+  void _recalcTotal() {
+    final total = _items.fold(0.0, (sum, item) {
+      return sum + (double.tryParse(item.amountCtrl.text) ?? 0);
+    });
+    setState(() => _amountController.text =
+        total > 0 ? total.toStringAsFixed(2) : '');
+  }
+
   @override
   void initState() {
     super.initState();
@@ -60,6 +81,10 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     _nameController.dispose();
     _amountController.dispose();
     _noteController.dispose();
+    for (final item in _items) {
+      item.nameCtrl.dispose();
+      item.amountCtrl.dispose();
+    }
     super.dispose();
   }
 
@@ -151,6 +176,41 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   }
 
   Future<void> _save() async {
+    // If using items mode, validate items and build name/note
+    if (_useItems && _items.isNotEmpty) {
+      final validItems = _items
+          .where((i) =>
+              i.nameCtrl.text.trim().isNotEmpty &&
+              (double.tryParse(i.amountCtrl.text) ?? 0) > 0)
+          .toList();
+      if (validItems.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please add at least one valid item.')),
+        );
+        return;
+      }
+      if (_selectedCategoryId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select a category.')),
+        );
+        return;
+      }
+      // Auto-fill name from items if empty
+      if (_nameController.text.trim().isEmpty) {
+        _nameController.text = validItems.length == 1
+            ? validItems.first.nameCtrl.text.trim()
+            : 'Shopping (${validItems.length} items)';
+      }
+      // Build itemized note
+      final itemLines = validItems
+          .map((i) =>
+              '• ${i.nameCtrl.text.trim()}: ${i.amountCtrl.text}')
+          .join('\n');
+      if (_noteController.text.trim().isEmpty) {
+        _noteController.text = itemLines;
+      }
+    }
+
     if (_nameController.text.isEmpty ||
         _amountController.text.isEmpty ||
         _selectedCategoryId == null) {
@@ -480,19 +540,211 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               _buildLabel('Amount *'),
               const SizedBox(height: 8),
               GestureDetector(
-                onTap: _openCalculator,
+                onTap: _useItems ? null : _openCalculator,
                 child: AbsorbPointer(
+                  absorbing: !_useItems,
                   child: TextField(
                     controller: _amountController,
                     readOnly: true,
                     decoration: InputDecoration(
-                      hintText: 'Tap to enter amount',
+                      hintText: _useItems
+                          ? 'Auto-calculated from items'
+                          : 'Tap to enter amount',
                       prefixIcon: const Icon(Icons.calculate_rounded),
                       suffixText: symbol,
                     ),
                   ),
                 ),
               ).animate().fadeIn(delay: 50.ms, duration: 300.ms).slideY(begin: 0.2),
+              const SizedBox(height: 12),
+
+              // ── Items toggle ──────────────────────────────────────────
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _useItems = !_useItems;
+                    if (_useItems && _items.isEmpty) _addItem();
+                    if (!_useItems) {
+                      _amountController.clear();
+                      _items.clear();
+                    }
+                  });
+                },
+                child: Row(
+                  children: [
+                    Icon(
+                      _useItems
+                          ? Icons.check_box_rounded
+                          : Icons.check_box_outline_blank_rounded,
+                      color: theme.colorScheme.primary,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Add multiple items (shopping list)',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // ── Items list ────────────────────────────────────────────
+              if (_useItems) ...[
+                const SizedBox(height: 12),
+                Container(
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFF1E1E1E)
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: theme.colorScheme.primary.withOpacity(0.2),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      // Item rows
+                      ...List.generate(_items.length, (i) {
+                        final item = _items[i];
+                        return Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                          child: Row(
+                            children: [
+                              // Item name
+                              Expanded(
+                                flex: 3,
+                                child: TextField(
+                                  controller: item.nameCtrl,
+                                  decoration: InputDecoration(
+                                    hintText: 'Item ${i + 1}',
+                                    border: InputBorder.none,
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 10),
+                                  ),
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                              ),
+                              // Item amount
+                              Expanded(
+                                flex: 2,
+                                child: GestureDetector(
+                                  onTap: () async {
+                                    final result =
+                                        await showModalBottomSheet<double>(
+                                      context: context,
+                                      isScrollControlled: true,
+                                      backgroundColor: Colors.transparent,
+                                      builder: (_) => CalculatorSheet(
+                                        initial: double.tryParse(
+                                                item.amountCtrl.text) ??
+                                            0,
+                                      ),
+                                    );
+                                    if (result != null) {
+                                      setState(() => item.amountCtrl.text =
+                                          result.toStringAsFixed(2));
+                                      _recalcTotal();
+                                    }
+                                  },
+                                  child: AbsorbPointer(
+                                    child: TextField(
+                                      controller: item.amountCtrl,
+                                      readOnly: true,
+                                      decoration: InputDecoration(
+                                        hintText: '0.00',
+                                        suffixText: symbol,
+                                        border: InputBorder.none,
+                                        isDense: true,
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                                horizontal: 8, vertical: 10),
+                                      ),
+                                      style: const TextStyle(fontSize: 14),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // Delete button
+                              if (_items.length > 1)
+                                GestureDetector(
+                                  onTap: () => _removeItem(i),
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(left: 4),
+                                    child: Icon(Icons.close_rounded,
+                                        size: 18,
+                                        color: theme.colorScheme.onSurface
+                                            .withOpacity(0.3)),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      }),
+
+                      // Divider + total
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                        child: Divider(
+                            color: theme.colorScheme.onSurface.withOpacity(0.1)),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Total',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13,
+                                    color: theme.colorScheme.onSurface
+                                        .withOpacity(0.6))),
+                            Text(
+                              '$symbol${_amountController.text.isEmpty ? '0.00' : _amountController.text}',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 15,
+                                  color: theme.colorScheme.primary),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Add item button
+                      GestureDetector(
+                        onTap: _addItem,
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary.withOpacity(0.06),
+                            borderRadius: const BorderRadius.vertical(
+                                bottom: Radius.circular(16)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.add_rounded,
+                                  color: theme.colorScheme.primary, size: 18),
+                              const SizedBox(width: 6),
+                              Text('Add Item',
+                                  style: TextStyle(
+                                      color: theme.colorScheme.primary,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
               const SizedBox(height: 20),
 
               // ── Pay With ──────────────────────────────────────────────
@@ -1125,4 +1377,11 @@ class _BalanceRow extends StatelessWidget {
       ],
     );
   }
+}
+
+// ── Expense Item Model ────────────────────────────────────────────────────────
+
+class _ExpenseItem {
+  final TextEditingController nameCtrl = TextEditingController();
+  final TextEditingController amountCtrl = TextEditingController();
 }

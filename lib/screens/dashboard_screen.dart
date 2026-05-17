@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:hive/hive.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../providers/expense_provider.dart';
@@ -41,6 +42,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    // Restore hide balance from Hive so it persists across tab switches
+    final box = Hive.box('settings');
+    _hideBalance = box.get('hideBalance', defaultValue: false) as bool;
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       CoachMarkHelper.showDashboard(
@@ -51,6 +56,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
         fabKey: _fabKey,
       );
     });
+  }
+
+  void _toggleHideBalance() {
+    final newValue = !_hideBalance;
+    setState(() => _hideBalance = newValue);
+    // Save to Hive so it persists
+    Hive.box('settings').put('hideBalance', newValue);
   }
 
   @override
@@ -216,8 +228,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           card: card,
                           symbol: symbol,
                           hideBalance: _hideBalance,
-                          onToggleHide: () =>
-                              setState(() => _hideBalance = !_hideBalance),
+                          onToggleHide: _toggleHideBalance,
                         ),
                       );
                     },

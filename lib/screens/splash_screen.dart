@@ -45,29 +45,45 @@ class _SplashScreenState extends State<SplashScreen> {
 
     return Scaffold(
       backgroundColor:
-          isDark ? const Color(0xFF121212) : const Color(0xFF1E3A5F),
+          isDark ? const Color(0xFF121212) : Colors.white,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // App icon / logo
+            // App icon / logo — bigger, no clashing bg in dark
             Container(
-              width: 110,
-              height: 110,
+              width: 150,
+              height: 150,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(28),
+                color: isDark
+                    ? const Color(0xFF1E1E1E)
+                    : const Color(0xFF1E3A5F).withOpacity(0.06),
+                borderRadius: BorderRadius.circular(36),
                 border: Border.all(
-                    color: Colors.white.withOpacity(0.2), width: 1.5),
+                  color: isDark
+                      ? Colors.white.withOpacity(0.08)
+                      : const Color(0xFF1E3A5F).withOpacity(0.12),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: isDark
+                        ? Colors.black.withOpacity(0.4)
+                        : const Color(0xFF1E3A5F).withOpacity(0.15),
+                    blurRadius: 30,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
               ),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
                 child: Image.asset(
                   isDark
                       ? 'assets/images/logo_dark.png'
                       : 'assets/images/logo_light.png',
-                  width: 70,
-                  height: 70,
                   fit: BoxFit.contain,
                 ),
+              ),
             )
                 .animate()
                 .scale(
@@ -80,11 +96,11 @@ class _SplashScreenState extends State<SplashScreen> {
             const SizedBox(height: 28),
 
             // App name
-            const Text(
+            Text(
               'Spendly',
               style: TextStyle(
-                color: Colors.white,
-                fontSize: 36,
+                color: isDark ? Colors.white : const Color(0xFF1E3A5F),
+                fontSize: 38,
                 fontWeight: FontWeight.w800,
                 letterSpacing: -1,
               ),
@@ -95,19 +111,20 @@ class _SplashScreenState extends State<SplashScreen> {
 
             const SizedBox(height: 10),
 
-            // Tagline
-            Text(
-              'Track. Save. Grow.',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.65),
-                fontSize: 16,
-                fontWeight: FontWeight.w400,
-                letterSpacing: 1.5,
-              ),
-            )
-                .animate()
-                .fadeIn(delay: 700.ms, duration: 500.ms)
-                .slideY(begin: 0.3, end: 0),
+            // Tagline — only in light mode
+            if (!isDark)
+              Text(
+                'Track. Save. Grow.',
+                style: TextStyle(
+                  color: const Color(0xFF1E3A5F).withOpacity(0.5),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w400,
+                  letterSpacing: 1.5,
+                ),
+              )
+                  .animate()
+                  .fadeIn(delay: 700.ms, duration: 500.ms)
+                  .slideY(begin: 0.3, end: 0),
 
             const SizedBox(height: 80),
 
@@ -120,7 +137,9 @@ class _SplashScreenState extends State<SplashScreen> {
                   width: 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.6),
+                    color: isDark
+                        ? Colors.white.withOpacity(0.4)
+                        : const Color(0xFF1E3A5F).withOpacity(0.4),
                     shape: BoxShape.circle,
                   ),
                 )

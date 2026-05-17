@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -15,7 +16,7 @@ import '../widgets/daily_summary_card.dart';
 import '../widgets/streak_badge.dart';
 import '../utils/app_utils.dart';
 import '../utils/category_icons.dart';
-import '../widgets/hint_banner.dart';
+import '../utils/coach_mark_helper.dart';
 import 'add_expense_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -30,6 +31,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final PageController _cardController = PageController();
   int _currentCard = 0;
   bool _hideBalance = false;
+
+  // Coach mark keys
+  final GlobalKey _walletCardKey = GlobalKey();
+  final GlobalKey _moreButtonKey = GlobalKey();
+  final GlobalKey _quickStatsKey = GlobalKey();
+  final GlobalKey _fabKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      CoachMarkHelper.showDashboard(
+        context,
+        walletCardKey: _walletCardKey,
+        moreButtonKey: _moreButtonKey,
+        quickStatsKey: _quickStatsKey,
+        fabKey: _fabKey,
+      );
+    });
+  }
 
   @override
   void dispose() {
@@ -96,18 +118,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
         slivers: [
           // ── App Bar ──────────────────────────────────────────────────
           SliverAppBar(
-            expandedHeight: 80,
-            floating: false,
+            expandedHeight: 60,
+            floating: true,
             pinned: true,
+            elevation: 0,
             backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
             flexibleSpace: FlexibleSpaceBar(
-              titlePadding: const EdgeInsets.only(left: 20, bottom: 14),
-              title: Text(
-                'Spendly',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: theme.colorScheme.onSurface,
+              titlePadding: const EdgeInsets.only(left: 20, bottom: 12),
+              title: ShaderMask(
+                shaderCallback: (bounds) => LinearGradient(
+                  colors: [
+                    theme.colorScheme.primary,
+                    theme.colorScheme.primary.withOpacity(0.7),
+                  ],
+                ).createShader(bounds),
+                child: Text(
+                  'Spendly',
+                  style: TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    letterSpacing: -0.5,
+                    shadows: [
+                      Shadow(
+                        color: theme.colorScheme.primary.withOpacity(0.6),
+                        blurRadius: 12,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -116,8 +154,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 margin: const EdgeInsets.only(right: 4),
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withOpacity(0.1),
+                  color: theme.colorScheme.primary.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: theme.colorScheme.primary.withOpacity(0.2),
+                      blurRadius: 8,
+                    ),
+                  ],
                 ),
                 child: Text(
                   _todayDate(),
@@ -132,6 +176,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 GestureDetector(
                   onTap: widget.onMoreTap,
                   child: Container(
+                    key: _moreButtonKey,
                     margin: const EdgeInsets.only(right: 8),
                     padding: const EdgeInsets.all(7),
                     decoration: BoxDecoration(
@@ -157,7 +202,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                 // ── Swipeable Wallet Cards ────────────────────────────
                 SizedBox(
-                  height: 250,
+                  key: _walletCardKey,
+                  height: 310,
                   child: PageView.builder(
                     controller: _cardController,
                     itemCount: allCards.length,
@@ -245,38 +291,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
 
-                // ── Hints ─────────────────────────────────────────────
-                const HintBanner(
-                  hintKey: 'hint_wallet_swipe',
-                  icon: Icons.swipe_rounded,
-                  title: 'Swipe to see your wallets',
-                  message: 'The card above shows all wallets combined. Swipe left to view Cash, Card, Bank individually.',
-                  color: Color(0xFF4A90E2),
-                ),
-                const HintBanner(
-                  hintKey: 'hint_more_button',
-                  icon: Icons.more_horiz_rounded,
-                  title: 'The ••• button is your shortcut',
-                  message: 'Tap ••• next to the date to access Settings, Loans, Goals, Income and Customize your tabs — all in one place.',
-                  color: Color(0xFF9C27B0),
-                ),
-                const HintBanner(
-                  hintKey: 'hint_add_expense',
-                  icon: Icons.add_circle_outline_rounded,
-                  title: 'Record your spending',
-                  message: 'Tap "+ Add Expense" to log what you spent, which wallet you paid from, and which category it belongs to.',
-                  color: Color(0xFF2ECC71),
-                ),
-                const HintBanner(
-                  hintKey: 'hint_budget_health',
-                  icon: Icons.monitor_heart_rounded,
-                  title: 'Budget Health tracks your limits',
-                  message: 'Go to Settings → Category Budgets to set monthly limits. Budget Health below will show how much you\'ve used.',
-                  color: Color(0xFFFF9800),
-                ),
-
                 // ── Quick Stats Row ───────────────────────────────────
                 Padding(
+                  key: _quickStatsKey,
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
                   child: Row(
                     children: [
@@ -322,7 +339,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 // ── Daily Summary ─────────────────────────────────────
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: const DailySummaryCard().animate().fadeIn(delay: 450.ms),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF6C63FF).withOpacity(0.15),
+                          blurRadius: 20,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: const DailySummaryCard(),
+                  ).animate().fadeIn(delay: 450.ms),
                 ),
 
                 const SizedBox(height: 16),
@@ -359,6 +388,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
 
       floatingActionButton: FloatingActionButton.extended(
+        key: _fabKey,
         onPressed: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const AddExpenseScreen()),
@@ -436,14 +466,17 @@ class _WalletCard extends StatelessWidget {
         : 0.0;
     final isOver = card.spent > card.totalBalance && card.totalBalance > 0;
 
-    // Color: navy for All Wallets, wallet's own color for individuals
     final Color cardColor = card.isAllWallets
         ? const Color(0xFF1E3A5F)
         : Color(card.colorValue ?? 0xFF1E3A5F);
     final Color cardColorDark = card.isAllWallets
         ? const Color(0xFF0F2440)
         : HSLColor.fromColor(Color(card.colorValue ?? 0xFF1E3A5F))
-            .withLightness((HSLColor.fromColor(Color(card.colorValue ?? 0xFF1E3A5F)).lightness - 0.15).clamp(0.0, 1.0))
+            .withLightness((HSLColor.fromColor(
+                        Color(card.colorValue ?? 0xFF1E3A5F))
+                    .lightness -
+                0.15)
+            .clamp(0.0, 1.0))
             .toColor();
 
     IconData walletIcon = Icons.account_balance_wallet_rounded;
@@ -453,159 +486,290 @@ class _WalletCard extends StatelessWidget {
 
     final isNetPositive = card.netLoan >= 0;
 
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: LinearGradient(
-          colors: [cardColor, cardColorDark],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: cardColor.withOpacity(0.5),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            gradient: LinearGradient(
+              colors: [
+                cardColor.withOpacity(0.75),
+                cardColorDark.withOpacity(0.88),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.18),
+              width: 1.2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: cardColor.withOpacity(0.45),
+                blurRadius: 28,
+                offset: const Offset(0, 12),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          Positioned(top: -30, right: -20,
-            child: Container(width: 130, height: 130,
-              decoration: BoxDecoration(shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.04)))),
-          Positioned(bottom: -40, right: 60,
-            child: Container(width: 160, height: 160,
-              decoration: BoxDecoration(shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.03)))),
+          child: Stack(
+            children: [
+              // Glass shine overlay
+              Positioned(
+                top: -60, left: -40,
+                child: Container(
+                  width: 200, height: 200,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(0.06),
+                  ),
+                ),
+              ),
+              Positioned(
+                bottom: -50, right: -30,
+                child: Container(
+                  width: 180, height: 180,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(0.04),
+                  ),
+                ),
+              ),
 
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Top row
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(card.title,
-                      style: TextStyle(color: Colors.white.withOpacity(0.7),
-                        fontSize: 13, fontWeight: FontWeight.w500)),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                    // Top row — title | eye | yellow chip
+                    Row(
                       children: [
-                        // Yellow chip
+                        // Wallet title
+                        Expanded(
+                          child: Text(card.title,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.85),
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.3,
+                            )),
+                        ),
+                        // Eye button — center between title and chip
+                        GestureDetector(
+                          onTap: onToggleHide,
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.15),
+                                width: 1,
+                              ),
+                            ),
+                            child: Icon(
+                              hideBalance
+                                  ? Icons.visibility_off_rounded
+                                  : Icons.visibility_rounded,
+                              color: Colors.white.withOpacity(0.85),
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        // Yellow chip — far right
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 7),
                           decoration: BoxDecoration(
-                            color: Colors.amber.withOpacity(0.85),
-                            borderRadius: BorderRadius.circular(10)),
+                            color: Colors.amber.withOpacity(0.9),
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.amber.withOpacity(0.45),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
                           child: Row(mainAxisSize: MainAxisSize.min, children: [
                             Icon(walletIcon, color: Colors.white, size: 14),
                             const SizedBox(width: 6),
                             Text(_fmt(card.totalBalance),
-                              style: const TextStyle(color: Colors.white,
-                                fontSize: 12, fontWeight: FontWeight.w700)),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800)),
                           ]),
-                        ),
-                        const SizedBox(height: 4),
-                        // Eye button below chip
-                        GestureDetector(
-                          onTap: onToggleHide,
-                          child: Icon(
-                            hideBalance
-                                ? Icons.visibility_off_rounded
-                                : Icons.visibility_rounded,
-                            color: Colors.white.withOpacity(0.55),
-                            size: 16,
-                          ),
                         ),
                       ],
                     ),
+
+                    const SizedBox(height: 10),
+
+                    // BIG remaining number
+                    Text(
+                      _fmt(card.remaining),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 48,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -2,
+                        height: 1.0,
+                        shadows: [
+                          Shadow(
+                            color: Colors.white.withOpacity(0.3),
+                            blurRadius: 16,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text('remaining',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.55),
+                        fontSize: 13,
+                        letterSpacing: 0.5,
+                      )),
+
+                    // Net row (below big number)
+                    if (card.isAllWallets &&
+                        (card.borrowed > 0 || card.lentOut > 0)) ...[
+                      const SizedBox(height: 6),
+                      Row(children: [
+                        Text('Net  ',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.55),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500)),
+                        Text(
+                          _fmt(card.remaining - card.borrowed + card.lentOut),
+                          style: TextStyle(
+                            color: const Color(0xFF4A90E2),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            shadows: [
+                              Shadow(
+                                color: const Color(0xFF4A90E2).withOpacity(0.7),
+                                blurRadius: 10,
+                              ),
+                            ],
+                          )),
+                      ]),
+                    ],
+
+                    const Spacer(),
+
+                    // Borrowed / Lent rows — always reserve space for All Wallets
+                    if (card.isAllWallets) ...[
+                      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('+ Borrowed',
+                            style: TextStyle(
+                              color: card.borrowed > 0
+                                  ? const Color(0xFF2ECC71).withOpacity(0.9)
+                                  : Colors.white.withOpacity(0.25),
+                              fontSize: 13, fontWeight: FontWeight.w600)),
+                          Text(_fmt(card.borrowed),
+                            style: TextStyle(
+                              color: card.borrowed > 0
+                                  ? const Color(0xFF2ECC71)
+                                  : Colors.white.withOpacity(0.25),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              shadows: card.borrowed > 0 ? [
+                                Shadow(
+                                  color: const Color(0xFF2ECC71).withOpacity(0.6),
+                                  blurRadius: 8,
+                                ),
+                              ] : null,
+                            )),
+                        ]),
+                      const SizedBox(height: 4),
+                      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('- Lent out',
+                            style: TextStyle(
+                              color: card.lentOut > 0
+                                  ? const Color(0xFFE57373).withOpacity(0.9)
+                                  : Colors.white.withOpacity(0.25),
+                              fontSize: 13, fontWeight: FontWeight.w600)),
+                          Text(_fmt(card.lentOut),
+                            style: TextStyle(
+                              color: card.lentOut > 0
+                                  ? const Color(0xFFE57373)
+                                  : Colors.white.withOpacity(0.25),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              shadows: card.lentOut > 0 ? [
+                                Shadow(
+                                  color: const Color(0xFFE57373).withOpacity(0.6),
+                                  blurRadius: 8,
+                                ),
+                              ] : null,
+                            )),
+                        ]),
+                      const SizedBox(height: 10),
+                    ],
+
+                    // Progress bar
+                    Row(mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Spent ${_fmt(card.spent)}',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.5),
+                            fontSize: 11)),
+                        if (card.totalBalance > 0)
+                          Text('${(pct * 100).round()}% used',
+                            style: TextStyle(
+                              color: isOver
+                                  ? const Color(0xFFE57373)
+                                  : const Color(0xFF2ECC71),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700)),
+                      ]),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: Stack(children: [
+                        Container(
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                        FractionallySizedBox(
+                          widthFactor: pct,
+                          child: Container(
+                            height: 5,
+                            decoration: BoxDecoration(
+                              color: isOver
+                                  ? const Color(0xFFE57373)
+                                  : pct > 0.75
+                                      ? const Color(0xFFFF9800)
+                                      : const Color(0xFF2ECC71),
+                              borderRadius: BorderRadius.circular(6),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: (isOver
+                                          ? const Color(0xFFE57373)
+                                          : const Color(0xFF2ECC71))
+                                      .withOpacity(0.6),
+                                  blurRadius: 4,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ]),
+                    ),
                   ],
                 ),
-
-                const SizedBox(height: 8),
-
-                // Big number — what's physically in wallet right now
-                Text(
-                  _fmt(card.remaining),
-                  style: const TextStyle(color: Colors.white,
-                    fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -1)),
-                Text('remaining',
-                  style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
-
-                // Net — your TRUE money (remaining minus what belongs to others)
-                if (card.isAllWallets && (card.borrowed > 0 || card.lentOut > 0)) ...[
-                  const SizedBox(height: 4),
-                  Row(children: [
-                    Text('Net  ', style: TextStyle(
-                      color: Colors.white.withOpacity(0.45),
-                      fontSize: 11, fontWeight: FontWeight.w500)),
-                    Text(
-                      _fmt(card.remaining - card.borrowed + card.lentOut),
-                      style: const TextStyle(
-                        color: Color(0xFF4A90E2),
-                        fontSize: 11, fontWeight: FontWeight.w700)),
-                  ]),
-                ],
-
-                const SizedBox(height: 8),
-
-                // Borrowed / Lent rows
-                if (card.isAllWallets && (card.borrowed > 0 || card.lentOut > 0)) ...[
-                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                    Text('+ Borrowed', style: TextStyle(
-                      color: const Color(0xFF2ECC71).withOpacity(0.9),
-                      fontSize: 11, fontWeight: FontWeight.w500)),
-                    Text(_fmt(card.borrowed),
-                      style: const TextStyle(color: Color(0xFF2ECC71),
-                        fontSize: 11, fontWeight: FontWeight.w600)),
-                  ]),
-                  const SizedBox(height: 2),
-                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                    Text('- Lent out', style: TextStyle(
-                      color: const Color(0xFFE57373).withOpacity(0.9),
-                      fontSize: 11, fontWeight: FontWeight.w500)),
-                    Text(_fmt(card.lentOut),
-                      style: const TextStyle(color: Color(0xFFE57373),
-                        fontSize: 11, fontWeight: FontWeight.w600)),
-                  ]),
-                  const SizedBox(height: 4),
-                ],
-
-                const Spacer(),
-
-                // Progress bar
-                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  Text('Spent ${_fmt(card.spent)}',
-                    style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11)),
-                  if (card.totalBalance > 0)
-                    Text('${(pct * 100).round()}% used',
-                      style: TextStyle(
-                        color: isOver ? const Color(0xFFE57373) : const Color(0xFF2ECC71),
-                        fontSize: 11, fontWeight: FontWeight.w700)),
-                ]),
-                const SizedBox(height: 6),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: Stack(children: [
-                    Container(height: 6, color: Colors.white.withOpacity(0.12)),
-                    FractionallySizedBox(
-                      widthFactor: pct,
-                      child: Container(
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: isOver ? const Color(0xFFE57373)
-                              : pct > 0.75 ? const Color(0xFFFF9800) : const Color(0xFF2ECC71),
-                          borderRadius: BorderRadius.circular(6)))),
-                  ]),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -641,7 +805,6 @@ class _BudgetHealthCard extends StatelessWidget {
         .where((e) => budgets.hasBudget(e.key))
         .toList()
       ..sort((a, b) {
-            // Sort by % used descending (most critical first)
             final pctA = (a.value / budgets.getLimitFor(a.key)).clamp(0.0, 9.0);
             final pctB = (b.value / budgets.getLimitFor(b.key)).clamp(0.0, 9.0);
             return pctB.compareTo(pctA);
@@ -664,7 +827,15 @@ class _BudgetHealthCard extends StatelessWidget {
           width: 1,
         ),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)
+          BoxShadow(
+            color: const Color(0xFFFF9800).withOpacity(0.15),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+          ),
         ],
       ),
       child: Column(
@@ -834,11 +1005,16 @@ class _QuickStatCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withOpacity(0.12), width: 1),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 10,
+              color: color.withOpacity(0.18),
+              blurRadius: 16,
               offset: const Offset(0, 4),
+            ),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
             ),
           ],
         ),

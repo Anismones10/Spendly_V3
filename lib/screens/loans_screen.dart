@@ -7,8 +7,8 @@ import '../providers/settings_provider.dart';
 import '../providers/wallet_provider.dart';
 import '../providers/expense_provider.dart';
 import '../utils/app_utils.dart';
+import '../utils/coach_mark_helper.dart';
 import '../widgets/empty_state.dart';
-import '../widgets/hint_banner.dart';
 
 class LoansScreen extends StatefulWidget {
   const LoansScreen({super.key});
@@ -21,10 +21,24 @@ class _LoansScreenState extends State<LoansScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
+  // Coach mark keys
+  final GlobalKey _lendingTabKey = GlobalKey();
+  final GlobalKey _borrowingTabKey = GlobalKey();
+  final GlobalKey _addButtonKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      CoachMarkHelper.showLoans(
+        context,
+        lendingTabKey: _lendingTabKey,
+        borrowingTabKey: _borrowingTabKey,
+        addButtonKey: _addButtonKey,
+      );
+    });
   }
 
   @override
@@ -55,15 +69,6 @@ class _LoansScreenState extends State<LoansScreen>
       ),
       body: Column(
         children: [
-          // ── Onboarding hint ───────────────────────────────────────────
-          const HintBanner(
-            hintKey: 'hint_loans',
-            icon: Icons.handshake_rounded,
-            title: 'Track money in and out',
-            message: 'Lending = money you gave someone (they owe you).\nBorrowing = money someone gave you (you owe them).\nPick a wallet so your balance stays accurate.',
-            color: Color(0xFF4A90E2),
-          ),
-
           // ── Net balance summary card ──────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
@@ -309,6 +314,7 @@ class _LoansScreenState extends State<LoansScreen>
                 dividerColor: Colors.transparent,
                 tabs: [
                   Tab(
+                    key: _lendingTabKey,
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -333,6 +339,7 @@ class _LoansScreenState extends State<LoansScreen>
                     ),
                   ),
                   Tab(
+                    key: _borrowingTabKey,
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -382,6 +389,7 @@ class _LoansScreenState extends State<LoansScreen>
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        key: _addButtonKey,
         onPressed: () => _showAddLoan(
             context,
             _tabController.index == 0 ? 'lending' : 'borrowing'),

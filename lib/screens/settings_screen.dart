@@ -117,7 +117,8 @@ class SettingsScreen extends StatelessWidget {
           _SectionHeader('Data'),
           _SettingTile(
             icon: Icons.download_rounded,
-            title: 'Export as CSV',
+            title: 'Export Expenses',
+            subtitle: 'Save expenses as CSV',
             onTap: () async {
               final expenses = context.read<ExpenseProvider>();
               final categories = context.read<CategoryProvider>();
@@ -126,6 +127,47 @@ class SettingsScreen extends StatelessWidget {
               };
               await CsvHelper.exportExpenses(
                   expenses.allExpenses, catMap, settings.currencySymbol);
+            },
+          ),
+          _SettingTile(
+            icon: Icons.download_rounded,
+            title: 'Export Income',
+            subtitle: 'Save income as CSV',
+            onTap: () async {
+              final income = context.read<IncomeProvider>();
+              await CsvHelper.exportIncome(
+                  income.allIncome, settings.currencySymbol);
+            },
+          ),
+          _SettingTile(
+            icon: Icons.download_rounded,
+            title: 'Export Loans',
+            subtitle: 'Save lending & borrowing as CSV',
+            onTap: () async {
+              final loans = context.read<LoanProvider>();
+              await CsvHelper.exportLoans(
+                  loans.allLoans, settings.currencySymbol);
+            },
+          ),
+          _SettingTile(
+            icon: Icons.download_for_offline_rounded,
+            title: 'Export All Data',
+            subtitle: 'Expenses + Income + Loans in one file',
+            onTap: () async {
+              final expenses = context.read<ExpenseProvider>();
+              final categories = context.read<CategoryProvider>();
+              final income = context.read<IncomeProvider>();
+              final loans = context.read<LoanProvider>();
+              final catMap = {
+                for (final c in categories.categories) c.id: c
+              };
+              await CsvHelper.exportAll(
+                expenses.allExpenses,
+                catMap,
+                income.allIncome,
+                loans.allLoans,
+                settings.currencySymbol,
+              );
             },
           ),
           _SettingTile(
@@ -760,8 +802,23 @@ class _WalletSheet extends StatefulWidget {
 
 class _WalletSheetState extends State<_WalletSheet> {
   final _nameCtrl = TextEditingController();
-  final _balanceCtrl = TextEditingController();
   String _selectedType = 'cash';
+  late Color _selectedColor;
+
+  static const List<Color> _palette = [
+    Color(0xFF4CAF50), // green (cash default)
+    Color(0xFF1E3A5F), // navy (card default)
+    Color(0xFF2196F3), // blue (bank default)
+    Color(0xFF9C27B0), // purple (savings default)
+    Color(0xFFE57373), // red
+    Color(0xFFFF9800), // orange
+    Color(0xFF00BCD4), // cyan
+    Color(0xFFFF6B6B), // coral
+    Color(0xFF4ECDC4), // teal
+    Color(0xFFFFBE76), // yellow
+    Color(0xFF6C63FF), // indigo
+    Color(0xFFE91E63), // pink
+  ];
 
   final List<Map<String, dynamic>> _types = [
     {'type': 'cash', 'label': 'Cash', 'icon': Icons.payments_rounded},
@@ -775,16 +832,16 @@ class _WalletSheetState extends State<_WalletSheet> {
     super.initState();
     if (widget.existing != null) {
       _nameCtrl.text = widget.existing!.name;
-      _balanceCtrl.text =
-          widget.existing!.balance.toStringAsFixed(2);
       _selectedType = widget.existing!.type;
+      _selectedColor = Color(widget.existing!.colorValue);
+    } else {
+      _selectedColor = Color(WalletProvider.colorForType(_selectedType));
     }
   }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _balanceCtrl.dispose();
     super.dispose();
   }
 
@@ -792,16 +849,14 @@ class _WalletSheetState extends State<_WalletSheet> {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) return;
     final provider = context.read<WalletProvider>();
-    // When editing, keep the existing balance — only set on creation
-    final balance = widget.existing != null
-        ? widget.existing!.balance
-        : (double.tryParse(_balanceCtrl.text) ?? 0);
+    // Balance always preserved from existing, or starts at 0 for new wallets
+    final balance = widget.existing?.balance ?? 0;
     final wallet = WalletModel(
       id: widget.existing?.id ?? AppUtils.generateId(),
       name: name,
       type: _selectedType,
       balance: balance,
-      colorValue: WalletProvider.colorForType(_selectedType),
+      colorValue: _selectedColor.value,
       icon: _selectedType,
     );
     if (widget.existing != null) {
@@ -857,77 +912,34 @@ class _WalletSheetState extends State<_WalletSheet> {
                 ),
               ),
               const SizedBox(height: 12),
-              // Balance field only shown when creating a new wallet
-              // Editing balance is disabled — use Income to add money instead
-              if (widget.existing == null)
-                TextField(
-                  controller: _balanceCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true),
-                  decoration: InputDecoration(
-                    hintText: 'Initial balance',
-                    prefixIcon: const Icon(Icons.attach_money_rounded),
-                    suffixText: settings.currencySymbol,
-                  ),
-                )
-              else
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? const Color(0xFF2A2A2A)
-                        : Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline_rounded,
-                          color: Theme.of(context).colorScheme.primary, size: 18),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'To change your balance, add income or record an expense.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.55),
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               const SizedBox(height: 16),
               const Text('Type',
-                  style: TextStyle(
-                      fontWeight: FontWeight.w600, fontSize: 14)),
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
               const SizedBox(height: 10),
               Row(
                 children: _types.map((t) {
                   final isSelected = _selectedType == t['type'];
-                  final color = Color(
-                      WalletProvider.colorForType(t['type'] as String));
+                  final color = Color(WalletProvider.colorForType(t['type'] as String));
                   return Expanded(
                     child: GestureDetector(
-                      onTap: () => setState(
-                          () => _selectedType = t['type'] as String),
+                      onTap: () => setState(() {
+                        _selectedType = t['type'] as String;
+                        // Reset to type default color
+                        _selectedColor = Color(WalletProvider.colorForType(_selectedType));
+                      }),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
-                        margin:
-                            const EdgeInsets.symmetric(horizontal: 3),
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 10),
+                        margin: const EdgeInsets.symmetric(horizontal: 3),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? color.withOpacity(0.15)
+                              ? _selectedColor.withOpacity(0.15)
                               : (isDark
                                   ? const Color(0xFF2A2A2A)
                                   : Colors.grey.shade100),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: isSelected
-                                ? color
-                                : Colors.transparent,
+                            color: isSelected ? _selectedColor : Colors.transparent,
                             width: 1.5,
                           ),
                         ),
@@ -935,9 +947,8 @@ class _WalletSheetState extends State<_WalletSheet> {
                           children: [
                             Icon(t['icon'] as IconData,
                                 color: isSelected
-                                    ? color
-                                    : theme.colorScheme.onSurface
-                                        .withOpacity(0.35),
+                                    ? _selectedColor
+                                    : theme.colorScheme.onSurface.withOpacity(0.35),
                                 size: 20),
                             const SizedBox(height: 4),
                             Text(t['label'] as String,
@@ -945,12 +956,48 @@ class _WalletSheetState extends State<_WalletSheet> {
                                     fontSize: 10,
                                     fontWeight: FontWeight.w600,
                                     color: isSelected
-                                        ? color
-                                        : theme.colorScheme.onSurface
-                                            .withOpacity(0.4))),
+                                        ? _selectedColor
+                                        : theme.colorScheme.onSurface.withOpacity(0.4))),
                           ],
                         ),
                       ),
+                    ),
+                  );
+                }).toList(),
+              ),
+
+              const SizedBox(height: 20),
+              const Text('Color',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: _palette.map((color) {
+                  final isSelected = _selectedColor.value == color.value;
+                  return GestureDetector(
+                    onTap: () => setState(() => _selectedColor = color),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      width: 38, height: 38,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isSelected ? Colors.white : Colors.transparent,
+                          width: 3,
+                        ),
+                        boxShadow: isSelected
+                            ? [BoxShadow(
+                                color: color.withOpacity(0.6),
+                                blurRadius: 10,
+                                spreadRadius: 2)]
+                            : null,
+                      ),
+                      child: isSelected
+                          ? const Icon(Icons.check_rounded,
+                              color: Colors.white, size: 18)
+                          : null,
                     ),
                   );
                 }).toList(),

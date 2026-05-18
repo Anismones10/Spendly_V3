@@ -54,17 +54,9 @@ class _SplashScreenState extends State<SplashScreen> {
             Container(
               width: 150,
               height: 150,
+              clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
-                color: isDark
-                    ? const Color(0xFF1E1E1E)
-                    : const Color(0xFF1E3A5F).withOpacity(0.06),
                 borderRadius: BorderRadius.circular(36),
-                border: Border.all(
-                  color: isDark
-                      ? Colors.white.withOpacity(0.08)
-                      : const Color(0xFF1E3A5F).withOpacity(0.12),
-                  width: 1.5,
-                ),
                 boxShadow: [
                   BoxShadow(
                     color: isDark
@@ -75,14 +67,13 @@ class _SplashScreenState extends State<SplashScreen> {
                   ),
                 ],
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Image.asset(
-                  isDark
-                      ? 'assets/images/logo_dark.png'
-                      : 'assets/images/logo_light.png',
-                  fit: BoxFit.contain,
-                ),
+              child: Image.asset(
+                isDark
+                    ? 'assets/images/logo_dark.png'
+                    : 'assets/images/logo_light.png',
+                fit: BoxFit.cover,
+                width: 150,
+                height: 150,
               ),
             )
                 .animate()
@@ -111,20 +102,21 @@ class _SplashScreenState extends State<SplashScreen> {
 
             const SizedBox(height: 10),
 
-            // Tagline — only in light mode
-            if (!isDark)
-              Text(
-                'Track. Save. Grow.',
-                style: TextStyle(
-                  color: const Color(0xFF1E3A5F).withOpacity(0.5),
-                  fontSize: 16,
-                  fontWeight: FontWeight.w400,
-                  letterSpacing: 1.5,
-                ),
-              )
-                  .animate()
-                  .fadeIn(delay: 700.ms, duration: 500.ms)
-                  .slideY(begin: 0.3, end: 0),
+            // Tagline — both themes, different colors
+            Text(
+              'Track. Save. Grow.',
+              style: TextStyle(
+                color: isDark
+                    ? Colors.white.withOpacity(0.4)
+                    : const Color(0xFF1E3A5F).withOpacity(0.5),
+                fontSize: 16,
+                fontWeight: FontWeight.w400,
+                letterSpacing: 1.5,
+              ),
+            )
+                .animate()
+                .fadeIn(delay: 700.ms, duration: 500.ms)
+                .slideY(begin: 0.3, end: 0),
 
             const SizedBox(height: 80),
 

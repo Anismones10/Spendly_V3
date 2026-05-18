@@ -14,7 +14,8 @@ import '../utils/category_icons.dart';
 import 'add_expense_screen.dart';
 
 class ExpensesScreen extends StatefulWidget {
-  const ExpensesScreen({super.key});
+  final VoidCallback? onMoreTap;
+  const ExpensesScreen({super.key, this.onMoreTap});
 
   @override
   State<ExpensesScreen> createState() => _ExpensesScreenState();
@@ -166,6 +167,22 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
         title: const Text('Expenses'),
         actions: [
+          // ••• More button
+          if (widget.onMoreTap != null)
+            GestureDetector(
+              onTap: widget.onMoreTap,
+              child: Container(
+                margin: const EdgeInsets.only(right: 4),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Icon(Icons.more_horiz_rounded,
+                    color: theme.colorScheme.primary, size: 20),
+              ),
+            ),
+          // Filter button
           Stack(
             children: [
               IconButton(

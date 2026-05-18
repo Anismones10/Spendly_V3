@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 import '../providers/settings_provider.dart';
 import 'dashboard_screen.dart';
 import 'expenses_screen.dart';
+import 'income_screen.dart';
+import 'expenses_screen.dart';
 import 'goals_screen.dart';
 import 'settings_screen.dart';
 import 'statistics_screen.dart';
@@ -207,13 +209,11 @@ class _MainShellState extends State<MainShell> {
                 onTap: () {
                   Navigator.pop(ctx);
                   if (tab.id == 'settings') return;
-                  setState(() {
-                    if (!_visibleTabIds.contains(tab.id)) {
-                      _visibleTabIds.add(tab.id);
-                    }
-                    _currentIndex = _visibleTabIds.indexOf(tab.id);
-                    _previousIndex = _currentIndex;
-                  });
+                  // Just navigate — never add to bottom nav permanently
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => tab.screen),
+                  );
                 },
               )),
             ],
@@ -270,37 +270,78 @@ class _MainShellState extends State<MainShell> {
     final isDark = theme.brightness == Brightness.dark;
     final tabs = _visibleTabs;
 
-    // For home tab (index 0), pass the More callback so ... appears in AppBar
+    // Build current screen — pass onMoreTap to screens that handle it in AppBar
     Widget currentScreen;
-    if (_currentIndex == 0) {
+    final currentId = _currentIndex < tabs.length ? tabs[_currentIndex].id : 'home';
+
+    if (_currentIndex == 0 || currentId == 'home') {
       currentScreen = DashboardScreen(onMoreTap: _showMoreMenu);
+    } else if (currentId == 'expenses') {
+      currentScreen = ExpensesScreen(onMoreTap: _showMoreMenu);
+    } else if (currentId == 'income') {
+      currentScreen = IncomeScreen(onMoreTap: _showMoreMenu);
     } else if (_currentIndex < tabs.length) {
       currentScreen = tabs[_currentIndex].screen;
     } else {
       currentScreen = DashboardScreen(onMoreTap: _showMoreMenu);
     }
 
+    // Screens that handle their own ••• button in AppBar
+    final hasOwnMoreButton = ['home', 'expenses', 'income'].contains(currentId);
+
     return Scaffold(
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 260),
-        transitionBuilder: (child, animation) {
-          final goRight = _currentIndex >= _previousIndex;
-          return FadeTransition(
-            opacity: animation,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: Offset(goRight ? 0.06 : -0.06, 0),
-                end: Offset.zero,
-              ).animate(CurvedAnimation(
-                  parent: animation, curve: Curves.easeOut)),
-              child: child,
+      body: Stack(
+        children: [
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 260),
+            transitionBuilder: (child, animation) {
+              final goRight = _currentIndex >= _previousIndex;
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: Offset(goRight ? 0.06 : -0.06, 0),
+                    end: Offset.zero,
+                  ).animate(CurvedAnimation(
+                      parent: animation, curve: Curves.easeOut)),
+                  child: child,
+                ),
+              );
+            },
+            child: KeyedSubtree(
+              key: ValueKey(_currentIndex),
+              child: currentScreen,
             ),
-          );
-        },
-        child: KeyedSubtree(
-          key: ValueKey(_currentIndex),
-          child: currentScreen,
-        ),
+          ),
+
+          // ••• More button overlay — only for screens without their own AppBar button
+          if (!hasOwnMoreButton)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 10,
+              right: 12,
+              child: GestureDetector(
+                onTap: _showMoreMenu,
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: theme.colorScheme.primary.withOpacity(0.15),
+                        blurRadius: 8,
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    Icons.more_horiz_rounded,
+                    color: theme.colorScheme.primary,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
 
       bottomNavigationBar: Container(
@@ -323,7 +364,6 @@ class _MainShellState extends State<MainShell> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                // All visible tabs including Home
                 ...List.generate(tabs.length, (i) {
                   final tab = tabs[i];
                   final isSelected = i == _currentIndex;

@@ -54,3 +54,4 @@ flutter_launcher_icons:
       sdk: flutter
       dependencies:
         tutorial_coach_mark: ^1.2.11
+fl_chart: ^0.70.0

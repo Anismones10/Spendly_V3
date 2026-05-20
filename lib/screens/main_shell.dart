@@ -200,32 +200,6 @@ class _MainShellState extends State<MainShell> {
                         fontSize: 18, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 16),
 
-                // Search entry in More menu
-                _MoreTile(
-                  icon: Icons.search_rounded,
-                  label: 'Global Search',
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    Navigator.push(
-                      context,
-                      PageRouteBuilder(
-                        pageBuilder: (_, __, ___) =>
-                            const GlobalSearchScreen(),
-                        transitionsBuilder:
-                            (_, animation, __, child) =>
-                                FadeTransition(
-                                    opacity: animation, child: child),
-                        transitionDuration:
-                            const Duration(milliseconds: 200),
-                      ),
-                    );
-                  },
-                ),
-
-                const SizedBox(height: 4),
-                Divider(color: Colors.grey.withOpacity(0.15)),
-                const SizedBox(height: 4),
-
                 _MoreTile(
                   icon: Icons.settings_rounded,
                   label: 'Settings',

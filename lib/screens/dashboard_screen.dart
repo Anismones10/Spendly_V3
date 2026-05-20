@@ -227,14 +227,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
 
-              // 3 ── More button
+              // 3 ── More button (same size as search icon)
               if (widget.onMoreTap != null)
                 GestureDetector(
                   onTap: widget.onMoreTap,
                   child: Container(
                     key: _moreButtonKey,
                     margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.all(7),
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: theme.colorScheme.primary
                           .withOpacity(0.1),
@@ -243,7 +243,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: Icon(
                       Icons.more_horiz_rounded,
                       color: theme.colorScheme.primary,
-                      size: 18,
+                      size: 20,
                     ),
                   ),
                 ),

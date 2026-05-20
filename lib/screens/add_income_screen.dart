@@ -7,7 +7,6 @@ import '../providers/settings_provider.dart';
 import '../providers/wallet_provider.dart';
 import '../utils/app_utils.dart';
 
-// Income source definitions
 const List<Map<String, dynamic>> _incomeSources = [
   {'key': 'salary',     'label': 'Salary',     'icon': Icons.work_rounded,           'color': 0xFF2ECC71},
   {'key': 'freelance',  'label': 'Freelance',  'icon': Icons.laptop_rounded,          'color': 0xFF4A90E2},
@@ -58,6 +57,7 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
   String _selectedSource = 'salary';
   String? _selectedWalletId;
   DateTime _selectedDate = DateTime.now();
+  TimeOfDay? _selectedTime;
 
   @override
   void initState() {
@@ -70,8 +70,12 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
       _selectedSource = e.source;
       _selectedWalletId = e.walletId;
       _selectedDate = e.date;
+      if (e.timeHour != null && e.timeMinute != null) {
+        _selectedTime =
+            TimeOfDay(hour: e.timeHour!, minute: e.timeMinute!);
+      }
     } else {
-      // Default to first wallet
+      _selectedTime = TimeOfDay.now();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final wallets = context.read<WalletProvider>().wallets;
         if (wallets.isNotEmpty && _selectedWalletId == null) {
@@ -99,18 +103,47 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
     if (picked != null) setState(() => _selectedDate = picked);
   }
 
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _selectedTime ?? TimeOfDay.now(),
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(alwaysUse24HourFormat: false),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) setState(() => _selectedTime = picked);
+  }
+
+  void _clearTime() => setState(() => _selectedTime = null);
+
+  String _formatTime(TimeOfDay t) {
+    final h = t.hour;
+    final m = t.minute;
+    final period = h >= 12 ? 'PM' : 'AM';
+    final hour = h == 0 ? 12 : (h > 12 ? h - 12 : h);
+    final min = m.toString().padLeft(2, '0');
+    return '$hour:$min $period';
+  }
+
   void _save() {
-    if (_nameController.text.isEmpty || _amountController.text.isEmpty) {
+    if (_nameController.text.isEmpty ||
+        _amountController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Please fill in all required fields.')),
+            content:
+                Text('Please fill in all required fields.')),
       );
       return;
     }
     final amount = double.tryParse(_amountController.text);
     if (amount == null || amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid amount.')),
+        const SnackBar(
+            content: Text('Please enter a valid amount.')),
       );
       return;
     }
@@ -125,6 +158,8 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
           : _noteController.text.trim(),
       source: _selectedSource,
       walletId: _selectedWalletId,
+      timeHour: _selectedTime?.hour,
+      timeMinute: _selectedTime?.minute,
     );
 
     final provider = context.read<IncomeProvider>();
@@ -145,13 +180,16 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor:
-          isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
+      backgroundColor: isDark
+          ? const Color(0xFF121212)
+          : const Color(0xFFF5F7FA),
       appBar: AppBar(
-        backgroundColor:
-            isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
-        title: Text(
-            widget.existing != null ? 'Edit Income' : 'Add Income'),
+        backgroundColor: isDark
+            ? const Color(0xFF121212)
+            : const Color(0xFFF5F7FA),
+        title: Text(widget.existing != null
+            ? 'Edit Income'
+            : 'Add Income'),
         actions: [
           TextButton(
             onPressed: _save,
@@ -165,8 +203,7 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
-            // ── Income name ───────────────────────────────────────────────
+            // ── Income name ──────────────────────────────────────────
             _buildLabel('Income Name *'),
             const SizedBox(height: 8),
             TextField(
@@ -178,7 +215,7 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
             ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.2),
             const SizedBox(height: 20),
 
-            // ── Amount ────────────────────────────────────────────────────
+            // ── Amount ────────────────────────────────────────────────
             _buildLabel('Amount *'),
             const SizedBox(height: 8),
             TextField(
@@ -187,20 +224,126 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
                   const TextInputType.numberWithOptions(decimal: true),
               decoration: InputDecoration(
                 hintText: 'Enter amount',
-                prefixIcon: const Icon(Icons.attach_money_rounded),
+                prefixIcon:
+                    const Icon(Icons.attach_money_rounded),
                 suffixText: symbol,
               ),
-            ).animate().fadeIn(delay: 50.ms, duration: 300.ms).slideY(begin: 0.2),
+            )
+                .animate()
+                .fadeIn(delay: 50.ms, duration: 300.ms)
+                .slideY(begin: 0.2),
             const SizedBox(height: 20),
 
-            // ── Add to Wallet ─────────────────────────────────────────────
+            // ── Date & Time row ───────────────────────────────────────
+            _buildLabel('Date & Time'),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                // Date
+                Expanded(
+                  child: GestureDetector(
+                    onTap: _pickDate,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0xFF2A2A2A)
+                            : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.calendar_today_rounded,
+                              color: theme.colorScheme.primary,
+                              size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              AppUtils.formatDate(_selectedDate),
+                              style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                // Time
+                GestureDetector(
+                  onTap: _pickTime,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: _selectedTime != null
+                          ? theme.colorScheme.primary
+                              .withOpacity(0.1)
+                          : (isDark
+                              ? const Color(0xFF2A2A2A)
+                              : Colors.grey.shade100),
+                      borderRadius: BorderRadius.circular(16),
+                      border: _selectedTime != null
+                          ? Border.all(
+                              color: theme.colorScheme.primary
+                                  .withOpacity(0.3),
+                              width: 1.5)
+                          : null,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.access_time_rounded,
+                            color: _selectedTime != null
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.onSurface
+                                    .withOpacity(0.4),
+                            size: 18),
+                        const SizedBox(width: 6),
+                        Text(
+                          _selectedTime != null
+                              ? _formatTime(_selectedTime!)
+                              : 'Time',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: _selectedTime != null
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.onSurface
+                                    .withOpacity(0.5),
+                          ),
+                        ),
+                        if (_selectedTime != null) ...[
+                          const SizedBox(width: 6),
+                          GestureDetector(
+                            onTap: _clearTime,
+                            child: Icon(Icons.close_rounded,
+                                size: 14,
+                                color: theme.colorScheme.primary
+                                    .withOpacity(0.6)),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ).animate().fadeIn(delay: 100.ms),
+            const SizedBox(height: 20),
+
+            // ── Add to Wallet ─────────────────────────────────────────
             _buildLabel('Add to Wallet'),
             const SizedBox(height: 4),
             Text(
               'Income will be added to the selected wallet balance',
               style: TextStyle(
                 fontSize: 11,
-                color: theme.colorScheme.onSurface.withOpacity(0.45),
+                color:
+                    theme.colorScheme.onSurface.withOpacity(0.45),
               ),
             ),
             const SizedBox(height: 10),
@@ -216,7 +359,8 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
                 child: Row(
                   children: [
                     Icon(Icons.info_outline_rounded,
-                        color: theme.colorScheme.primary, size: 18),
+                        color: theme.colorScheme.primary,
+                        size: 18),
                     const SizedBox(width: 10),
                     const Expanded(
                       child: Text(
@@ -241,7 +385,8 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
                           horizontal: 16, vertical: 14),
                       decoration: BoxDecoration(
                         color: _selectedWalletId == null
-                            ? theme.colorScheme.primary.withOpacity(0.1)
+                            ? theme.colorScheme.primary
+                                .withOpacity(0.1)
                             : (isDark
                                 ? const Color(0xFF1E1E1E)
                                 : Colors.white),
@@ -254,7 +399,8 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
                         ),
                         boxShadow: [
                           BoxShadow(
-                              color: Colors.black.withOpacity(0.04),
+                              color:
+                                  Colors.black.withOpacity(0.04),
                               blurRadius: 6),
                         ],
                       ),
@@ -271,7 +417,8 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   'Just track (no wallet)',
@@ -302,17 +449,14 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 8),
-
-                  // Wallet options
                   ...wallets.map((wallet) {
                     final isSelected = _selectedWalletId == wallet.id;
                     final walletColor = Color(wallet.colorValue);
 
                     return GestureDetector(
-                      onTap: () =>
-                          setState(() => _selectedWalletId = wallet.id),
+                      onTap: () => setState(
+                          () => _selectedWalletId = wallet.id),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
                         width: double.infinity,
@@ -334,7 +478,8 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
                           ),
                           boxShadow: [
                             BoxShadow(
-                                color: Colors.black.withOpacity(0.04),
+                                color:
+                                    Colors.black.withOpacity(0.04),
                                 blurRadius: 6),
                           ],
                         ),
@@ -345,10 +490,12 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
                               height: 40,
                               decoration: BoxDecoration(
                                 color: walletColor.withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius:
+                                    BorderRadius.circular(12),
                               ),
                               child: Icon(
-                                WalletProvider.resolveIcon(wallet.type),
+                                WalletProvider.resolveIcon(
+                                    wallet.type),
                                 color: walletColor,
                                 size: 20,
                               ),
@@ -370,7 +517,7 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
                                     ),
                                   ),
                                   Text(
-                                    'Current balance: ${_formatAmount(wallet.balance, symbol)}',
+                                    'Current balance: ${_formatBalance(wallet.balance, symbol)}',
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: isSelected
@@ -382,7 +529,6 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
                                 ],
                               ),
                             ),
-                            // Arrow showing income flow
                             if (isSelected) ...[
                               Container(
                                 padding: const EdgeInsets.symmetric(
@@ -390,7 +536,8 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
                                 decoration: BoxDecoration(
                                   color: const Color(0xFF2ECC71)
                                       .withOpacity(0.15),
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius:
+                                      BorderRadius.circular(8),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -423,7 +570,7 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
               ),
             const SizedBox(height: 20),
 
-            // ── Source picker ─────────────────────────────────────────────
+            // ── Source picker ─────────────────────────────────────────
             _buildLabel('Source *'),
             const SizedBox(height: 10),
             Wrap(
@@ -437,7 +584,8 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
                 final isSelected = _selectedSource == key;
 
                 return GestureDetector(
-                  onTap: () => setState(() => _selectedSource = key),
+                  onTap: () =>
+                      setState(() => _selectedSource = key),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     padding: const EdgeInsets.symmetric(
@@ -450,7 +598,9 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
                               : Colors.grey.shade100),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: isSelected ? color : Colors.transparent,
+                        color: isSelected
+                            ? color
+                            : Colors.transparent,
                         width: 1.5,
                       ),
                     ),
@@ -485,39 +635,7 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
             ).animate().fadeIn(delay: 100.ms),
             const SizedBox(height: 20),
 
-            // ── Date ──────────────────────────────────────────────────────
-            _buildLabel('Date'),
-            const SizedBox(height: 8),
-            GestureDetector(
-              onTap: _pickDate,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 20, vertical: 16),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF2A2A2A)
-                      : Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.calendar_today_rounded,
-                        color: theme.colorScheme.primary),
-                    const SizedBox(width: 12),
-                    Text(
-                      AppUtils.formatDate(_selectedDate),
-                      style: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w500),
-                    ),
-                    const Spacer(),
-                    const Icon(Icons.chevron_right_rounded),
-                  ],
-                ),
-              ),
-            ).animate().fadeIn(delay: 150.ms),
-            const SizedBox(height: 20),
-
-            // ── Note ──────────────────────────────────────────────────────
+            // ── Note ──────────────────────────────────────────────────
             _buildLabel('Note (Optional)'),
             const SizedBox(height: 8),
             TextField(
@@ -530,7 +648,7 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
             ).animate().fadeIn(delay: 200.ms),
             const SizedBox(height: 32),
 
-            // ── Save button ───────────────────────────────────────────────
+            // ── Save button ───────────────────────────────────────────
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -552,7 +670,7 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
     );
   }
 
-  String _formatAmount(double amount, String symbol) {
+  String _formatBalance(double amount, String symbol) {
     if (amount == 0) return 'Empty';
     return '$symbol${amount.toStringAsFixed(2)}';
   }
@@ -563,7 +681,8 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
       style: TextStyle(
         fontWeight: FontWeight.w600,
         fontSize: 14,
-        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+        color:
+            Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
       ),
     );
   }

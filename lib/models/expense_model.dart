@@ -29,7 +29,19 @@ class ExpenseModel extends HiveObject {
   String? recurringType; // 'daily', 'weekly', 'monthly'
 
   @HiveField(8)
-  String? walletId; // NEW — which wallet was used
+  String? walletId;
+
+  @HiveField(9)
+  int? timeHour; // NEW — hour (0–23)
+
+  @HiveField(10)
+  int? timeMinute; // NEW — minute (0–59)
+
+  @HiveField(11)
+  String? recurringParentId; // NEW — links generated instances to parent
+
+  @HiveField(12)
+  DateTime? recurringLastGenerated; // NEW — tracks last auto-generation date
 
   ExpenseModel({
     required this.id,
@@ -41,5 +53,31 @@ class ExpenseModel extends HiveObject {
     this.isRecurring = false,
     this.recurringType,
     this.walletId,
+    this.timeHour,
+    this.timeMinute,
+    this.recurringParentId,
+    this.recurringLastGenerated,
   });
+
+  /// Returns the full DateTime combining date + time fields
+  DateTime get dateTime {
+    return DateTime(
+      date.year,
+      date.month,
+      date.day,
+      timeHour ?? 0,
+      timeMinute ?? 0,
+    );
+  }
+
+  /// Formatted time string e.g. "09:30 AM"
+  String get formattedTime {
+    if (timeHour == null || timeMinute == null) return '';
+    final h = timeHour!;
+    final m = timeMinute!;
+    final period = h >= 12 ? 'PM' : 'AM';
+    final hour = h == 0 ? 12 : (h > 12 ? h - 12 : h);
+    final min = m.toString().padLeft(2, '0');
+    return '$hour:$min $period';
+  }
 }

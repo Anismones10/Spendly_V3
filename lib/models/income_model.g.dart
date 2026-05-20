@@ -24,13 +24,15 @@ class IncomeModelAdapter extends TypeAdapter<IncomeModel> {
       note: fields[4] as String?,
       source: fields[5] as String,
       walletId: fields[6] as String?,
+      timeHour: fields[7] as int?,
+      timeMinute: fields[8] as int?,
     );
   }
 
   @override
   void write(BinaryWriter writer, IncomeModel obj) {
     writer
-      ..writeByte(7)
+      ..writeByte(9)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -44,7 +46,11 @@ class IncomeModelAdapter extends TypeAdapter<IncomeModel> {
       ..writeByte(5)
       ..write(obj.source)
       ..writeByte(6)
-      ..write(obj.walletId);
+      ..write(obj.walletId)
+      ..writeByte(7)
+      ..write(obj.timeHour)
+      ..writeByte(8)
+      ..write(obj.timeMinute);
   }
 
   @override

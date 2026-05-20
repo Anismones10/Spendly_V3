@@ -12,19 +12,24 @@ class ExpenseTile extends StatelessWidget {
   final ExpenseModel expense;
   final String symbol;
 
-  const ExpenseTile({super.key, required this.expense, required this.symbol});
+  const ExpenseTile(
+      {super.key, required this.expense, required this.symbol});
 
   @override
   Widget build(BuildContext context) {
     final categories = context.watch<CategoryProvider>();
     final wallets = context.watch<WalletProvider>();
     final cat = categories.getById(expense.categoryId);
-    final wallet =
-        expense.walletId != null ? wallets.getById(expense.walletId!) : null;
+    final wallet = expense.walletId != null
+        ? wallets.getById(expense.walletId!)
+        : null;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final hasNote =
         expense.note != null && expense.note!.trim().isNotEmpty;
+    final hasTime =
+        expense.timeHour != null && expense.timeMinute != null;
+    final isRecurringInstance = expense.recurringParentId != null;
 
     return Dismissible(
       key: ValueKey(expense.id),
@@ -34,15 +39,15 @@ class ExpenseTile extends StatelessWidget {
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Delete Expense'),
-            content:
-                Text('Delete "${expense.name}"? This cannot be undone.'),
+            content: Text(
+                'Delete "${expense.name}"? This cannot be undone.'),
             actions: [
               TextButton(
                   onPressed: () => Navigator.pop(ctx, false),
                   child: const Text('Cancel')),
               ElevatedButton(
-                style:
-                    ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red),
                 onPressed: () => Navigator.pop(ctx, true),
                 child: const Text('Delete'),
               ),
@@ -68,7 +73,8 @@ class ExpenseTile extends StatelessWidget {
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(
-              builder: (_) => AddExpenseScreen(existing: expense)),
+              builder: (_) =>
+                  AddExpenseScreen(existing: expense)),
         ),
         child: Container(
           margin: const EdgeInsets.only(bottom: 12),
@@ -76,6 +82,11 @@ class ExpenseTile extends StatelessWidget {
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
             borderRadius: BorderRadius.circular(16),
+            border: isRecurringInstance
+                ? Border.all(
+                    color: theme.colorScheme.primary.withOpacity(0.15),
+                    width: 1)
+                : null,
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.05),
@@ -86,7 +97,7 @@ class ExpenseTile extends StatelessWidget {
           ),
           child: Row(
             children: [
-              // ── Category icon with wallet badge ────────────────────────
+              // ── Category icon with wallet badge ──────────────────────
               Stack(
                 clipBehavior: Clip.none,
                 children: [
@@ -96,7 +107,8 @@ class ExpenseTile extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: cat != null
                           ? Color(cat.colorValue).withOpacity(0.15)
-                          : theme.colorScheme.primary.withOpacity(0.15),
+                          : theme.colorScheme.primary
+                              .withOpacity(0.15),
                       borderRadius: BorderRadius.circular(14),
                     ),
                     alignment: Alignment.center,
@@ -137,12 +149,12 @@ class ExpenseTile extends StatelessWidget {
 
               const SizedBox(width: 14),
 
-              // ── Details ────────────────────────────────────────────────
+              // ── Details ──────────────────────────────────────────────
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Name row with note icon
+                    // Name row with icons
                     Row(
                       children: [
                         Expanded(
@@ -155,17 +167,38 @@ class ExpenseTile extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        // ── Note info button ──────────────────────────
+                        if (isRecurringInstance) ...[
+                          const SizedBox(width: 4),
+                          Tooltip(
+                            message: 'Auto-generated recurring',
+                            child: Container(
+                              padding: const EdgeInsets.all(3),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primary
+                                    .withOpacity(0.1),
+                                borderRadius:
+                                    BorderRadius.circular(6),
+                              ),
+                              child: Icon(
+                                Icons.repeat_rounded,
+                                size: 12,
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                          ),
+                        ],
                         if (hasNote) ...[
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 4),
                           GestureDetector(
-                            onTap: () => _showNote(context, isDark, theme),
+                            onTap: () =>
+                                _showNote(context, isDark, theme),
                             child: Container(
                               padding: const EdgeInsets.all(4),
                               decoration: BoxDecoration(
                                 color: theme.colorScheme.primary
                                     .withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius:
+                                    BorderRadius.circular(8),
                               ),
                               child: Icon(
                                 Icons.sticky_note_2_outlined,
@@ -178,6 +211,8 @@ class ExpenseTile extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 2),
+
+                    // Badges row
                     Row(
                       children: [
                         // Category name
@@ -200,7 +235,8 @@ class ExpenseTile extends StatelessWidget {
                             decoration: BoxDecoration(
                               color: Color(wallet.colorValue)
                                   .withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(6),
+                              borderRadius:
+                                  BorderRadius.circular(6),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -209,7 +245,8 @@ class ExpenseTile extends StatelessWidget {
                                     WalletProvider.resolveIcon(
                                         wallet.type),
                                     size: 9,
-                                    color: Color(wallet.colorValue)),
+                                    color:
+                                        Color(wallet.colorValue)),
                                 const SizedBox(width: 3),
                                 Text(
                                   wallet.name,
@@ -232,7 +269,8 @@ class ExpenseTile extends StatelessWidget {
                             decoration: BoxDecoration(
                               color: theme.colorScheme.primary
                                   .withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(6),
+                              borderRadius:
+                                  BorderRadius.circular(6),
                             ),
                             child: Text(
                               expense.recurringType ?? 'recurring',
@@ -246,19 +284,51 @@ class ExpenseTile extends StatelessWidget {
                         ],
                       ],
                     ),
+
                     const SizedBox(height: 2),
-                    Text(
-                      AppUtils.formatDate(expense.date),
-                      style: TextStyle(
-                          fontSize: 11,
-                          color: theme.colorScheme.onSurface
-                              .withOpacity(0.4)),
+
+                    // Date + Time row
+                    Row(
+                      children: [
+                        Text(
+                          AppUtils.formatDate(expense.date),
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: theme.colorScheme.onSurface
+                                  .withOpacity(0.4)),
+                        ),
+                        if (hasTime) ...[
+                          Text(
+                            '  ·  ',
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: theme.colorScheme.onSurface
+                                    .withOpacity(0.25)),
+                          ),
+                          Icon(
+                            Icons.access_time_rounded,
+                            size: 11,
+                            color: theme.colorScheme.primary
+                                .withOpacity(0.5),
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            expense.formattedTime,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: theme.colorScheme.primary
+                                  .withOpacity(0.7),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
                 ),
               ),
 
-              // ── Amount ─────────────────────────────────────────────────
+              // ── Amount ───────────────────────────────────────────────
               Text(
                 AppUtils.formatAmount(expense.amount, symbol),
                 style: const TextStyle(
@@ -271,7 +341,8 @@ class ExpenseTile extends StatelessWidget {
     );
   }
 
-  void _showNote(BuildContext context, bool isDark, ThemeData theme) {
+  void _showNote(
+      BuildContext context, bool isDark, ThemeData theme) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -283,7 +354,8 @@ class ExpenseTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.15), blurRadius: 20)
+                color: Colors.black.withOpacity(0.15),
+                blurRadius: 20)
           ],
         ),
         child: Column(
@@ -295,7 +367,8 @@ class ExpenseTile extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withOpacity(0.1),
+                    color:
+                        theme.colorScheme.primary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(Icons.sticky_note_2_rounded,
@@ -314,7 +387,8 @@ class ExpenseTile extends StatelessWidget {
                 IconButton(
                   onPressed: () => Navigator.pop(ctx),
                   icon: Icon(Icons.close_rounded,
-                      color: theme.colorScheme.onSurface.withOpacity(0.4)),
+                      color: theme.colorScheme.onSurface
+                          .withOpacity(0.4)),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                 ),
@@ -330,14 +404,16 @@ class ExpenseTile extends StatelessWidget {
                     : Colors.grey.shade50,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                    color: theme.colorScheme.primary.withOpacity(0.15)),
+                    color: theme.colorScheme.primary
+                        .withOpacity(0.15)),
               ),
               child: Text(
                 expense.note!,
                 style: TextStyle(
                   fontSize: 14,
                   height: 1.6,
-                  color: theme.colorScheme.onSurface.withOpacity(0.8),
+                  color:
+                      theme.colorScheme.onSurface.withOpacity(0.8),
                 ),
               ),
             ),

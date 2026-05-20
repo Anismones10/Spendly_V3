@@ -8,6 +8,7 @@ import '../providers/settings_provider.dart';
 import '../utils/app_utils.dart';
 import '../providers/income_provider.dart';
 import '../utils/category_icons.dart';
+import '../widgets/empty_state.dart';
 import 'calendar_screen.dart';
 
 class StatisticsScreen extends StatefulWidget {
@@ -18,20 +19,30 @@ class StatisticsScreen extends StatefulWidget {
 }
 
 class _StatisticsScreenState extends State<StatisticsScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+    with TickerProviderStateMixin {
+  late TabController _mainTabController;   // Expense | Income
+  late TabController _expenseTabController; // Overview | Categories | Compare | Calendar
+  late TabController _incomeTabController;  // Overview | By Source | Trend
+
   int _touchedPieIndex = -1;
+  int _touchedIncomePieIndex = -1;
   String _comparePeriod = 'month';
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _mainTabController = TabController(length: 2, vsync: this);
+    _expenseTabController = TabController(length: 4, vsync: this);
+    _incomeTabController = TabController(length: 3, vsync: this);
+
+    _mainTabController.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _mainTabController.dispose();
+    _expenseTabController.dispose();
+    _incomeTabController.dispose();
     super.dispose();
   }
 
@@ -40,57 +51,98 @@ class _StatisticsScreenState extends State<StatisticsScreen>
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final expenses = context.watch<ExpenseProvider>();
+    final income = context.watch<IncomeProvider>();
     final settings = context.watch<SettingsProvider>();
     final now = DateTime.now();
 
     return Scaffold(
-      backgroundColor:
-          isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
       appBar: AppBar(
-        backgroundColor:
-            isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
+        backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
         title: const Text('Statistics',
             style: TextStyle(fontWeight: FontWeight.w700)),
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: theme.colorScheme.primary,
-          unselectedLabelColor:
-              theme.colorScheme.onSurface.withOpacity(0.4),
-          indicatorColor: theme.colorScheme.primary,
-          indicatorSize: TabBarIndicatorSize.label,
-          tabs: const [
-            Tab(text: 'Overview'),
-            Tab(text: 'Categories'),
-            Tab(text: 'Compare'),
-            Tab(text: 'Calendar'),
-          ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(96),
+          child: Column(
+            children: [
+              // ── Top: Expense | Income ───────────────────────────────
+              TabBar(
+                controller: _mainTabController,
+                labelColor: theme.colorScheme.primary,
+                unselectedLabelColor: theme.colorScheme.onSurface.withOpacity(0.4),
+                indicatorColor: theme.colorScheme.primary,
+                indicatorSize: TabBarIndicatorSize.label,
+                tabs: const [
+                  Tab(text: 'Expense'),
+                  Tab(text: 'Income'),
+                ],
+              ),
+              // ── Sub tabs ────────────────────────────────────────────
+              if (_mainTabController.index == 0)
+                TabBar(
+                  controller: _expenseTabController,
+                  labelColor: theme.colorScheme.primary,
+                  unselectedLabelColor: theme.colorScheme.onSurface.withOpacity(0.4),
+                  indicatorColor: theme.colorScheme.primary,
+                  indicatorSize: TabBarIndicatorSize.label,
+                  isScrollable: true,
+                  tabs: const [
+                    Tab(text: 'Overview'),
+                    Tab(text: 'Categories'),
+                    Tab(text: 'Compare'),
+                    Tab(text: 'Calendar'),
+                  ],
+                )
+              else
+                TabBar(
+                  controller: _incomeTabController,
+                  labelColor: const Color(0xFF2ECC71),
+                  unselectedLabelColor: theme.colorScheme.onSurface.withOpacity(0.4),
+                  indicatorColor: const Color(0xFF2ECC71),
+                  indicatorSize: TabBarIndicatorSize.label,
+                  isScrollable: true,
+                  tabs: const [
+                    Tab(text: 'Overview'),
+                    Tab(text: 'By Source'),
+                    Tab(text: 'Trend'),
+                  ],
+                ),
+            ],
+          ),
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _OverviewTab(
-            expenses: expenses,
-            settings: settings,
-            now: now,
-          ),
-          _CategoriesTab(
-            expenses: expenses,
-            settings: settings,
-            now: now,
-            touchedIndex: _touchedPieIndex,
-            onTouch: (i) => setState(() => _touchedPieIndex = i),
-          ),
-          _CompareTab(
-            expenses: expenses,
-            settings: settings,
-            now: now,
-            period: _comparePeriod,
-            onPeriodChanged: (p) => setState(() => _comparePeriod = p),
-          ),
-          const CalendarScreen(embedded: true),
-        ],
-      ),
+      body: _mainTabController.index == 0
+          // ── Expense sub-tabs ────────────────────────────────────────
+          ? TabBarView(
+              controller: _expenseTabController,
+              children: [
+                _OverviewTab(expenses: expenses, settings: settings, now: now),
+                _CategoriesTab(
+                  expenses: expenses, settings: settings, now: now,
+                  touchedIndex: _touchedPieIndex,
+                  onTouch: (i) => setState(() => _touchedPieIndex = i),
+                ),
+                _CompareTab(
+                  expenses: expenses, settings: settings, now: now,
+                  period: _comparePeriod,
+                  onPeriodChanged: (p) => setState(() => _comparePeriod = p),
+                ),
+                const CalendarScreen(embedded: true),
+              ],
+            )
+          // ── Income sub-tabs ─────────────────────────────────────────
+          : TabBarView(
+              controller: _incomeTabController,
+              children: [
+                _IncomeOverviewTab(income: income, expenses: expenses, settings: settings, now: now),
+                _IncomeBySourceTab(
+                  income: income, settings: settings, now: now,
+                  touchedIndex: _touchedIncomePieIndex,
+                  onTouch: (i) => setState(() => _touchedIncomePieIndex = i),
+                ),
+                _IncomeTrendTab(income: income, settings: settings, now: now),
+              ],
+            ),
     );
   }
 }
@@ -1103,4 +1155,644 @@ class _PeriodData {
   final String label;
   final double total;
   const _PeriodData({required this.label, required this.total});
+}
+
+// ── Income Overview Tab ───────────────────────────────────────────────────────
+
+class _IncomeOverviewTab extends StatelessWidget {
+  final IncomeProvider income;
+  final ExpenseProvider expenses;
+  final SettingsProvider settings;
+  final DateTime now;
+
+  const _IncomeOverviewTab({
+    required this.income,
+    required this.expenses,
+    required this.settings,
+    required this.now,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final symbol = settings.currencySymbol;
+
+    final monthlyIncome = income.getTotalForMonth(now.year, now.month);
+    final monthlyExpenses = expenses.getTotalForMonth(now.year, now.month);
+    final saved = monthlyIncome - monthlyExpenses;
+    final savingsRate = monthlyIncome > 0
+        ? ((saved / monthlyIncome) * 100).clamp(0.0, 100.0)
+        : 0.0;
+
+    // Last 6 months bar data
+    final barData = List.generate(6, (i) {
+      final date = DateTime(now.year, now.month - 5 + i);
+      return _IncomeBar(
+        month: _shortMonth(date.month),
+        income: income.getTotalForMonth(date.year, date.month),
+        expense: expenses.getTotalForMonth(date.year, date.month),
+      );
+    });
+
+    final maxY = barData.fold(0.0, (max, b) {
+      final m = b.income > b.expense ? b.income : b.expense;
+      return m > max ? m : max;
+    });
+    final safeMax = maxY == 0 ? 100.0 : maxY * 1.25;
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // Summary cards row
+        Row(
+          children: [
+            Expanded(child: _StatMiniCard(
+              label: 'Income', value: AppUtils.formatAmount(monthlyIncome, symbol),
+              icon: Icons.arrow_downward_rounded, color: const Color(0xFF2ECC71),
+              isDark: isDark,
+            )),
+            const SizedBox(width: 12),
+            Expanded(child: _StatMiniCard(
+              label: 'Expenses', value: AppUtils.formatAmount(monthlyExpenses, symbol),
+              icon: Icons.arrow_upward_rounded, color: const Color(0xFFE57373),
+              isDark: isDark,
+            )),
+            const SizedBox(width: 12),
+            Expanded(child: _StatMiniCard(
+              label: 'Saved', value: AppUtils.formatAmount(saved.abs(), symbol),
+              icon: saved >= 0 ? Icons.savings_rounded : Icons.warning_rounded,
+              color: saved >= 0 ? const Color(0xFF4A90E2) : const Color(0xFFFF9800),
+              isDark: isDark,
+            )),
+          ],
+        ),
+
+        const SizedBox(height: 20),
+
+        // Savings rate
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Savings Rate',
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                  Text('${savingsRate.toStringAsFixed(1)}%',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800, fontSize: 20,
+                        color: savingsRate >= 20
+                            ? const Color(0xFF2ECC71)
+                            : savingsRate >= 10
+                                ? const Color(0xFFFF9800)
+                                : const Color(0xFFE57373),
+                      )),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: LinearProgressIndicator(
+                  value: savingsRate / 100,
+                  minHeight: 10,
+                  backgroundColor: Colors.grey.withOpacity(0.15),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    savingsRate >= 20
+                        ? const Color(0xFF2ECC71)
+                        : savingsRate >= 10
+                            ? const Color(0xFFFF9800)
+                            : const Color(0xFFE57373),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                savingsRate >= 20
+                    ? '🎉 Excellent! You save more than 20% of income.'
+                    : savingsRate >= 10
+                        ? '👍 Good. Aim for 20%+ savings rate.'
+                        : savingsRate > 0
+                            ? '⚠️ Low savings rate. Try reducing expenses.'
+                            : '❌ Spending exceeds income this month.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: theme.colorScheme.onSurface.withOpacity(0.55),
+                ),
+              ),
+            ],
+          ),
+        ).animate().fadeIn(delay: 100.ms),
+
+        const SizedBox(height: 20),
+
+        // Income vs Expense bar chart
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Income vs Expenses',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 200,
+                child: BarChart(BarChartData(
+                  maxY: safeMax,
+                  minY: 0,
+                  barTouchData: BarTouchData(
+                    touchTooltipData: BarTouchTooltipData(
+                      tooltipRoundedRadius: 10,
+                      getTooltipItem: (group, gi, rod, ri) => BarTooltipItem(
+                        '$symbol${rod.toY.toStringAsFixed(0)}',
+                        const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12),
+                      ),
+                    ),
+                  ),
+                  titlesData: FlTitlesData(
+                    bottomTitles: AxisTitles(sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (v, _) => Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(barData[v.toInt()].month,
+                          style: TextStyle(fontSize: 11,
+                            color: theme.colorScheme.onSurface.withOpacity(0.5))),
+                      ),
+                    )),
+                    leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  ),
+                  gridData: FlGridData(
+                    show: true, drawVerticalLine: false,
+                    horizontalInterval: safeMax / 4,
+                    getDrawingHorizontalLine: (_) => FlLine(
+                      color: theme.colorScheme.onSurface.withOpacity(0.07), strokeWidth: 1),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  barGroups: barData.asMap().entries.map((e) =>
+                    BarChartGroupData(x: e.key, barRods: [
+                      BarChartRodData(
+                        toY: e.value.income, width: 10,
+                        borderRadius: BorderRadius.circular(6),
+                        color: const Color(0xFF2ECC71),
+                      ),
+                      BarChartRodData(
+                        toY: e.value.expense, width: 10,
+                        borderRadius: BorderRadius.circular(6),
+                        color: const Color(0xFFE57373),
+                      ),
+                    ]),
+                  ).toList(),
+                )),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _ChartLegend(color: const Color(0xFF2ECC71), label: 'Income'),
+                  const SizedBox(width: 20),
+                  _ChartLegend(color: const Color(0xFFE57373), label: 'Expenses'),
+                ],
+              ),
+            ],
+          ),
+        ).animate().fadeIn(delay: 200.ms),
+      ],
+    );
+  }
+
+  String _shortMonth(int m) {
+    const months = ['Jan','Feb','Mar','Apr','May','Jun',
+                    'Jul','Aug','Sep','Oct','Nov','Dec'];
+    return months[m - 1];
+  }
+}
+
+// ── Income By Source Tab ──────────────────────────────────────────────────────
+
+class _IncomeBySourceTab extends StatelessWidget {
+  final IncomeProvider income;
+  final SettingsProvider settings;
+  final DateTime now;
+  final int touchedIndex;
+  final ValueChanged<int> onTouch;
+
+  const _IncomeBySourceTab({
+    required this.income,
+    required this.settings,
+    required this.now,
+    required this.touchedIndex,
+    required this.onTouch,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final symbol = settings.currencySymbol;
+    final sourceTotals = income.getSourceTotals(now.year, now.month);
+    final total = sourceTotals.values.fold(0.0, (a, b) => a + b);
+
+    const colors = [
+      Color(0xFF2ECC71), Color(0xFF4A90E2), Color(0xFFFF9800),
+      Color(0xFF9C27B0), Color(0xFFE57373), Color(0xFF00BCD4),
+      Color(0xFF6C63FF), Color(0xFFFFBE76),
+    ];
+
+    final entries = sourceTotals.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    if (entries.isEmpty) {
+      return const Center(child: EmptyState(
+        icon: Icons.pie_chart_rounded,
+        title: 'No Income This Month',
+        subtitle: 'Add income to see breakdown by source.',
+      ));
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // Donut chart
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+          ),
+          child: Column(
+            children: [
+              const Text('Income by Source',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 220,
+                child: PieChart(PieChartData(
+                  sectionsSpace: 2,
+                  centerSpaceRadius: 55,
+                  pieTouchData: PieTouchData(
+                    touchCallback: (event, response) => onTouch(
+                      response?.touchedSection?.touchedSectionIndex ?? -1),
+                  ),
+                  sections: entries.asMap().entries.map((e) {
+                    final isTouched = e.key == touchedIndex;
+                    final color = colors[e.key % colors.length];
+                    final pct = total > 0 ? (e.value.value / total * 100) : 0;
+                    return PieChartSectionData(
+                      color: color,
+                      value: e.value.value,
+                      radius: isTouched ? 65 : 55,
+                      title: '${pct.round()}%',
+                      titleStyle: TextStyle(
+                        fontSize: isTouched ? 14 : 11,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    );
+                  }).toList(),
+                )),
+              ),
+            ],
+          ),
+        ).animate().fadeIn(delay: 100.ms),
+
+        const SizedBox(height: 16),
+
+        // Source list
+        ...entries.asMap().entries.map((e) {
+          final color = colors[e.key % colors.length];
+          final pct = total > 0 ? (e.value.value / total * 100) : 0.0;
+          return Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 12, height: 12,
+                  decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(e.value.key,
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                      const SizedBox(height: 4),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: pct / 100,
+                          minHeight: 5,
+                          backgroundColor: color.withOpacity(0.12),
+                          valueColor: AlwaysStoppedAnimation<Color>(color),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(AppUtils.formatAmount(e.value.value, symbol),
+                        style: TextStyle(fontWeight: FontWeight.w700,
+                            fontSize: 14, color: color)),
+                    Text('${pct.toStringAsFixed(1)}%',
+                        style: TextStyle(fontSize: 11,
+                            color: theme.colorScheme.onSurface.withOpacity(0.4))),
+                  ],
+                ),
+              ],
+            ),
+          ).animate().fadeIn(delay: ((e.key + 1) * 60).ms).slideX(begin: 0.1);
+        }),
+      ],
+    );
+  }
+}
+
+// ── Income Trend Tab ──────────────────────────────────────────────────────────
+
+class _IncomeTrendTab extends StatelessWidget {
+  final IncomeProvider income;
+  final SettingsProvider settings;
+  final DateTime now;
+
+  const _IncomeTrendTab({
+    required this.income,
+    required this.settings,
+    required this.now,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final symbol = settings.currencySymbol;
+
+    // Last 12 months
+    final months = List.generate(12, (i) {
+      final date = DateTime(now.year, now.month - 11 + i);
+      return _MonthIncome(
+        label: _shortMonth(date.month),
+        amount: income.getTotalForMonth(date.year, date.month),
+      );
+    });
+
+    final maxY = months.fold(0.0, (max, m) => m.amount > max ? m.amount : max);
+    final safeMax = maxY == 0 ? 100.0 : maxY * 1.25;
+
+    // Totals
+    final last3 = months.sublist(9).fold(0.0, (s, m) => s + m.amount);
+    final prev3 = months.sublist(6, 9).fold(0.0, (s, m) => s + m.amount);
+    final trend = prev3 > 0 ? ((last3 - prev3) / prev3 * 100) : 0.0;
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // Trend summary
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: trend >= 0
+                  ? [const Color(0xFF2ECC71), const Color(0xFF27AE60)]
+                  : [const Color(0xFFE57373), const Color(0xFFEF5350)],
+              begin: Alignment.topLeft, end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: (trend >= 0 ? const Color(0xFF2ECC71) : const Color(0xFFE57373))
+                    .withOpacity(0.3),
+                blurRadius: 16, offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Icon(
+                trend >= 0 ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+                color: Colors.white, size: 36,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${trend >= 0 ? '+' : ''}${trend.toStringAsFixed(1)}%',
+                      style: const TextStyle(
+                        color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800),
+                    ),
+                    Text(
+                      trend >= 0
+                          ? 'Income up vs last quarter'
+                          : 'Income down vs last quarter',
+                      style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ).animate().fadeIn(duration: 400.ms),
+
+        const SizedBox(height: 20),
+
+        // 12-month line chart
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('12-Month Income Trend',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 200,
+                child: LineChart(LineChartData(
+                  minY: 0, maxY: safeMax,
+                  lineTouchData: LineTouchData(
+                    touchTooltipData: LineTouchTooltipData(
+                      tooltipRoundedRadius: 10,
+                      getTooltipItems: (spots) => spots.map((s) =>
+                        LineTooltipItem(
+                          '${months[s.x.toInt()].label}\n$symbol${s.y.toStringAsFixed(0)}',
+                          const TextStyle(color: Colors.white,
+                            fontWeight: FontWeight.w700, fontSize: 12),
+                        ),
+                      ).toList(),
+                    ),
+                  ),
+                  titlesData: FlTitlesData(
+                    bottomTitles: AxisTitles(sideTitles: SideTitles(
+                      showTitles: true, interval: 2,
+                      getTitlesWidget: (v, _) {
+                        final idx = v.toInt();
+                        if (idx < 0 || idx >= months.length) return const SizedBox();
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(months[idx].label,
+                            style: TextStyle(fontSize: 10,
+                              color: theme.colorScheme.onSurface.withOpacity(0.5))),
+                        );
+                      },
+                    )),
+                    leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  ),
+                  gridData: FlGridData(
+                    show: true, drawVerticalLine: false,
+                    horizontalInterval: safeMax / 4,
+                    getDrawingHorizontalLine: (_) => FlLine(
+                      color: theme.colorScheme.onSurface.withOpacity(0.07), strokeWidth: 1),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: months.asMap().entries
+                          .map((e) => FlSpot(e.key.toDouble(), e.value.amount))
+                          .toList(),
+                      isCurved: true,
+                      color: const Color(0xFF2ECC71),
+                      barWidth: 3,
+                      dotData: FlDotData(
+                        getDotPainter: (spot, pct, bar, idx) =>
+                          FlDotCirclePainter(
+                            radius: idx == months.length - 1 ? 5 : 3,
+                            color: const Color(0xFF2ECC71),
+                            strokeWidth: 2,
+                            strokeColor: Colors.white,
+                          ),
+                      ),
+                      belowBarData: BarAreaData(
+                        show: true,
+                        gradient: LinearGradient(
+                          colors: [
+                            const Color(0xFF2ECC71).withOpacity(0.3),
+                            const Color(0xFF2ECC71).withOpacity(0.0),
+                          ],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                      ),
+                    ),
+                  ],
+                )),
+              ),
+            ],
+          ),
+        ).animate().fadeIn(delay: 150.ms),
+      ],
+    );
+  }
+
+  String _shortMonth(int m) {
+    const months = ['Jan','Feb','Mar','Apr','May','Jun',
+                    'Jul','Aug','Sep','Oct','Nov','Dec'];
+    return months[m - 1];
+  }
+}
+
+// ── Shared helpers ────────────────────────────────────────────────────────────
+
+class _IncomeBar {
+  final String month;
+  final double income;
+  final double expense;
+  const _IncomeBar({required this.month, required this.income, required this.expense});
+}
+
+class _MonthIncome {
+  final String label;
+  final double amount;
+  const _MonthIncome({required this.label, required this.amount});
+}
+
+class _StatMiniCard extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+  final bool isDark;
+
+  const _StatMiniCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.15)),
+        boxShadow: [
+          BoxShadow(color: color.withOpacity(0.12), blurRadius: 12, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(height: 8),
+          Text(value,
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: color),
+            maxLines: 1, overflow: TextOverflow.ellipsis),
+          Text(label,
+            style: TextStyle(fontSize: 11,
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5))),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChartLegend extends StatelessWidget {
+  final Color color;
+  final String label;
+  const _ChartLegend({required this.color, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(children: [
+      Container(width: 12, height: 12,
+        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3))),
+      const SizedBox(width: 6),
+      Text(label, style: TextStyle(fontSize: 11,
+        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5))),
+    ]);
+  }
 }

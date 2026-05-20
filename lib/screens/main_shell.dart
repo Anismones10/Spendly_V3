@@ -7,12 +7,11 @@ import '../providers/settings_provider.dart';
 import 'dashboard_screen.dart';
 import 'expenses_screen.dart';
 import 'income_screen.dart';
-import 'expenses_screen.dart';
 import 'goals_screen.dart';
 import 'settings_screen.dart';
 import 'statistics_screen.dart';
-import 'income_screen.dart';
 import 'loans_screen.dart';
+import 'global_search_screen.dart';
 
 class _TabDef {
   final String id;
@@ -73,6 +72,14 @@ final List<_TabDef> _allTabs = [
     activeIcon: Icons.bar_chart_rounded,
     screen: const StatisticsScreen(),
   ),
+  // Search is a real tab — customizable, hideable like any other
+  _TabDef(
+    id: 'search',
+    label: 'Search',
+    icon: Icons.search_outlined,
+    activeIcon: Icons.search_rounded,
+    screen: const GlobalSearchScreen(),
+  ),
   _TabDef(
     id: 'settings',
     label: 'Settings',
@@ -87,6 +94,7 @@ const List<String> _defaultTabOrder = [
   'expenses',
   'stats',
   'goals',
+  'search',
 ];
 
 class MainShell extends StatefulWidget {
@@ -111,10 +119,12 @@ class _MainShellState extends State<MainShell> {
   void _loadTabPrefs() {
     final saved = _settingsBox.get('visibleTabs') as List?;
     if (saved != null && saved.length >= 2) {
-      _visibleTabIds = List<String>.from(saved)..remove('settings');
+      _visibleTabIds = List<String>.from(saved)
+        ..remove('settings');
     } else {
       _visibleTabIds = List<String>.from(_defaultTabOrder);
     }
+    // settings is never shown in bottom nav
     _visibleTabIds.remove('settings');
     // home always first
     _visibleTabIds.remove('home');
@@ -124,16 +134,19 @@ class _MainShellState extends State<MainShell> {
   }
 
   void _saveTabPrefs() {
-    final toSave = List<String>.from(_visibleTabIds)..remove('settings');
+    final toSave = List<String>.from(_visibleTabIds)
+      ..remove('settings');
     _settingsBox.put('visibleTabs', toSave);
   }
 
-  List<_TabDef> get _visibleTabs =>
-      _visibleTabIds.map((id) => _allTabs.firstWhere((t) => t.id == id)).toList();
+  List<_TabDef> get _visibleTabs => _visibleTabIds
+      .map((id) => _allTabs.firstWhere((t) => t.id == id))
+      .toList();
 
   void _goTo(int index) {
     if (index == _currentIndex) return;
-    final haptic = _settingsBox.get('hapticEnabled', defaultValue: true) as bool;
+    final haptic = _settingsBox.get('hapticEnabled',
+        defaultValue: true) as bool;
     if (haptic) HapticFeedback.lightImpact();
     setState(() {
       _previousIndex = _currentIndex;
@@ -145,7 +158,8 @@ class _MainShellState extends State<MainShell> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final hiddenTabs = _allTabs
-        .where((t) => !_visibleTabIds.contains(t.id) && t.id != 'settings')
+        .where((t) =>
+            !_visibleTabIds.contains(t.id) && t.id != 'settings')
         .toList();
 
     showModalBottomSheet(
@@ -157,83 +171,115 @@ class _MainShellState extends State<MainShell> {
         minChildSize: 0.3,
         maxChildSize: 0.85,
         builder: (_, scrollController) => Container(
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        padding: EdgeInsets.fromLTRB(
-            24, 16, 24, MediaQuery.of(ctx).padding.bottom + 24),
-        child: SingleChildScrollView(
-          controller: scrollController,
-          child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40, height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(2),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          padding: EdgeInsets.fromLTRB(
+              24, 16, 24, MediaQuery.of(ctx).padding.bottom + 24),
+          child: SingleChildScrollView(
+            controller: scrollController,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(height: 20),
+                const Text('More',
+                    style: TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 16),
+
+                // Search entry in More menu
+                _MoreTile(
+                  icon: Icons.search_rounded,
+                  label: 'Global Search',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    Navigator.push(
+                      context,
+                      PageRouteBuilder(
+                        pageBuilder: (_, __, ___) =>
+                            const GlobalSearchScreen(),
+                        transitionsBuilder:
+                            (_, animation, __, child) =>
+                                FadeTransition(
+                                    opacity: animation, child: child),
+                        transitionDuration:
+                            const Duration(milliseconds: 200),
+                      ),
+                    );
+                  },
+                ),
+
+                const SizedBox(height: 4),
+                Divider(color: Colors.grey.withOpacity(0.15)),
+                const SizedBox(height: 4),
+
+                _MoreTile(
+                  icon: Icons.settings_rounded,
+                  label: 'Settings',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const SettingsScreen()));
+                  },
+                ),
+
+                if (hiddenTabs.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Divider(color: Colors.grey.withOpacity(0.15)),
+                  const SizedBox(height: 8),
+                  Text('Other Screens',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: theme.colorScheme.onSurface
+                              .withOpacity(0.4))),
+                  const SizedBox(height: 8),
+                  ...hiddenTabs.map((tab) => _MoreTile(
+                        icon: tab.activeIcon,
+                        label: tab.label,
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          if (tab.id == 'settings') return;
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => tab.screen),
+                          );
+                        },
+                      )),
+                ],
+
+                const SizedBox(height: 8),
+                Divider(color: Colors.grey.withOpacity(0.15)),
+                const SizedBox(height: 8),
+
+                _MoreTile(
+                  icon: Icons.tune_rounded,
+                  label: 'Customize Tabs',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showTabCustomizer();
+                  },
+                ),
+              ],
             ),
-            const SizedBox(height: 20),
-            const Text('More',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 16),
-
-            _MoreTile(
-              icon: Icons.settings_rounded,
-              label: 'Settings',
-              onTap: () {
-                Navigator.pop(ctx);
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const SettingsScreen()));
-              },
-            ),
-
-            if (hiddenTabs.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Divider(color: Colors.grey.withOpacity(0.15)),
-              const SizedBox(height: 8),
-              Text('Other Screens',
-                  style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: theme.colorScheme.onSurface.withOpacity(0.4))),
-              const SizedBox(height: 8),
-              ...hiddenTabs.map((tab) => _MoreTile(
-                icon: tab.activeIcon,
-                label: tab.label,
-                onTap: () {
-                  Navigator.pop(ctx);
-                  if (tab.id == 'settings') return;
-                  // Just navigate — never add to bottom nav permanently
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => tab.screen),
-                  );
-                },
-              )),
-            ],
-
-            const SizedBox(height: 8),
-            Divider(color: Colors.grey.withOpacity(0.15)),
-            const SizedBox(height: 8),
-
-            _MoreTile(
-              icon: Icons.tune_rounded,
-              label: 'Customize Tabs',
-              onTap: () {
-                Navigator.pop(ctx);
-                _showTabCustomizer();
-              },
-            ),
-          ],
+          ),
         ),
-        ),
-      ),
       ),
     );
   }
@@ -244,6 +290,7 @@ class _MainShellState extends State<MainShell> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _TabCustomizerSheet(
+        // Exclude settings only — search is a normal customizable tab
         allTabs: _allTabs.where((t) => t.id != 'settings').toList(),
         visibleTabIds: List<String>.from(_visibleTabIds),
         onSave: (newIds) {
@@ -254,7 +301,8 @@ class _MainShellState extends State<MainShell> {
                 ? _visibleTabs[_currentIndex].id
                 : 'home';
             final newIndex = newIds.indexOf(currentId);
-            _currentIndex = newIndex >= 0 ? newIndex : newIds.indexOf('home');
+            _currentIndex =
+                newIndex >= 0 ? newIndex : newIds.indexOf('home');
             if (_currentIndex < 0) _currentIndex = 0;
             _previousIndex = _currentIndex;
           });
@@ -270,9 +318,9 @@ class _MainShellState extends State<MainShell> {
     final isDark = theme.brightness == Brightness.dark;
     final tabs = _visibleTabs;
 
-    // Build current screen — pass onMoreTap to screens that handle it in AppBar
     Widget currentScreen;
-    final currentId = _currentIndex < tabs.length ? tabs[_currentIndex].id : 'home';
+    final currentId =
+        _currentIndex < tabs.length ? tabs[_currentIndex].id : 'home';
 
     if (_currentIndex == 0 || currentId == 'home') {
       currentScreen = DashboardScreen(onMoreTap: _showMoreMenu);
@@ -280,14 +328,19 @@ class _MainShellState extends State<MainShell> {
       currentScreen = ExpensesScreen(onMoreTap: _showMoreMenu);
     } else if (currentId == 'income') {
       currentScreen = IncomeScreen(onMoreTap: _showMoreMenu);
+    } else if (currentId == 'search') {
+      currentScreen = const GlobalSearchScreen();
     } else if (_currentIndex < tabs.length) {
       currentScreen = tabs[_currentIndex].screen;
     } else {
       currentScreen = DashboardScreen(onMoreTap: _showMoreMenu);
     }
 
-    // Screens that handle their own ••• button in AppBar
-    final hasOwnMoreButton = ['home', 'expenses', 'income'].contains(currentId);
+    final hasOwnMoreButton =
+        ['home', 'expenses', 'income'].contains(currentId);
+    // Search screen has its own back button, no overlay needed
+    final needsMoreOverlay =
+        !hasOwnMoreButton && currentId != 'search';
 
     return Scaffold(
       body: Stack(
@@ -314,8 +367,8 @@ class _MainShellState extends State<MainShell> {
             ),
           ),
 
-          // ••• More button overlay — only for screens without their own AppBar button
-          if (!hasOwnMoreButton)
+          // ••• More button overlay for screens without their own AppBar button
+          if (needsMoreOverlay)
             Positioned(
               top: MediaQuery.of(context).padding.top + 10,
               right: 12,
@@ -328,7 +381,8 @@ class _MainShellState extends State<MainShell> {
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
-                        color: theme.colorScheme.primary.withOpacity(0.15),
+                        color:
+                            theme.colorScheme.primary.withOpacity(0.15),
                         blurRadius: 8,
                       ),
                     ],
@@ -360,15 +414,19 @@ class _MainShellState extends State<MainShell> {
         child: SafeArea(
           top: false,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            padding: const EdgeInsets.symmetric(
+                horizontal: 8, vertical: 10),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
+                // Regular nav tabs — search is just another tab now
                 ...List.generate(tabs.length, (i) {
                   final tab = tabs[i];
                   final isSelected = i == _currentIndex;
                   return _NavButton(
-                    icon: isSelected ? tab.activeIcon : tab.icon,
+                    icon: isSelected
+                        ? tab.activeIcon
+                        : tab.icon,
                     label: tab.label,
                     isSelected: isSelected,
                     onTap: () => _goTo(i),
@@ -406,7 +464,8 @@ class _NavButton extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 220),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected
               ? theme.colorScheme.primary.withOpacity(0.1)
@@ -428,49 +487,14 @@ class _NavButton extends StatelessWidget {
               duration: const Duration(milliseconds: 200),
               style: TextStyle(
                 fontSize: 10,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+                fontWeight: isSelected
+                    ? FontWeight.w700
+                    : FontWeight.w400,
                 color: isSelected
                     ? theme.colorScheme.primary
                     : theme.colorScheme.onSurface.withOpacity(0.38),
               ),
               child: Text(label),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── More / Customize Button ───────────────────────────────────────────────────
-
-class _CustomizeButton extends StatelessWidget {
-  final VoidCallback onTap;
-  const _CustomizeButton({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.more_horiz_rounded,
-              size: 22,
-              color: theme.colorScheme.onSurface.withOpacity(0.38),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              'More',
-              style: TextStyle(
-                fontSize: 10,
-                color: theme.colorScheme.onSurface.withOpacity(0.38),
-              ),
             ),
           ],
         ),
@@ -493,7 +517,8 @@ class _TabCustomizerSheet extends StatefulWidget {
   });
 
   @override
-  State<_TabCustomizerSheet> createState() => _TabCustomizerSheetState();
+  State<_TabCustomizerSheet> createState() =>
+      _TabCustomizerSheetState();
 }
 
 class _TabCustomizerSheetState extends State<_TabCustomizerSheet> {
@@ -519,7 +544,8 @@ class _TabCustomizerSheetState extends State<_TabCustomizerSheet> {
   }
 
   void _resetToDefault() {
-    setState(() => _selected = List<String>.from(_defaultTabOrder));
+    setState(
+        () => _selected = List<String>.from(_defaultTabOrder));
   }
 
   @override
@@ -530,7 +556,8 @@ class _TabCustomizerSheetState extends State<_TabCustomizerSheet> {
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius:
+            const BorderRadius.vertical(top: Radius.circular(28)),
       ),
       padding: EdgeInsets.fromLTRB(
           24, 16, 24, MediaQuery.of(context).padding.bottom + 24),
@@ -540,7 +567,8 @@ class _TabCustomizerSheetState extends State<_TabCustomizerSheet> {
         children: [
           Center(
             child: Container(
-              width: 40, height: 4,
+              width: 40,
+              height: 4,
               decoration: BoxDecoration(
                   color: Colors.grey.withOpacity(0.3),
                   borderRadius: BorderRadius.circular(2)),
@@ -551,14 +579,16 @@ class _TabCustomizerSheetState extends State<_TabCustomizerSheet> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text('Customize Tabs',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                  style: TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.w700)),
               TextButton(
-                  onPressed: _resetToDefault, child: const Text('Reset')),
+                  onPressed: _resetToDefault,
+                  child: const Text('Reset')),
             ],
           ),
           const SizedBox(height: 6),
           Text(
-            'Choose 3–5 tabs. Home is always visible.',
+            'Choose 3–5 tabs. Home always visible.',
             style: TextStyle(
                 fontSize: 12,
                 color: theme.colorScheme.onSurface.withOpacity(0.5)),
@@ -574,11 +604,14 @@ class _TabCustomizerSheetState extends State<_TabCustomizerSheet> {
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
                   color: isSelected
                       ? theme.colorScheme.primary.withOpacity(0.08)
-                      : (isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade50),
+                      : (isDark
+                          ? const Color(0xFF2A2A2A)
+                          : Colors.grey.shade50),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: isSelected
@@ -593,7 +626,8 @@ class _TabCustomizerSheetState extends State<_TabCustomizerSheet> {
                       isSelected ? tab.activeIcon : tab.icon,
                       color: isSelected
                           ? theme.colorScheme.primary
-                          : theme.colorScheme.onSurface.withOpacity(0.4),
+                          : theme.colorScheme.onSurface
+                              .withOpacity(0.4),
                       size: 22,
                     ),
                     const SizedBox(width: 14),
@@ -603,7 +637,9 @@ class _TabCustomizerSheetState extends State<_TabCustomizerSheet> {
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 15,
-                          color: isSelected ? theme.colorScheme.primary : null,
+                          color: isSelected
+                              ? theme.colorScheme.primary
+                              : null,
                         ),
                       ),
                     ),
@@ -612,7 +648,8 @@ class _TabCustomizerSheetState extends State<_TabCustomizerSheet> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.primary.withOpacity(0.1),
+                          color: theme.colorScheme.primary
+                              .withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -626,7 +663,8 @@ class _TabCustomizerSheetState extends State<_TabCustomizerSheet> {
                     else
                       AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
-                        width: 22, height: 22,
+                        width: 22,
+                        height: 22,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: isSelected
@@ -635,7 +673,8 @@ class _TabCustomizerSheetState extends State<_TabCustomizerSheet> {
                           border: Border.all(
                             color: isSelected
                                 ? theme.colorScheme.primary
-                                : theme.colorScheme.onSurface.withOpacity(0.3),
+                                : theme.colorScheme.onSurface
+                                    .withOpacity(0.3),
                             width: 2,
                           ),
                         ),
@@ -656,7 +695,8 @@ class _TabCustomizerSheetState extends State<_TabCustomizerSheet> {
               '${_selected.length} / 5 tabs selected',
               style: TextStyle(
                   fontSize: 12,
-                  color: theme.colorScheme.onSurface.withOpacity(0.4)),
+                  color: theme.colorScheme.onSurface
+                      .withOpacity(0.4)),
             ),
           ),
           const SizedBox(height: 16),
@@ -693,21 +733,26 @@ class _MoreTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 4),
       leading: Container(
-        width: 42, height: 42,
+        width: 42,
+        height: 42,
         decoration: BoxDecoration(
           color: theme.colorScheme.primary.withOpacity(0.1),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Icon(icon, color: theme.colorScheme.primary, size: 20),
+        child: Icon(icon, color: theme.colorScheme.primary,
+            size: 20),
       ),
       title: Text(label,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+          style: const TextStyle(
+              fontWeight: FontWeight.w600, fontSize: 15)),
       trailing: Icon(Icons.chevron_right_rounded,
           color: theme.colorScheme.onSurface.withOpacity(0.3)),
       onTap: onTap,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12)),
     );
   }
 }

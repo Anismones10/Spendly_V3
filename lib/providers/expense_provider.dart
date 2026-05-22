@@ -322,7 +322,7 @@ class ExpenseProvider extends ChangeNotifier {
             'You spent $diff% more this month compared to last month.');
       } else if (diff < 0) {
         insights.add(
-            'Great job! You saved ${diff.abs()}% more than last month! 🎉');
+            'Great job! You saved ${diff.abs()}% more than last month!');
       }
     }
 

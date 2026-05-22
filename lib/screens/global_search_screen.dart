@@ -327,37 +327,95 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
     return Scaffold(
       backgroundColor:
           isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
-      appBar: AppBar(
-        backgroundColor:
-            isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
-        titleSpacing: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: TextField(
-          controller: _controller,
-          focusNode: _focusNode,
-          style: const TextStyle(fontSize: 16),
-          decoration: InputDecoration(
-            hintText: 'Search expenses, income, loans...',
-            hintStyle: TextStyle(
-                fontSize: 15,
-                color: theme.colorScheme.onSurface.withOpacity(0.4)),
-            border: InputBorder.none,
-            filled: false,
-            contentPadding: const EdgeInsets.symmetric(vertical: 14),
-            suffixIcon: _query.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.close_rounded, size: 20),
-                    onPressed: () {
-                      _controller.clear();
-                      _focusNode.requestFocus();
-                    },
-                  )
-                : null,
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(64),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: Row(
+              children: [
+                // Back button
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? const Color(0xFF2A2A2A)
+                          : Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                            color: Colors.black.withOpacity(0.06),
+                            blurRadius: 6),
+                      ],
+                    ),
+                    child: Icon(Icons.arrow_back_rounded,
+                        size: 20,
+                        color: theme.colorScheme.onSurface),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                // Search field
+                Expanded(
+                  child: Container(
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? const Color(0xFF2A2A2A)
+                          : Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: theme.colorScheme.primary.withOpacity(0.3),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 8),
+                      ],
+                    ),
+                    child: TextField(
+                      controller: _controller,
+                      focusNode: _focusNode,
+                      style: const TextStyle(fontSize: 15),
+                      decoration: InputDecoration(
+                        hintText: 'Search expenses, income, loans...',
+                        hintStyle: TextStyle(
+                            fontSize: 14,
+                            color: theme.colorScheme.onSurface
+                                .withOpacity(0.35)),
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        filled: false,
+                        prefixIcon: Icon(Icons.search_rounded,
+                            size: 18,
+                            color: theme.colorScheme.primary
+                                .withOpacity(0.5)),
+                        suffixIcon: _query.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.close_rounded,
+                                    size: 18),
+                                color: theme.colorScheme.onSurface
+                                    .withOpacity(0.4),
+                                onPressed: () {
+                                  _controller.clear();
+                                  _focusNode.requestFocus();
+                                },
+                              )
+                            : null,
+                        contentPadding:
+                            const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      textInputAction: TextInputAction.search,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-          textInputAction: TextInputAction.search,
         ),
       ),
 
@@ -507,7 +565,11 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
   }
 }
 
-// ── Filter Grid (2-column layout, glowy) ─────────────────────────────────────
+// ── Filter Grid (3-column equal size) ────────────────────────────────────────
+//
+//  Col 0        Col 1       Col 2
+//  Expenses     Loans       Wallets
+//  Income       Goals       (empty)
 
 class _FilterGrid extends StatelessWidget {
   final bool showExpenses, showIncome, showLoans, showGoals, showWallets;
@@ -526,73 +588,113 @@ class _FilterGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // Layout: Expense | Goal
-    //         Income  | Wallet
-    //         Loans   |
-    final chips = [
-      (SearchResultType.expense, 'Expenses',  Icons.receipt_long_rounded,           showExpenses),
-      (SearchResultType.goal,    'Goals',     Icons.flag_rounded,                    showGoals),
-      (SearchResultType.income,  'Income',    Icons.account_balance_wallet_rounded,  showIncome),
-      (SearchResultType.wallet,  'Wallets',   Icons.wallet_rounded,                  showWallets),
-      (SearchResultType.loan,    'Loans',     Icons.handshake_rounded,               showLoans),
+    // Row 0: Expenses | Loans    | Wallets
+    // Row 1: Income   | Goals    | (empty)
+    final rows = [
+      [
+        (SearchResultType.expense, 'Expenses', Icons.receipt_long_rounded),
+        (SearchResultType.loan,    'Loans',    Icons.handshake_rounded),
+        (SearchResultType.wallet,  'Wallets',  Icons.wallet_rounded),
+      ],
+      [
+        (SearchResultType.income,  'Income',   Icons.account_balance_wallet_rounded),
+        (SearchResultType.goal,    'Goals',    Icons.flag_rounded),
+        null, // empty cell to maintain grid
+      ],
     ];
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-      child: Wrap(
-        spacing: 10,
-        runSpacing: 10,
-        children: chips.map((chip) {
-          final (type, label, icon, active) = chip;
-          final color = _filterColors[type]!;
+    bool isActive(SearchResultType t) {
+      switch (t) {
+        case SearchResultType.expense: return showExpenses;
+        case SearchResultType.income:  return showIncome;
+        case SearchResultType.loan:    return showLoans;
+        case SearchResultType.goal:    return showGoals;
+        case SearchResultType.wallet:  return showWallets;
+      }
+    }
 
-          return GestureDetector(
-            onTap: () => onToggle(type),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-              decoration: BoxDecoration(
-                color: active
-                    ? color.withOpacity(isDark ? 0.25 : 0.15)
-                    : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: active ? color : Colors.transparent,
-                  width: 1.5,
-                ),
-                boxShadow: active
-                    ? [
-                        BoxShadow(
-                          color: color.withOpacity(0.4),
-                          blurRadius: 12,
-                          spreadRadius: 0,
-                          offset: const Offset(0, 3),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Column(
+        children: rows.map((row) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              children: row.asMap().entries.map((entry) {
+                final i = entry.key;
+                final cell = entry.value;
+
+                // Spacer for null (empty cell)
+                if (cell == null) {
+                  return const Expanded(child: SizedBox.shrink());
+                }
+
+                final (type, label, icon) = cell;
+                final color = _filterColors[type]!;
+                final active = isActive(type);
+
+                return Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      left: i == 0 ? 0 : 5,
+                      right: i == row.length - 1 ? 0 : 5,
+                    ),
+                    child: GestureDetector(
+                      onTap: () => onToggle(type),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: active
+                              ? color.withOpacity(isDark ? 0.25 : 0.15)
+                              : (isDark
+                                  ? const Color(0xFF1E1E1E)
+                                  : Colors.white),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: active ? color : Colors.transparent,
+                            width: 1.5,
+                          ),
+                          boxShadow: active
+                              ? [
+                                  BoxShadow(
+                                    color: color.withOpacity(0.35),
+                                    blurRadius: 14,
+                                    spreadRadius: 0,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ]
+                              : [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.05),
+                                    blurRadius: 6,
+                                  ),
+                                ],
                         ),
-                      ]
-                    : [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 6,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(icon,
+                                size: 16,
+                                color: active
+                                    ? color
+                                    : Colors.grey.withOpacity(0.45)),
+                            const SizedBox(width: 6),
+                            Text(
+                              label,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: active ? color : Colors.grey,
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(icon,
-                      size: 15,
-                      color: active ? color : Colors.grey.withOpacity(0.5)),
-                  const SizedBox(width: 6),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: active ? color : Colors.grey,
+                      ),
                     ),
                   ),
-                ],
-              ),
+                );
+              }).toList(),
             ),
           );
         }).toList(),
@@ -601,9 +703,9 @@ class _FilterGrid extends StatelessWidget {
   }
 }
 
-// ── Recent Results ────────────────────────────────────────────────────────────
+// ── Recent Results (deletable) ────────────────────────────────────────────────
 
-class _RecentResults extends StatelessWidget {
+class _RecentResults extends StatefulWidget {
   final List<SearchResult> recents;
   final ValueChanged<SearchResult> onTap;
   final bool isDark;
@@ -617,9 +719,28 @@ class _RecentResults extends StatelessWidget {
   });
 
   @override
+  State<_RecentResults> createState() => _RecentResultsState();
+}
+
+class _RecentResultsState extends State<_RecentResults> {
+  void _deleteOne(SearchResult r) {
+    setState(() {
+      _GlobalSearchScreenState._recentResults
+          .removeWhere((x) => x.id == r.id);
+    });
+  }
+
+  void _clearAll() {
+    setState(() {
+      _GlobalSearchScreenState._recentResults.clear();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final recents = _GlobalSearchScreenState._recentResults;
+
     if (recents.isEmpty) {
-      // Simple empty state — no tips list
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -627,25 +748,25 @@ class _RecentResults extends StatelessWidget {
             Container(
               width: 80, height: 80,
               decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withOpacity(0.08),
+                color: widget.theme.colorScheme.primary.withOpacity(0.08),
                 shape: BoxShape.circle,
               ),
               child: Icon(Icons.search_rounded,
                   size: 38,
-                  color: theme.colorScheme.primary.withOpacity(0.4)),
+                  color: widget.theme.colorScheme.primary.withOpacity(0.4)),
             ),
             const SizedBox(height: 16),
             Text('Search everything',
                 style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
-                    color: theme.colorScheme.onSurface)),
+                    color: widget.theme.colorScheme.onSurface)),
             const SizedBox(height: 8),
             Text(
               'Expenses · Income · Loans · Goals · Wallets',
               style: TextStyle(
                   fontSize: 13,
-                  color: theme.colorScheme.onSurface.withOpacity(0.4)),
+                  color: widget.theme.colorScheme.onSurface.withOpacity(0.4)),
             ),
           ],
         ),
@@ -653,35 +774,86 @@ class _RecentResults extends StatelessWidget {
     }
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
       children: [
+        // Header row with "Recent" label + "Clear all" button
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Icon(Icons.history_rounded,
-                size: 16, color: theme.colorScheme.onSurface.withOpacity(0.4)),
-            const SizedBox(width: 6),
-            Text(
-              'Recent',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: theme.colorScheme.onSurface.withOpacity(0.5),
+            Row(children: [
+              Icon(Icons.history_rounded,
+                  size: 16,
+                  color: widget.theme.colorScheme.onSurface.withOpacity(0.4)),
+              const SizedBox(width: 6),
+              Text(
+                'Recent',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: widget.theme.colorScheme.onSurface.withOpacity(0.5),
+                ),
+              ),
+            ]),
+            GestureDetector(
+              onTap: _clearAll,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Text(
+                  'Clear all',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFFE57373),
+                  ),
+                ),
               ),
             ),
           ],
         ),
         const SizedBox(height: 10),
-        ...recents.asMap().entries.map((e) =>
-          _ResultTile(
-            result: e.value,
-            query: '',
-            onTap: () => onTap(e.value),
-            isDark: isDark,
-            theme: theme,
-          )
-          .animate()
-          .fadeIn(delay: (e.key * 25).ms, duration: 200.ms),
-        ),
+
+        // Individual dismissible tiles
+        ...recents.asMap().entries.map((e) {
+          final result = e.value;
+          return Dismissible(
+            key: ValueKey(result.id),
+            direction: DismissDirection.endToStart,
+            onDismissed: (_) => _deleteOne(result),
+            background: Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              alignment: Alignment.centerRight,
+              padding: const EdgeInsets.only(right: 20),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.85),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Icon(Icons.delete_rounded,
+                  color: Colors.white, size: 22),
+            ),
+            child: _ResultTile(
+              result: result,
+              query: '',
+              onTap: () => widget.onTap(result),
+              isDark: widget.isDark,
+              theme: widget.theme,
+              trailing: GestureDetector(
+                onTap: () => setState(() => _deleteOne(result)),
+                child: Icon(
+                  Icons.close_rounded,
+                  size: 16,
+                  color: widget.theme.colorScheme.onSurface.withOpacity(0.3),
+                ),
+              ),
+            )
+            .animate()
+            .fadeIn(delay: (e.key * 25).ms, duration: 200.ms),
+          );
+        }),
       ],
     );
   }
@@ -692,6 +864,7 @@ class _ResultTile extends StatelessWidget {
   final VoidCallback onTap;
   final bool isDark;
   final ThemeData theme;
+  final Widget? trailing;
 
   const _ResultTile({
     required this.result,
@@ -699,6 +872,7 @@ class _ResultTile extends StatelessWidget {
     required this.onTap,
     required this.isDark,
     required this.theme,
+    this.trailing,
   });
 
   @override
@@ -783,6 +957,7 @@ class _ResultTile extends StatelessWidget {
             const SizedBox(width: 8),
 
             // Amount + arrow
+            // Amount + trailing (arrow or custom widget)
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -800,10 +975,11 @@ class _ResultTile extends StatelessWidget {
                     ),
                   ),
                 const SizedBox(height: 2),
-                Icon(Icons.chevron_right_rounded,
-                    size: 16,
-                    color: theme.colorScheme.onSurface
-                        .withOpacity(0.25)),
+                trailing ??
+                    Icon(Icons.chevron_right_rounded,
+                        size: 16,
+                        color: theme.colorScheme.onSurface
+                            .withOpacity(0.25)),
               ],
             ),
           ],

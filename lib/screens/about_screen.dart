@@ -85,9 +85,9 @@ class AboutScreen extends StatelessWidget {
                     icon: Icons.email_rounded,
                     color: const Color(0xFFE57373),
                     label: 'Email',
-                    value: 'anisniazi2018@gmail.com',
+                    value: 'anis.mones.official@gmail.com',
                     onTap: () => _launch(
-                        context, 'mailto:anisniazi2018@gmail.com'),
+                        context, 'mailto:anis.mones.official@gmail.com'),
                   ),
                   const SizedBox(height: 10),
                   _ContactTile(

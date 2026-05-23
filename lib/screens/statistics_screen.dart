@@ -168,6 +168,7 @@ class _OverviewTab extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final incomeProvider = context.watch<IncomeProvider>();
+    final categories = context.watch<CategoryProvider>();
 
     final thisMonth = expenses.getTotalForMonth(now.year, now.month);
     final lastMonth = expenses.getTotalForMonth(
@@ -176,8 +177,7 @@ class _OverviewTab extends StatelessWidget {
     );
     final thisWeek = expenses.getTotalForWeek();
     final today = expenses.getTotalForDay(now);
-    final thisMonthIncome =
-        incomeProvider.getTotalForMonth(now.year, now.month);
+    final thisMonthIncome = incomeProvider.getTotalForMonth(now.year, now.month);
     final balance = thisMonthIncome - thisMonth;
 
     final dailyTotals = expenses.getDailyTotals(now.year, now.month);
@@ -185,207 +185,260 @@ class _OverviewTab extends StatelessWidget {
         ? 1.0
         : dailyTotals.values.reduce((a, b) => a > b ? a : b);
 
+    // Average daily spend
+    final daysWithExpense = dailyTotals.values.where((v) => v > 0).length;
+    final avgDaily = daysWithExpense > 0 ? thisMonth / daysWithExpense : 0.0;
+
+    // Top 3 categories this month
+    final catTotals = expenses.getCategoryTotals(now.year, now.month);
+    final topCats = catTotals.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    // vs last month
+    final diff = thisMonth - lastMonth;
+    final hasPrevData = lastMonth > 0;
+    final pctStr = hasPrevData
+        ? '${diff.abs() / lastMonth * 100 < 0.1 ? '0.0' : (diff.abs() / lastMonth * 100).toStringAsFixed(1)}%'
+        : null;
+    final isMore = diff > 0;
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // ── Summary cards ──────────────────────────────────────────────────
-        Row(
-          children: [
-            Expanded(
-              child: _StatCard(
-                label: 'This Month',
-                value: AppUtils.formatAmount(thisMonth, symbol),
-                icon: Icons.calendar_view_month_rounded,
-                color: theme.colorScheme.primary,
-              ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.2),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _StatCard(
-                label: 'Last Month',
-                value: AppUtils.formatAmount(lastMonth, symbol),
-                icon: Icons.history_rounded,
-                color: const Color(0xFF78909C),
-              ).animate().fadeIn(delay: 80.ms, duration: 400.ms).slideY(begin: 0.2),
-            ),
-          ],
-        ),
+        // ── 4 stat cards ──────────────────────────────────────────────
+        Row(children: [
+          Expanded(child: _StatCard(
+            label: 'This Month', value: AppUtils.formatAmount(thisMonth, symbol),
+            icon: Icons.calendar_view_month_rounded, color: theme.colorScheme.primary,
+          ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.2)),
+          const SizedBox(width: 12),
+          Expanded(child: _StatCard(
+            label: 'Last Month', value: AppUtils.formatAmount(lastMonth, symbol),
+            icon: Icons.history_rounded, color: const Color(0xFF78909C),
+          ).animate().fadeIn(delay: 80.ms, duration: 400.ms).slideY(begin: 0.2)),
+        ]),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _StatCard(
-                label: 'This Week',
-                value: AppUtils.formatAmount(thisWeek, symbol),
-                icon: Icons.date_range_rounded,
-                color: const Color(0xFF26A69A),
-              ).animate().fadeIn(delay: 160.ms, duration: 400.ms).slideY(begin: 0.2),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _StatCard(
-                label: 'Today',
-                value: AppUtils.formatAmount(today, symbol),
-                icon: Icons.today_rounded,
-                color: const Color(0xFFEF6C00),
-              ).animate().fadeIn(delay: 240.ms, duration: 400.ms).slideY(begin: 0.2),
-            ),
-          ],
-        ),
+        Row(children: [
+          Expanded(child: _StatCard(
+            label: 'This Week', value: AppUtils.formatAmount(thisWeek, symbol),
+            icon: Icons.date_range_rounded, color: const Color(0xFF26A69A),
+          ).animate().fadeIn(delay: 160.ms, duration: 400.ms).slideY(begin: 0.2)),
+          const SizedBox(width: 12),
+          Expanded(child: _StatCard(
+            label: 'Today', value: AppUtils.formatAmount(today, symbol),
+            icon: Icons.today_rounded, color: const Color(0xFFEF6C00),
+          ).animate().fadeIn(delay: 240.ms, duration: 400.ms).slideY(begin: 0.2)),
+        ]),
 
         const SizedBox(height: 16),
 
-        // ── Income vs Expense this month ───────────────────────────────────
+        // ── This month summary ─────────────────────────────────────────
         if (thisMonthIncome > 0)
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                    color: Colors.black.withOpacity(0.05), blurRadius: 10)
-              ],
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('This Month Summary',
-                    style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        color: theme.colorScheme.onSurface.withOpacity(0.7))),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Income',
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    color: theme.colorScheme.onSurface
-                                        .withOpacity(0.5))),
-                            Text(AppUtils.formatAmount(thisMonthIncome, symbol),
-                                style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF2ECC71))),
-                          ]),
-                    ),
-                    Expanded(
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Text('Balance',
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    color: theme.colorScheme.onSurface
-                                        .withOpacity(0.5))),
-                            Text(
-                              '${balance >= 0 ? '+' : ''}${AppUtils.formatAmount(balance.abs(), symbol)}',
-                              style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: balance >= 0
-                                      ? const Color(0xFF2ECC71)
-                                      : const Color(0xFFE57373)),
-                            ),
-                          ]),
-                    ),
-                    Expanded(
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text('Expenses',
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    color: theme.colorScheme.onSurface
-                                        .withOpacity(0.5))),
-                            Text(AppUtils.formatAmount(thisMonth, symbol),
-                                style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFFE57373))),
-                          ]),
-                    ),
-                  ],
-                ),
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15,
+                    color: theme.colorScheme.onSurface)),
+                const SizedBox(height: 14),
+                Row(children: [
+                  Expanded(child: _MiniStat(
+                    label: 'Income', value: AppUtils.formatAmount(thisMonthIncome, symbol),
+                    color: const Color(0xFF2ECC71))),
+                  Expanded(child: _MiniStat(
+                    label: 'Balance', align: TextAlign.center,
+                    value: '${balance >= 0 ? '+' : ''}${AppUtils.formatAmount(balance.abs(), symbol)}',
+                    color: balance >= 0 ? const Color(0xFF2ECC71) : const Color(0xFFE57373))),
+                  Expanded(child: _MiniStat(
+                    label: 'Expenses', align: TextAlign.end,
+                    value: AppUtils.formatAmount(thisMonth, symbol),
+                    color: const Color(0xFFE57373))),
+                ]),
                 const SizedBox(height: 12),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(6),
                   child: Stack(children: [
-                    Container(
-                        height: 10,
-                        color:
-                            const Color(0xFF2ECC71).withOpacity(0.12)),
+                    Container(height: 8, color: const Color(0xFF2ECC71).withOpacity(0.12)),
                     FractionallySizedBox(
                       widthFactor: thisMonthIncome > 0
-                          ? (thisMonth / thisMonthIncome).clamp(0.0, 1.0)
-                          : 0,
-                      child: Container(
-                          height: 10,
-                          decoration: BoxDecoration(
-                            color: thisMonth > thisMonthIncome
-                                ? const Color(0xFFE57373)
-                                : const Color(0xFF2ECC71),
-                            borderRadius: BorderRadius.circular(6),
-                          )),
+                          ? (thisMonth / thisMonthIncome).clamp(0.0, 1.0) : 0,
+                      child: Container(height: 8,
+                        decoration: BoxDecoration(
+                          color: thisMonth > thisMonthIncome
+                              ? const Color(0xFFE57373) : const Color(0xFF2ECC71),
+                          borderRadius: BorderRadius.circular(6))),
                     ),
                   ]),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  thisMonthIncome > 0
-                      ? '${(thisMonth / thisMonthIncome * 100).toStringAsFixed(1)}% of income spent'
-                      : '',
-                  style: TextStyle(
-                      fontSize: 11,
-                      color:
-                          theme.colorScheme.onSurface.withOpacity(0.4)),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${(thisMonth / thisMonthIncome * 100).toStringAsFixed(1)}% of income spent',
+                      style: TextStyle(fontSize: 11,
+                        color: theme.colorScheme.onSurface.withOpacity(0.45))),
+                    Text('Avg/day: ${AppUtils.formatAmount(avgDaily, symbol)}',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.primary)),
+                  ],
                 ),
               ],
             ),
           ).animate().fadeIn(delay: 280.ms),
 
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
 
-        // ── Month vs last month ────────────────────────────────────────────
-        _buildCompareCard(context, thisMonth, lastMonth, symbol, isDark),
+        // ── vs last month card ─────────────────────────────────────────
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: isMore
+                  ? [const Color(0xFFE57373).withOpacity(0.15), const Color(0xFFEF5350).withOpacity(0.05)]
+                  : [const Color(0xFF2ECC71).withOpacity(0.15), const Color(0xFF27AE60).withOpacity(0.05)],
+              begin: Alignment.topLeft, end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isMore
+                  ? const Color(0xFFE57373).withOpacity(0.3)
+                  : const Color(0xFF2ECC71).withOpacity(0.3),
+            ),
+          ),
+          child: Row(children: [
+            Icon(
+              isMore ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+              color: isMore ? const Color(0xFFE57373) : const Color(0xFF2ECC71),
+              size: 36,
+            ),
+            const SizedBox(width: 16),
+            Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  hasPrevData
+                      ? (isMore
+                          ? 'Spending up $pctStr vs last month'
+                          : diff == 0
+                              ? 'Same spending as last month'
+                              : 'Spending down $pctStr vs last month')
+                      : (thisMonth > 0
+                          ? 'First month tracked — great start!'
+                          : 'No expenses this month yet'),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700, fontSize: 14,
+                    color: isMore ? const Color(0xFFE57373) : const Color(0xFF2ECC71)),
+                ),
+                if (hasPrevData && diff != 0) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    '${isMore ? '+' : '-'}${AppUtils.formatAmount(diff.abs(), symbol)} compared to last month',
+                    style: TextStyle(fontSize: 12,
+                      color: theme.colorScheme.onSurface.withOpacity(0.55))),
+                ],
+              ],
+            )),
+          ]),
+        ).animate().fadeIn(delay: 320.ms),
 
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
 
-        // ── Daily bar chart ────────────────────────────────────────────────
+        // ── Top categories ────────────────────────────────────────────
+        if (topCats.isNotEmpty) ...[
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Top Categories',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                const SizedBox(height: 14),
+                ...topCats.take(3).map((e) {
+                  final cat = categories.getById(e.key);
+                  final color = cat != null ? Color(cat.colorValue) : theme.colorScheme.primary;
+                  final pct = thisMonth > 0 ? e.value / thisMonth : 0.0;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(children: [
+                      Container(width: 36, height: 36,
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(10)),
+                        child: Icon(CategoryIcons.resolve(cat?.icon ?? ''),
+                          color: color, size: 18)),
+                      const SizedBox(width: 12),
+                      Expanded(child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(cat?.name ?? e.key,
+                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                              Text(AppUtils.formatAmount(e.value, symbol),
+                                style: TextStyle(fontWeight: FontWeight.w700,
+                                  fontSize: 13, color: color)),
+                            ],
+                          ),
+                          const SizedBox(height: 5),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: pct, minHeight: 5,
+                              backgroundColor: color.withOpacity(0.12),
+                              valueColor: AlwaysStoppedAnimation<Color>(color),
+                            ),
+                          ),
+                        ],
+                      )),
+                    ]),
+                  );
+                }),
+              ],
+            ),
+          ).animate().fadeIn(delay: 360.ms),
+          const SizedBox(height: 16),
+        ],
+
+        // ── Daily bar chart ────────────────────────────────────────────
         if (dailyTotals.isNotEmpty) ...[
-          Text('Daily Spending — ${AppUtils.formatMonthYear(now)}',
-              style: const TextStyle(
-                  fontWeight: FontWeight.w700, fontSize: 15)),
+          Row(children: [
+            const Text('Daily Spending',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+            const SizedBox(width: 8),
+            Text(AppUtils.formatMonthYear(now),
+              style: TextStyle(fontSize: 13,
+                color: theme.colorScheme.onSurface.withOpacity(0.45))),
+          ]),
           const SizedBox(height: 12),
-          Builder(builder: (context) {
-            final daysInMonth =
-                DateTime(now.year, now.month + 1, 0).day;
+          Builder(builder: (ctx) {
+            final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
             final chartMax = maxVal * 1.3;
-            final double yInterval =
-                maxVal > 0 ? (maxVal / 4).ceilToDouble() : 100.0;
+            final yInterval = maxVal > 0 ? (maxVal / 4).ceilToDouble() : 100.0;
             const double barWidth = 14.0;
             const double barSpacing = 8.0;
             const double leftAxisWidth = 52.0;
-            final double chartWidth = leftAxisWidth +
-                (daysInMonth * (barWidth + barSpacing)) +
-                16;
-
+            final chartWidth = leftAxisWidth + (daysInMonth * (barWidth + barSpacing)) + 16;
             final hScrollController = ScrollController();
 
             return Container(
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                 borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 12)
-                ],
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 12)],
               ),
               child: Scrollbar(
                 controller: hScrollController,
@@ -395,130 +448,93 @@ class _OverviewTab extends StatelessWidget {
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.only(bottom: 12),
                   child: SizedBox(
-                    width: chartWidth,
-                    height: 240,
+                    width: chartWidth, height: 240,
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(0, 8, 12, 0),
-                      child: BarChart(
-                        BarChartData(
-                          maxY: chartMax,
-                          groupsSpace: barSpacing,
-                          barTouchData: BarTouchData(
-                            touchTooltipData: BarTouchTooltipData(
-                              getTooltipColor: (_) => theme
-                                  .colorScheme.primary
-                                  .withOpacity(0.9),
-                              getTooltipItem: (g, gi, rod, ri) =>
-                                  BarTooltipItem(
-                                'Day ${g.x}\n${AppUtils.formatAmount(rod.toY, symbol)}',
-                                const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 11),
-                              ),
+                      child: BarChart(BarChartData(
+                        maxY: chartMax,
+                        groupsSpace: barSpacing,
+                        barTouchData: BarTouchData(
+                          touchTooltipData: BarTouchTooltipData(
+                            getTooltipColor: (_) => theme.colorScheme.primary.withOpacity(0.9),
+                            getTooltipItem: (g, gi, rod, ri) => BarTooltipItem(
+                              'Day ${g.x}\n${AppUtils.formatAmount(rod.toY, symbol)}',
+                              const TextStyle(color: Colors.white,
+                                fontWeight: FontWeight.w700, fontSize: 11),
                             ),
                           ),
-                          titlesData: FlTitlesData(
-                            bottomTitles: AxisTitles(
-                              sideTitles: SideTitles(
-                                showTitles: true,
-                                reservedSize: 26,
-                                getTitlesWidget: (v, meta) {
-                                  final d = v.toInt();
-                                  final hasExpense =
-                                      dailyTotals.containsKey(d);
-                                  return Padding(
-                                    padding:
-                                        const EdgeInsets.only(top: 6),
-                                    child: Text(
-                                      '$d',
-                                      style: TextStyle(
-                                        fontSize: 9,
-                                        fontWeight: hasExpense
-                                            ? FontWeight.w700
-                                            : FontWeight.w400,
-                                        color: hasExpense
-                                            ? theme.colorScheme.primary
-                                            : theme.colorScheme.onSurface
-                                                .withOpacity(0.35),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                            leftTitles: AxisTitles(
-                              sideTitles: SideTitles(
-                                showTitles: true,
-                                reservedSize: leftAxisWidth,
-                                interval: yInterval,
-                                getTitlesWidget: (v, meta) {
-                                  if (v == 0) {
-                                    return const SizedBox.shrink();
-                                  }
-                                  final label = v >= 1000
-                                      ? '${(v / 1000).toStringAsFixed(v % 1000 == 0 ? 0 : 1)}k'
-                                      : v.toStringAsFixed(0);
-                                  return Padding(
-                                    padding:
-                                        const EdgeInsets.only(right: 4),
-                                    child: Text(label,
-                                        style: TextStyle(
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w500,
-                                          color: theme.colorScheme.onSurface
-                                              .withOpacity(0.45),
-                                        )),
-                                  );
-                                },
-                              ),
-                            ),
-                            topTitles: const AxisTitles(
-                                sideTitles:
-                                    SideTitles(showTitles: false)),
-                            rightTitles: const AxisTitles(
-                                sideTitles:
-                                    SideTitles(showTitles: false)),
-                          ),
-                          gridData: FlGridData(
-                            show: true,
-                            drawVerticalLine: false,
-                            horizontalInterval: yInterval,
-                            getDrawingHorizontalLine: (v) => FlLine(
-                              color: theme.colorScheme.onSurface
-                                  .withOpacity(0.06),
-                              strokeWidth: 1,
-                            ),
-                          ),
-                          borderData: FlBorderData(show: false),
-                          barGroups: List.generate(daysInMonth, (i) {
-                            final day = i + 1;
-                            final value = dailyTotals[day] ?? 0.0;
-                            return BarChartGroupData(
-                              x: day,
-                              barRods: [
-                                BarChartRodData(
-                                  toY: value,
-                                  color: value > 0
-                                      ? theme.colorScheme.primary
-                                      : Colors.transparent,
-                                  width: barWidth,
-                                  borderRadius:
-                                      const BorderRadius.vertical(
-                                          top: Radius.circular(4)),
-                                  backDrawRodData:
-                                      BackgroundBarChartRodData(
-                                    show: value > 0,
-                                    toY: chartMax,
-                                    color: theme.colorScheme.primary
-                                        .withOpacity(0.07),
-                                  ),
-                                ),
-                              ],
-                            );
-                          }),
                         ),
-                      ),
+                        titlesData: FlTitlesData(
+                          bottomTitles: AxisTitles(sideTitles: SideTitles(
+                            showTitles: true, reservedSize: 26,
+                            getTitlesWidget: (v, meta) {
+                              final d = v.toInt();
+                              final isToday = d == now.day;
+                              final hasExpense = dailyTotals.containsKey(d);
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 6),
+                                child: Text('$d',
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: isToday || hasExpense ? FontWeight.w800 : FontWeight.w400,
+                                    color: isToday
+                                        ? theme.colorScheme.primary
+                                        : hasExpense
+                                            ? theme.colorScheme.primary.withOpacity(0.7)
+                                            : theme.colorScheme.onSurface.withOpacity(0.3),
+                                  )),
+                              );
+                            },
+                          )),
+                          leftTitles: AxisTitles(sideTitles: SideTitles(
+                            showTitles: true, reservedSize: leftAxisWidth,
+                            interval: yInterval,
+                            getTitlesWidget: (v, meta) {
+                              if (v == 0) return const SizedBox.shrink();
+                              final label = v >= 1000
+                                  ? '${(v / 1000).toStringAsFixed(v % 1000 == 0 ? 0 : 1)}k'
+                                  : v.toStringAsFixed(0);
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 4),
+                                child: Text(label, style: TextStyle(fontSize: 9,
+                                  fontWeight: FontWeight.w500,
+                                  color: theme.colorScheme.onSurface.withOpacity(0.45))),
+                              );
+                            },
+                          )),
+                          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        ),
+                        gridData: FlGridData(
+                          show: true, drawVerticalLine: false,
+                          horizontalInterval: yInterval,
+                          getDrawingHorizontalLine: (v) => FlLine(
+                            color: theme.colorScheme.onSurface.withOpacity(0.06), strokeWidth: 1),
+                        ),
+                        borderData: FlBorderData(show: false),
+                        barGroups: List.generate(daysInMonth, (i) {
+                          final day = i + 1;
+                          final value = dailyTotals[day] ?? 0.0;
+                          final isToday = day == now.day;
+                          return BarChartGroupData(x: day, barRods: [
+                            BarChartRodData(
+                              toY: value,
+                              color: isToday
+                                  ? theme.colorScheme.primary
+                                  : value > 0
+                                      ? theme.colorScheme.primary.withOpacity(0.55)
+                                      : Colors.transparent,
+                              width: barWidth,
+                              borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                              backDrawRodData: BackgroundBarChartRodData(
+                                show: value > 0,
+                                toY: chartMax,
+                                color: theme.colorScheme.primary.withOpacity(0.07),
+                              ),
+                            ),
+                          ]);
+                        }),
+                      )),
                     ),
                   ),
                 ),
@@ -529,66 +545,41 @@ class _OverviewTab extends StatelessWidget {
       ],
     );
   }
-
-  Widget _buildCompareCard(BuildContext context, double thisMonth,
-      double lastMonth, String symbol, bool isDark) {
-    final theme = Theme.of(context);
-    final diff = thisMonth - lastMonth;
-    final pct = lastMonth > 0
-        ? ((diff / lastMonth) * 100).abs().toStringAsFixed(1)
-        : '—';
-    final isMore = diff > 0;
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.05), blurRadius: 12)
-        ],
-      ),
-      child: Row(
-        children: [
-          Icon(
-            isMore
-                ? Icons.trending_up_rounded
-                : Icons.trending_down_rounded,
-            color: isMore
-                ? const Color(0xFFE57373)
-                : const Color(0xFF2ECC71),
-            size: 36,
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isMore
-                      ? 'Spending up $pct% vs last month'
-                      : 'Spending down $pct% vs last month',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w700, fontSize: 14),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Difference: ${AppUtils.formatAmount(diff.abs(), symbol)}',
-                  style: TextStyle(
-                      fontSize: 12,
-                      color: theme.colorScheme.onSurface.withOpacity(0.5)),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    ).animate().fadeIn(delay: 300.ms);
-  }
 }
 
-// ── Categories Tab ────────────────────────────────────────────────────────────
+class _MiniStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  final TextAlign align;
+
+  const _MiniStat({
+    required this.label,
+    required this.value,
+    required this.color,
+    this.align = TextAlign.start,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: align == TextAlign.end
+          ? CrossAxisAlignment.end
+          : align == TextAlign.center
+              ? CrossAxisAlignment.center
+              : CrossAxisAlignment.start,
+      children: [
+        Text(label,
+          style: TextStyle(fontSize: 11,
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+          textAlign: align),
+        Text(value,
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: color),
+          textAlign: align, maxLines: 1, overflow: TextOverflow.ellipsis),
+      ],
+    );
+  }
+}
 
 class _CategoriesTab extends StatelessWidget {
   final ExpenseProvider expenses;

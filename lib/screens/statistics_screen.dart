@@ -426,11 +426,26 @@ class _OverviewTab extends StatelessWidget {
           const SizedBox(height: 12),
           Builder(builder: (ctx) {
             final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
-            final chartMax = maxVal * 1.3;
-            final yInterval = maxVal > 0 ? (maxVal / 4).ceilToDouble() : 100.0;
+            final chartMax = maxVal > 0
+                ? (maxVal * 1.25).ceilToDouble()
+                : 100.0;
+            // Round up to a clean interval
+            final rawInterval = chartMax / 4;
+            final magnitude = rawInterval > 0
+                ? (rawInterval / (10 * (rawInterval / 10).floor())).isNaN
+                    ? 1.0
+                    : 1.0
+                : 1.0;
+            final yInterval = rawInterval <= 50
+                ? (rawInterval / 10).ceil() * 10.0
+                : rawInterval <= 500
+                    ? (rawInterval / 50).ceil() * 50.0
+                    : rawInterval <= 5000
+                        ? (rawInterval / 500).ceil() * 500.0
+                        : (rawInterval / 5000).ceil() * 5000.0;
             const double barWidth = 14.0;
             const double barSpacing = 8.0;
-            const double leftAxisWidth = 52.0;
+            const double leftAxisWidth = 44.0;
             final chartWidth = leftAxisWidth + (daysInMonth * (barWidth + barSpacing)) + 16;
             final hScrollController = ScrollController();
 
@@ -491,14 +506,16 @@ class _OverviewTab extends StatelessWidget {
                             interval: yInterval,
                             getTitlesWidget: (v, meta) {
                               if (v == 0) return const SizedBox.shrink();
+                              // Skip if too close to chartMax to avoid duplicate
+                              if (v > chartMax - yInterval * 0.5) return const SizedBox.shrink();
                               final label = v >= 1000
                                   ? '${(v / 1000).toStringAsFixed(v % 1000 == 0 ? 0 : 1)}k'
                                   : v.toStringAsFixed(0);
                               return Padding(
-                                padding: const EdgeInsets.only(right: 4),
+                                padding: const EdgeInsets.only(right: 6),
                                 child: Text(label, style: TextStyle(fontSize: 9,
                                   fontWeight: FontWeight.w500,
-                                  color: theme.colorScheme.onSurface.withOpacity(0.45))),
+                                  color: theme.colorScheme.onSurface.withOpacity(0.4))),
                               );
                             },
                           )),

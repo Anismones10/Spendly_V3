@@ -472,8 +472,11 @@ class _OverviewTab extends StatelessWidget {
                         barTouchData: BarTouchData(
                           touchTooltipData: BarTouchTooltipData(
                             getTooltipColor: (_) => theme.colorScheme.primary.withOpacity(0.9),
+                            fitInsideHorizontally: true,
+                            fitInsideVertically: true,
+                            tooltipMargin: 6,
                             getTooltipItem: (g, gi, rod, ri) => BarTooltipItem(
-                              'Day ${g.x}\n${AppUtils.formatAmount(rod.toY, symbol)}',
+                              'Day ${g.x}  ${AppUtils.formatAmount(rod.toY, symbol)}',
                               const TextStyle(color: Colors.white,
                                 fontWeight: FontWeight.w700, fontSize: 11),
                             ),

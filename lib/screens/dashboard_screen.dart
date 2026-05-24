@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
@@ -43,9 +44,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     final box = Hive.box('settings');
-    _hideBalance =
-        box.get('hideBalance', defaultValue: false) as bool;
-
+    _hideBalance = box.get('hideBalance', defaultValue: false) as bool;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       CoachMarkHelper.showDashboard(
@@ -86,30 +85,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final expenses = context.watch<ExpenseProvider>();
-    final SettingsProvider settings =
-        context.watch<SettingsProvider>();
+    final SettingsProvider settings = context.watch<SettingsProvider>();
     final income = context.watch<IncomeProvider>();
     final loans = context.watch<LoanProvider>();
     final wallets = context.watch<WalletProvider>();
 
-    final monthlyIncome =
-        income.getTotalForMonth(now.year, now.month);
-    final totalSpent =
-        expenses.getTotalForMonth(now.year, now.month);
-    final double budget = settings.monthlyBudget;
+    final monthlyIncome = income.getTotalForMonth(now.year, now.month);
     final symbol = settings.currencySymbol;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
     final allExpenses = expenses.allExpenses;
-    final netLoan =
-        loans.totalBorrowing - loans.totalLending;
-    final totalAllSpent =
-        expenses.getTotalForMonth(now.year, now.month);
+    final netLoan = loans.totalBorrowing - loans.totalLending;
+    final totalAllSpent = expenses.getTotalForMonth(now.year, now.month);
 
     double spentForWallet(String walletId) {
-      final filtered =
-          allExpenses.where((e) => e.walletId == walletId);
+      final filtered = allExpenses.where((e) => e.walletId == walletId);
       if (filtered.isEmpty) return 0;
       return filtered.fold(0.0, (sum, e) => sum + e.amount);
     }
@@ -138,23 +129,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
     ];
 
     return Scaffold(
-      backgroundColor: isDark
-          ? const Color(0xFF121212)
-          : const Color(0xFFF5F7FA),
+      backgroundColor:
+          isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
       body: CustomScrollView(
         slivers: [
-          // ── App Bar ─────────────────────────────────────────────────
           SliverAppBar(
             expandedHeight: 60,
             floating: true,
             pinned: true,
             elevation: 0,
-            backgroundColor: isDark
-                ? const Color(0xFF121212)
-                : const Color(0xFFF5F7FA),
+            backgroundColor:
+                isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
             flexibleSpace: FlexibleSpaceBar(
-              titlePadding:
-                  const EdgeInsets.only(left: 20, bottom: 12),
+              titlePadding: const EdgeInsets.only(left: 20, bottom: 12),
               title: ShaderMask(
                 shaderCallback: (bounds) => LinearGradient(
                   colors: [
@@ -171,8 +158,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     letterSpacing: -0.5,
                     shadows: [
                       Shadow(
-                        color: theme.colorScheme.primary
-                            .withOpacity(0.6),
+                        color: theme.colorScheme.primary.withOpacity(0.6),
                         blurRadius: 12,
                       ),
                     ],
@@ -181,19 +167,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             actions: [
-              // 1 ── Date chip
               Container(
                 margin: const EdgeInsets.only(right: 4),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primary
-                      .withOpacity(0.12),
+                  color: theme.colorScheme.primary.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: theme.colorScheme.primary
-                          .withOpacity(0.2),
+                      color: theme.colorScheme.primary.withOpacity(0.2),
                       blurRadius: 8,
                     ),
                   ],
@@ -207,27 +190,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
               ),
-
-              // 2 ── Search icon
               GestureDetector(
                 onTap: _openSearch,
                 child: Container(
                   margin: const EdgeInsets.only(right: 4),
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primary
-                        .withOpacity(0.1),
+                    color: theme.colorScheme.primary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Icon(
-                    Icons.search_rounded,
-                    color: theme.colorScheme.primary,
-                    size: 20,
-                  ),
+                  child: Icon(Icons.search_rounded,
+                      color: theme.colorScheme.primary, size: 20),
                 ),
               ),
-
-              // 3 ── More button (same size as search icon)
               if (widget.onMoreTap != null)
                 GestureDetector(
                   onTap: widget.onMoreTap,
@@ -236,15 +211,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     margin: const EdgeInsets.only(right: 8),
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.primary
-                          .withOpacity(0.1),
+                      color: theme.colorScheme.primary.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: Icon(
-                      Icons.more_horiz_rounded,
-                      color: theme.colorScheme.primary,
-                      size: 20,
-                    ),
+                    child: Icon(Icons.more_horiz_rounded,
+                        color: theme.colorScheme.primary, size: 20),
                   ),
                 ),
               StreakBadge(streak: settings.streak),
@@ -256,8 +227,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             padding: const EdgeInsets.fromLTRB(0, 0, 0, 100),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-
-                // ── Swipeable Wallet Cards ────────────────────────────
+                // ── Wallet Cards ──────────────────────────────────────
                 SizedBox(
                   key: _walletCardKey,
                   height: 310,
@@ -269,8 +239,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     itemBuilder: (ctx, i) {
                       final card = allCards[i];
                       return Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16),
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 16),
                         child: _WalletCard(
                           card: card,
                           symbol: symbol,
@@ -294,13 +264,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             onTap: () {
                               if (_currentCard > 0) {
                                 _cardController.previousPage(
-                                    duration: const Duration(
-                                        milliseconds: 300),
+                                    duration:
+                                        const Duration(milliseconds: 300),
                                     curve: Curves.easeInOut);
                               }
                             },
-                            child: Icon(
-                                Icons.chevron_left_rounded,
+                            child: Icon(Icons.chevron_left_rounded,
                                 size: 22,
                                 color: _currentCard > 0
                                     ? theme.colorScheme.onSurface
@@ -312,10 +281,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ...List.generate(allCards.length, (i) {
                             final isSelected = i == _currentCard;
                             return AnimatedContainer(
-                              duration:
-                                  const Duration(milliseconds: 250),
-                              margin: const EdgeInsets.symmetric(
-                                  horizontal: 3),
+                              duration: const Duration(milliseconds: 250),
+                              margin:
+                                  const EdgeInsets.symmetric(horizontal: 3),
                               width: isSelected ? 20 : 8,
                               height: 8,
                               decoration: BoxDecoration(
@@ -323,31 +291,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     ? theme.colorScheme.primary
                                     : theme.colorScheme.onSurface
                                         .withOpacity(0.2),
-                                borderRadius:
-                                    BorderRadius.circular(4),
+                                borderRadius: BorderRadius.circular(4),
                               ),
                             );
                           }),
                           const SizedBox(width: 8),
                           GestureDetector(
                             onTap: () {
-                              if (_currentCard <
-                                  allCards.length - 1) {
+                              if (_currentCard < allCards.length - 1) {
                                 _cardController.nextPage(
-                                    duration: const Duration(
-                                        milliseconds: 300),
+                                    duration:
+                                        const Duration(milliseconds: 300),
                                     curve: Curves.easeInOut);
                               }
                             },
-                            child: Icon(
-                                Icons.chevron_right_rounded,
+                            child: Icon(Icons.chevron_right_rounded,
                                 size: 22,
-                                color:
-                                    _currentCard < allCards.length - 1
-                                        ? theme.colorScheme.onSurface
-                                            .withOpacity(0.5)
-                                        : theme.colorScheme.onSurface
-                                            .withOpacity(0.15)),
+                                color: _currentCard < allCards.length - 1
+                                    ? theme.colorScheme.onSurface
+                                        .withOpacity(0.5)
+                                    : theme.colorScheme.onSurface
+                                        .withOpacity(0.15)),
                           ),
                         ],
                       ),
@@ -356,30 +320,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         'Swipe to see wallets',
                         style: TextStyle(
                           fontSize: 11,
-                          color: theme.colorScheme.onSurface
-                              .withOpacity(0.35),
+                          color:
+                              theme.colorScheme.onSurface.withOpacity(0.35),
                         ),
                       ),
                     ],
                   ),
                 ),
 
-                // ── Quick Stats Row ───────────────────────────────────
+                // ── Quick Stats ───────────────────────────────────────
                 Padding(
                   key: _quickStatsKey,
-                  padding:
-                      const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
                   child: Row(
                     children: [
                       Expanded(
                         child: _QuickStatCard(
                           label: 'Today',
                           value: AppUtils.formatAmount(
-                              expenses.getTotalForDay(now),
-                              symbol),
+                              expenses.getTotalForDay(now), symbol),
                           icon: Icons.today_rounded,
                           color: const Color(0xFF6C63FF),
-                        ).animate().fadeIn(delay: 300.ms).slideX(begin: -0.2),
+                        )
+                            .animate()
+                            .fadeIn(delay: 300.ms)
+                            .slideX(begin: -0.2),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -389,23 +354,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               expenses.getTotalForWeek(), symbol),
                           icon: Icons.date_range_rounded,
                           color: const Color(0xFF03DAC6),
-                        ).animate().fadeIn(delay: 350.ms).slideX(begin: 0.2),
+                        )
+                            .animate()
+                            .fadeIn(delay: 350.ms)
+                            .slideX(begin: 0.2),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: _QuickStatCard(
                           label: 'Income',
-                          value: AppUtils.formatAmount(
-                              monthlyIncome, symbol),
+                          value:
+                              AppUtils.formatAmount(monthlyIncome, symbol),
                           icon: Icons.account_balance_wallet_rounded,
                           color: const Color(0xFF2ECC71),
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(
-                                builder: (_) =>
-                                    const IncomeScreen()),
+                                builder: (_) => const IncomeScreen()),
                           ),
-                        ).animate().fadeIn(delay: 400.ms).slideX(begin: 0.2),
+                        )
+                            .animate()
+                            .fadeIn(delay: 400.ms)
+                            .slideX(begin: 0.2),
                       ),
                     ],
                   ),
@@ -415,15 +385,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                 // ── Daily Summary ─────────────────────────────────────
                 Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF6C63FF)
-                              .withOpacity(0.15),
+                          color: const Color(0xFF6C63FF).withOpacity(0.15),
                           blurRadius: 20,
                           offset: const Offset(0, 6),
                         ),
@@ -437,8 +405,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                 // ── Budget Health ─────────────────────────────────────
                 Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: _BudgetHealthCard(
                     expenses: expenses,
                     settings: settings,
@@ -453,8 +420,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                 // ── Insights ──────────────────────────────────────────
                 Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: InsightCard(
                     insights: expenses.getInsights(
                       categoryNames: {
@@ -526,6 +492,137 @@ class _CardData {
   });
 }
 
+// ── Blob Painter ──────────────────────────────────────────────────────────────
+// KEY FIX: every blob uses ONLY sin/cos with full 2*pi cycles and NO phase
+// offsets on the outer multiplier — this guarantees position at t=0.0 equals
+// position at t=1.0, so repeat() never jumps.
+
+class _BlobPainter extends CustomPainter {
+  final double t; // 0.0 → 1.0, perfectly periodic
+  final Color baseColor;
+
+  _BlobPainter({required this.t, required this.baseColor});
+
+  // angle that completes exactly N full circles per loop — always seamless
+  double _a(double cycles) => t * math.pi * 2.0 * cycles;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+
+    // Blob 1 — top-left, 1 cycle X, 1 cycle Y (different axis speeds = ellipse)
+    _drawBlob(
+      canvas,
+      center: Offset(
+        w * 0.18 + math.sin(_a(1.0)) * w * 0.10,
+        h * 0.22 + math.cos(_a(1.0)) * h * 0.09,
+      ),
+      radius: w * 0.30,
+      color: baseColor.withOpacity(0.28),
+      blur: 36,
+    );
+
+    // Blob 2 — bottom-right, 2 cycles X, 1 cycle Y
+    _drawBlob(
+      canvas,
+      center: Offset(
+        w * 0.78 + math.cos(_a(2.0)) * w * 0.09,
+        h * 0.70 + math.sin(_a(1.0)) * h * 0.11,
+      ),
+      radius: w * 0.27,
+      color: baseColor.withOpacity(0.22),
+      blur: 32,
+    );
+
+    // Blob 3 — centre white, 1 cycle X, 2 cycles Y
+    _drawBlob(
+      canvas,
+      center: Offset(
+        w * 0.50 + math.sin(_a(1.0)) * w * 0.13,
+        h * 0.50 + math.cos(_a(2.0)) * h * 0.13,
+      ),
+      radius: w * 0.21,
+      color: Colors.white.withOpacity(0.11),
+      blur: 28,
+    );
+
+    // Blob 4 — top-right, 3 cycles X, 2 cycles Y (fastest — adds liveliness)
+    _drawBlob(
+      canvas,
+      center: Offset(
+        w * 0.84 + math.cos(_a(3.0)) * w * 0.07,
+        h * 0.16 + math.sin(_a(2.0)) * h * 0.08,
+      ),
+      radius: w * 0.14,
+      color: Colors.white.withOpacity(0.14),
+      blur: 22,
+    );
+  }
+
+  void _drawBlob(
+    Canvas canvas, {
+    required Offset center,
+    required double radius,
+    required Color color,
+    required double blur,
+  }) {
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..color = color
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, blur),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_BlobPainter old) => old.t != t;
+}
+
+// ── Animated Blobs ────────────────────────────────────────────────────────────
+
+class _AnimatedBlobs extends StatefulWidget {
+  final Color baseColor;
+  const _AnimatedBlobs({required this.baseColor});
+
+  @override
+  State<_AnimatedBlobs> createState() => _AnimatedBlobsState();
+}
+
+class _AnimatedBlobsState extends State<_AnimatedBlobs>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      // 6 seconds — noticeably animated but still gentle
+      duration: const Duration(seconds: 6),
+    )..repeat(); // repeat() is seamless because painter is perfectly periodic
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, __) => CustomPaint(
+        painter:
+            _BlobPainter(t: _ctrl.value, baseColor: widget.baseColor),
+        child: const SizedBox.expand(),
+      ),
+    );
+  }
+}
+
 // ── Wallet Card ───────────────────────────────────────────────────────────────
 
 class _WalletCard extends StatelessWidget {
@@ -555,355 +652,406 @@ class _WalletCard extends StatelessWidget {
     final Color cardColor = card.isAllWallets
         ? const Color(0xFF1E3A5F)
         : Color(card.colorValue ?? 0xFF1E3A5F);
+
     final Color cardColorDark = card.isAllWallets
         ? const Color(0xFF0F2440)
         : HSLColor.fromColor(Color(card.colorValue ?? 0xFF1E3A5F))
             .withLightness(
-                (HSLColor.fromColor(
-                            Color(card.colorValue ?? 0xFF1E3A5F))
-                        .lightness -
-                    0.15)
-                    .clamp(0.0, 1.0))
+              (HSLColor.fromColor(Color(card.colorValue ?? 0xFF1E3A5F))
+                          .lightness -
+                      0.15)
+                  .clamp(0.0, 1.0),
+            )
             .toColor();
 
-    IconData walletIcon =
-        Icons.account_balance_wallet_rounded;
+    IconData walletIcon = Icons.account_balance_wallet_rounded;
     if (card.walletType != null) {
       walletIcon = WalletProvider.resolveIcon(card.walletType!);
     }
 
+    Color barColor;
+    if (isOver) {
+      barColor = const Color(0xFFE57373);
+    } else if (pct > 0.75) {
+      barColor = const Color(0xFFFF9800);
+    } else {
+      barColor = const Color(0xFF2ECC71);
+    }
+
     return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            gradient: LinearGradient(
-              colors: [
-                cardColor.withOpacity(0.75),
-                cardColorDark.withOpacity(0.88),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.18),
-              width: 1.2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: cardColor.withOpacity(0.45),
-                blurRadius: 28,
-                offset: const Offset(0, 12),
+      borderRadius: BorderRadius.circular(28),
+      child: Stack(
+        children: [
+          // Layer 1 — base gradient
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [cardColor, cardColorDark],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
               ),
-            ],
+            ),
           ),
-          child: Stack(
-            children: [
-              Positioned(
-                top: -60,
-                left: -40,
-                child: Container(
-                  width: 200,
-                  height: 200,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withOpacity(0.06),
-                  ),
-                ),
-              ),
-              Positioned(
-                bottom: -50,
-                right: -30,
-                child: Container(
-                  width: 180,
-                  height: 180,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withOpacity(0.04),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            card.title,
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.85),
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: onToggleHide,
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color:
-                                  Colors.white.withOpacity(0.1),
-                              borderRadius:
-                                  BorderRadius.circular(10),
-                              border: Border.all(
-                                color:
-                                    Colors.white.withOpacity(0.15),
-                                width: 1,
-                              ),
-                            ),
-                            child: Icon(
-                              hideBalance
-                                  ? Icons.visibility_off_rounded
-                                  : Icons.visibility_rounded,
-                              color: Colors.white.withOpacity(0.85),
-                              size: 20,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 7),
-                          decoration: BoxDecoration(
-                            color: Colors.amber.withOpacity(0.9),
-                            borderRadius:
-                                BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color:
-                                    Colors.amber.withOpacity(0.45),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(walletIcon,
-                                  color: Colors.white, size: 14),
-                              const SizedBox(width: 6),
-                              Text(
-                                _fmt(card.totalBalance),
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w800),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      _fmt(card.remaining),
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 48,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -2,
-                        height: 1.0,
-                        shadows: [
-                          Shadow(
-                            color: Colors.white.withOpacity(0.3),
-                            blurRadius: 16,
-                          ),
-                        ],
-                      ),
-                    ),
-                    Text(
-                      'remaining',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.55),
-                        fontSize: 13,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    if (card.isAllWallets &&
-                        (card.borrowed > 0 ||
-                            card.lentOut > 0)) ...[
-                      const SizedBox(height: 6),
-                      Row(children: [
-                        Text(
-                          'Net  ',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.55),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        Text(
-                          _fmt(card.remaining -
-                              card.borrowed +
-                              card.lentOut),
-                          style: TextStyle(
-                            color: const Color(0xFF4A90E2),
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            shadows: [
-                              Shadow(
-                                color: const Color(0xFF4A90E2)
-                                    .withOpacity(0.7),
-                                blurRadius: 10,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ]),
-                    ],
-                    const Spacer(),
-                    if (card.isAllWallets) ...[
-                      Row(
-                        mainAxisAlignment:
-                            MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            '+ Borrowed',
-                            style: TextStyle(
-                              color: card.borrowed > 0
-                                  ? const Color(0xFF2ECC71)
-                                      .withOpacity(0.9)
-                                  : Colors.white.withOpacity(0.25),
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Text(
-                            _fmt(card.borrowed),
-                            style: TextStyle(
-                              color: card.borrowed > 0
-                                  ? const Color(0xFF2ECC71)
-                                  : Colors.white.withOpacity(0.25),
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              shadows: card.borrowed > 0
-                                  ? [
-                                      Shadow(
-                                        color: const Color(0xFF2ECC71)
-                                            .withOpacity(0.6),
-                                        blurRadius: 8,
-                                      ),
-                                    ]
-                                  : null,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment:
-                            MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            '- Lent out',
-                            style: TextStyle(
-                              color: card.lentOut > 0
-                                  ? const Color(0xFFE57373)
-                                      .withOpacity(0.9)
-                                  : Colors.white.withOpacity(0.25),
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Text(
-                            _fmt(card.lentOut),
-                            style: TextStyle(
-                              color: card.lentOut > 0
-                                  ? const Color(0xFFE57373)
-                                  : Colors.white.withOpacity(0.25),
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              shadows: card.lentOut > 0
-                                  ? [
-                                      Shadow(
-                                        color: const Color(0xFFE57373)
-                                            .withOpacity(0.6),
-                                        blurRadius: 8,
-                                      ),
-                                    ]
-                                  : null,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                    ],
-                    Row(
-                      mainAxisAlignment:
-                          MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Spent ${_fmt(card.spent)}',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.5),
-                            fontSize: 11,
-                          ),
-                        ),
-                        if (card.totalBalance > 0)
-                          Text(
-                            '${(pct * 100).round()}% used',
-                            style: TextStyle(
-                              color: isOver
-                                  ? const Color(0xFFE57373)
-                                  : const Color(0xFF2ECC71),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
-                      child: Stack(children: [
-                        Container(
-                          height: 5,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                        ),
-                        FractionallySizedBox(
-                          widthFactor: pct,
-                          child: Container(
-                            height: 5,
-                            decoration: BoxDecoration(
-                              color: isOver
-                                  ? const Color(0xFFE57373)
-                                  : pct > 0.75
-                                      ? const Color(0xFFFF9800)
-                                      : const Color(0xFF2ECC71),
-                              borderRadius:
-                                  BorderRadius.circular(6),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: (isOver
-                                          ? const Color(0xFFE57373)
-                                          : const Color(0xFF2ECC71))
-                                      .withOpacity(0.6),
-                                  blurRadius: 4,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ]),
-                    ),
+
+          // Layer 2 — animated blobs (no BackdropFilter wrapper!)
+          Positioned.fill(
+            child: _AnimatedBlobs(baseColor: cardColor),
+          ),
+
+          // Layer 3 — top-left glare circle
+          Positioned(
+            top: -50,
+            left: -50,
+            child: Container(
+              width: 180,
+              height: 180,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    Colors.white.withOpacity(0.10),
+                    Colors.white.withOpacity(0.0),
                   ],
                 ),
               ),
-            ],
+            ),
+          ),
+
+          // Layer 4 — glass sheen + border
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(28),
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white.withOpacity(0.08),
+                    Colors.white.withOpacity(0.01),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.20),
+                  width: 1.2,
+                ),
+              ),
+            ),
+          ),
+
+          // Layer 5 — content
+          Padding(
+            padding: const EdgeInsets.all(22),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Top row ───────────────────────────────────────────
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        card.title,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.85),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.3,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black.withOpacity(0.4),
+                              blurRadius: 8,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Hide toggle
+                    GestureDetector(
+                      onTap: onToggleHide,
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.20),
+                            width: 1,
+                          ),
+                        ),
+                        child: Icon(
+                          hideBalance
+                              ? Icons.visibility_off_rounded
+                              : Icons.visibility_rounded,
+                          color: Colors.white.withOpacity(0.90),
+                          size: 18,
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(width: 10),
+
+                    // Balance pill
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withOpacity(0.90),
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.amber.withOpacity(0.55),
+                            blurRadius: 14,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(walletIcon, color: Colors.white, size: 14),
+                          const SizedBox(width: 6),
+                          Text(
+                            _fmt(card.totalBalance),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 12),
+
+                // ── Hero remaining ────────────────────────────────────
+                Text(
+                  _fmt(card.remaining),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 48,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -2,
+                    height: 1.0,
+                    shadows: [
+                      Shadow(
+                        color: Colors.white.withOpacity(0.45),
+                        blurRadius: 24,
+                      ),
+                      Shadow(
+                        color: Colors.black.withOpacity(0.35),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                ),
+
+                Text(
+                  'remaining',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.55),
+                    fontSize: 13,
+                    letterSpacing: 0.5,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 6,
+                      ),
+                    ],
+                  ),
+                ),
+
+                // ── Net loan ──────────────────────────────────────────
+                if (card.isAllWallets &&
+                    (card.borrowed > 0 || card.lentOut > 0)) ...[
+                  const SizedBox(height: 6),
+                  Row(children: [
+                    Text(
+                      'Net  ',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.55),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    Text(
+                      _fmt(card.remaining - card.borrowed + card.lentOut),
+                      style: TextStyle(
+                        color: const Color(0xFF4A90E2),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        shadows: [
+                          Shadow(
+                            color: const Color(0xFF4A90E2).withOpacity(0.90),
+                            blurRadius: 16,
+                          ),
+                          Shadow(
+                            color: const Color(0xFF4A90E2).withOpacity(0.50),
+                            blurRadius: 32,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ]),
+                ],
+
+                const Spacer(),
+
+                // ── Loan rows ─────────────────────────────────────────
+                if (card.isAllWallets) ...[
+                  _LoanRow(
+                    label: '+ Borrowed',
+                    value: _fmt(card.borrowed),
+                    active: card.borrowed > 0,
+                    color: const Color(0xFF2ECC71),
+                  ),
+                  const SizedBox(height: 4),
+                  _LoanRow(
+                    label: '- Lent out',
+                    value: _fmt(card.lentOut),
+                    active: card.lentOut > 0,
+                    color: const Color(0xFFE57373),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+
+                // ── Spent + usage badge ───────────────────────────────
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Spent ${_fmt(card.spent)}',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.50),
+                        fontSize: 11,
+                      ),
+                    ),
+                    if (card.totalBalance > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: barColor.withOpacity(0.20),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color: barColor.withOpacity(0.45), width: 1),
+                          boxShadow: [
+                            BoxShadow(
+                              color: barColor.withOpacity(0.35),
+                              blurRadius: 8,
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          '${(pct * 100).round()}% used',
+                          style: TextStyle(
+                            color: barColor,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            shadows: [
+                              Shadow(
+                                color: barColor.withOpacity(0.8),
+                                blurRadius: 8,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+
+                const SizedBox(height: 8),
+
+                // ── Progress bar ──────────────────────────────────────
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Stack(
+                    children: [
+                      Container(
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      FractionallySizedBox(
+                        widthFactor: pct,
+                        child: Container(
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: barColor,
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: [
+                              BoxShadow(
+                                color: barColor.withOpacity(0.80),
+                                blurRadius: 8,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Loan Row ──────────────────────────────────────────────────────────────────
+
+class _LoanRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool active;
+  final Color color;
+
+  const _LoanRow({
+    required this.label,
+    required this.value,
+    required this.active,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: active
+                ? color.withOpacity(0.90)
+                : Colors.white.withOpacity(0.25),
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
           ),
         ),
-      ),
+        Text(
+          value,
+          style: TextStyle(
+            color: active ? color : Colors.white.withOpacity(0.25),
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            shadows: active
+                ? [
+                    Shadow(color: color.withOpacity(0.80), blurRadius: 12),
+                    Shadow(color: color.withOpacity(0.40), blurRadius: 24),
+                  ]
+                : null,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -931,12 +1079,9 @@ class _BudgetHealthCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cats = context.watch<CategoryProvider>();
     final budgets = context.watch<CategoryBudgetProvider>();
-    final catTotals =
-        expenses.getCategoryTotals(now.year, now.month);
-
-    final allBudgetedCats = cats.categories
-        .where((c) => budgets.hasBudget(c.id))
-        .toList();
+    final catTotals = expenses.getCategoryTotals(now.year, now.month);
+    final allBudgetedCats =
+        cats.categories.where((c) => budgets.hasBudget(c.id)).toList();
 
     if (allBudgetedCats.isEmpty) return const SizedBox.shrink();
 
@@ -969,8 +1114,7 @@ class _BudgetHealthCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color:
-                      const Color(0xFFFF9800).withOpacity(0.15),
+                  color: const Color(0xFFFF9800).withOpacity(0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(Icons.monitor_heart_rounded,
@@ -980,15 +1124,13 @@ class _BudgetHealthCard extends StatelessWidget {
               const Expanded(
                 child: Text('Budget Health',
                     style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15)),
+                        fontWeight: FontWeight.w700, fontSize: 15)),
               ),
               Text(
                 '${allBudgetedCats.length} categor${allBudgetedCats.length == 1 ? 'y' : 'ies'}',
                 style: TextStyle(
                   fontSize: 11,
-                  color: theme.colorScheme.onSurface
-                      .withOpacity(0.4),
+                  color: theme.colorScheme.onSurface.withOpacity(0.4),
                 ),
               ),
             ],
@@ -1022,20 +1164,16 @@ class _BudgetHealthCard extends StatelessWidget {
                       color: catColor.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(
-                        CategoryIcons.resolve(cat.icon),
-                        color: catColor,
-                        size: 18),
+                    child: Icon(CategoryIcons.resolve(cat.icon),
+                        color: catColor, size: 18),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          mainAxisAlignment:
-                              MainAxisAlignment.spaceBetween,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(cat.name,
                                 style: const TextStyle(
@@ -1062,17 +1200,14 @@ class _BudgetHealthCard extends StatelessWidget {
                           child: LinearProgressIndicator(
                             value: pct,
                             minHeight: 6,
-                            backgroundColor:
-                                barColor.withOpacity(0.12),
+                            backgroundColor: barColor.withOpacity(0.12),
                             valueColor:
-                                AlwaysStoppedAnimation<Color>(
-                                    barColor),
+                                AlwaysStoppedAnimation<Color>(barColor),
                           ),
                         ),
                         const SizedBox(height: 4),
                         Row(
-                          mainAxisAlignment:
-                              MainAxisAlignment.spaceBetween,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
                               '${AppUtils.formatAmount(spent, symbol)} of ${AppUtils.formatAmount(limit, symbol)}',
@@ -1130,11 +1265,9 @@ class _QuickStatCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color:
-              isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border:
-              Border.all(color: color.withOpacity(0.12), width: 1),
+          border: Border.all(color: color.withOpacity(0.12), width: 1),
           boxShadow: [
             BoxShadow(
               color: color.withOpacity(0.18),

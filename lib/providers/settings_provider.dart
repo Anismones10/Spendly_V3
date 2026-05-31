@@ -12,6 +12,14 @@ class SettingsProvider extends ChangeNotifier {
   double get monthlyBudget => (_box.get('monthlyBudget', defaultValue: 0.0) as num).toDouble();
   int get streak => (_box.get('streak', defaultValue: 0) as num).toInt();
   String? get lastStreakDate => _box.get('lastStreakDate');
+  bool get notifEnabled  => _box.get('notifEnabled',  defaultValue: false) as bool;
+  bool get notifDaily    => _box.get('notifDaily',    defaultValue: true)  as bool;
+  bool get notifWeekly   => _box.get('notifWeekly',   defaultValue: true)  as bool;
+  bool get notifBudget   => _box.get('notifBudget',   defaultValue: true)  as bool;
+  bool get notifLoan     => _box.get('notifLoan',     defaultValue: true)  as bool;
+  bool get notifGoal     => _box.get('notifGoal',     defaultValue: true)  as bool;
+  int  get notifHour     => _box.get('notifHour',     defaultValue: 21)    as int;
+  int  get notifMinute   => _box.get('notifMinute',   defaultValue: 0)     as int;
 
   String _getCurrencySymbol(String code) {
     const map = {

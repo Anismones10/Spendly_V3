@@ -12,6 +12,7 @@ import '../utils/app_utils.dart';
 import '../utils/category_icons.dart';
 import '../utils/sound_helper.dart';
 import '../widgets/calculator_sheet.dart';
+import '../utils/notification_helper.dart';
 
 class AddExpenseScreen extends StatefulWidget {
   final ExpenseModel? existing;
@@ -504,17 +505,54 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       await SoundHelper.playChaChing();
 
       if (mounted) {
-        final budgets = context.read<CategoryBudgetProvider>();
-        if (budgets.hasBudget(_selectedCategoryId!)) {
-          final catTotals = provider.getCategoryTotals(
-              DateTime.now().year, DateTime.now().month);
-          final catSpent =
-              catTotals[_selectedCategoryId!] ?? 0;
-          final status =
-              budgets.getStatus(_selectedCategoryId!, catSpent);
-          if (status == 'danger') await SoundHelper.playWarning();
+      final budgets   = context.read<CategoryBudgetProvider>();
+      final settings  = context.read<SettingsProvider>();
+      final catNames  = context.read<CategoryProvider>();
+
+      if (budgets.hasBudget(_selectedCategoryId!)) {
+        final now2      = DateTime.now();
+        final catTotals = provider.getCategoryTotals(now2.year, now2.month);
+        final catSpent  = catTotals[_selectedCategoryId!] ?? 0;
+        final status    = budgets.getStatus(_selectedCategoryId!, catSpent);
+        final limit     = budgets.getLimitFor(_selectedCategoryId!);
+        final catName   = catNames.getById(_selectedCategoryId!)?.name ?? '';
+        final sym       = settings.currencySymbol;
+
+        if (status == 'danger') {
+          await SoundHelper.playWarning();
+
+          // Fire 100% budget notification
+          if (settings.notifEnabled && settings.notifBudget) {
+            final catIndex = context
+                .read<CategoryProvider>()
+                .categories
+                .indexWhere((c) => c.id == _selectedCategoryId);
+            await NotificationHelper.showBudgetWarning(
+              index: catIndex >= 0 ? catIndex : 0,
+              categoryName: catName,
+              spent: '$sym${catSpent.toStringAsFixed(2)}',
+              limit: '$sym${limit.toStringAsFixed(2)}',
+              isOver: true,
+            );
+          }
+        } else if (status == 'warning') {
+          // Fire 80% budget notification
+          if (settings.notifEnabled && settings.notifBudget) {
+            final catIndex = context
+                .read<CategoryProvider>()
+                .categories
+                .indexWhere((c) => c.id == _selectedCategoryId);
+            await NotificationHelper.showBudgetWarning(
+              index: catIndex >= 0 ? catIndex : 0,
+              categoryName: catName,
+              spent: '$sym${catSpent.toStringAsFixed(2)}',
+              limit: '$sym${limit.toStringAsFixed(2)}',
+              isOver: false,
+            );
+          }
         }
       }
+    }
     }
     if (mounted) Navigator.pop(context);
   }

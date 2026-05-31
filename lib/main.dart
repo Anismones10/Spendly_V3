@@ -23,6 +23,7 @@ import 'providers/transfer_provider.dart';
 import 'screens/main_shell.dart';
 import 'screens/splash_screen.dart';
 import 'utils/app_theme.dart';
+import 'utils/notification_helper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -48,6 +49,34 @@ void main() async {
   await Hive.openBox<CategoryBudgetModel>('category_budgets');
   await Hive.openBox<TransferModel>('transfers');
   await Hive.openBox('settings');
+  await NotificationHelper.init();
+  await NotificationHelper.init();
+
+  final settingsBox = Hive.box('settings');
+  final notifEnabled = settingsBox.get('notifEnabled', defaultValue: false) as bool;
+  if (notifEnabled) {
+    final notifDaily  = settingsBox.get('notifDaily',  defaultValue: true) as bool;
+    final notifWeekly = settingsBox.get('notifWeekly', defaultValue: true) as bool;
+    final hour        = settingsBox.get('notifHour',   defaultValue: 21)   as int;
+    final minute      = settingsBox.get('notifMinute', defaultValue: 0)    as int;
+
+    if (notifDaily) {
+      await NotificationHelper.scheduleDailyReminder(
+        hour: hour,
+        minute: minute,
+      );
+    }
+    if (notifWeekly) {
+      final weeklyDay    = settingsBox.get('notifWeeklyDay',    defaultValue: 6) as int;
+      final weeklyHour   = settingsBox.get('notifWeeklyHour',   defaultValue: 9) as int;
+      final weeklyMinute = settingsBox.get('notifWeeklyMinute', defaultValue: 0) as int;
+      await NotificationHelper.scheduleWeeklySummary(
+        weekday: weeklyDay,
+        hour:    weeklyHour,
+        minute:  weeklyMinute,
+      );
+    }
+  }
 
   runApp(
     MultiProvider(

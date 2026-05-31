@@ -13,10 +13,13 @@ import '../providers/transfer_provider.dart';
 import '../models/wallet_model.dart';
 import '../utils/csv_helper.dart';
 import '../screens/transfer_screen.dart';
+import '../screens/export_screen.dart';
 import 'about_screen.dart';
 import '../utils/category_icons.dart';
 import '../models/category_model.dart';
 import '../utils/app_utils.dart';
+import 'notification_settings_screen.dart';
+
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -38,6 +41,21 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // ── Notifications ─────────────────────────────────────────────
+          _SectionHeader('Notifications'),
+          _SettingTile(
+            icon: Icons.notifications_rounded,
+            title: 'Notifications',
+            subtitle: 'Reminders, alerts and summaries',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const NotificationSettingsScreen()),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // ── Appearance ────────────────────────────────────────────────
           _SectionHeader('Appearance'),
           _SettingTile(
             icon: Icons.dark_mode_rounded,
@@ -58,7 +76,6 @@ class SettingsScreen extends StatelessWidget {
               onChanged: (_) => settings.toggleSound(),
             ),
           ),
-
           _SettingTile(
             icon: Icons.vibration_rounded,
             title: 'Haptic Feedback',
@@ -91,8 +108,7 @@ class SettingsScreen extends StatelessWidget {
             subtitle: 'Move money from one wallet to another',
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(
-                  builder: (_) => const TransferScreen()),
+              MaterialPageRoute(builder: (_) => const TransferScreen()),
             ),
           ),
           const SizedBox(height: 16),
@@ -114,10 +130,20 @@ class SettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
+          // ── Data ──────────────────────────────────────────────────────
           _SectionHeader('Data'),
           _SettingTile(
+            icon: Icons.picture_as_pdf_rounded,
+            title: 'Export PDF Report',
+            subtitle: 'Full report with charts, pies & tables',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ExportScreen()),
+            ),
+          ),
+          _SettingTile(
             icon: Icons.download_rounded,
-            title: 'Export Expenses',
+            title: 'Export Expenses (CSV)',
             subtitle: 'Save expenses as CSV',
             onTap: () async {
               final expenses = context.read<ExpenseProvider>();
@@ -131,7 +157,7 @@ class SettingsScreen extends StatelessWidget {
           ),
           _SettingTile(
             icon: Icons.download_rounded,
-            title: 'Export Income',
+            title: 'Export Income (CSV)',
             subtitle: 'Save income as CSV',
             onTap: () async {
               final income = context.read<IncomeProvider>();
@@ -141,7 +167,7 @@ class SettingsScreen extends StatelessWidget {
           ),
           _SettingTile(
             icon: Icons.download_rounded,
-            title: 'Export Loans',
+            title: 'Export Loans (CSV)',
             subtitle: 'Save lending & borrowing as CSV',
             onTap: () async {
               final loans = context.read<LoanProvider>();
@@ -151,7 +177,7 @@ class SettingsScreen extends StatelessWidget {
           ),
           _SettingTile(
             icon: Icons.download_for_offline_rounded,
-            title: 'Export All Data',
+            title: 'Export All Data (CSV)',
             subtitle: 'Expenses + Income + Loans in one file',
             onTap: () async {
               final expenses = context.read<ExpenseProvider>();
@@ -225,7 +251,6 @@ class SettingsScreen extends StatelessWidget {
       builder: (ctx) => _CurrencyPickerSheet(settings: settings),
     );
   }
-
 
   void _manageCategories(BuildContext context) {
     Navigator.push(
@@ -351,7 +376,8 @@ class _CategoryBudgetsPage extends StatelessWidget {
                   Row(
                     children: [
                       Container(
-                        width: 40, height: 40,
+                        width: 40,
+                        height: 40,
                         decoration: BoxDecoration(
                           color: catColor.withOpacity(0.15),
                           borderRadius: BorderRadius.circular(12),
@@ -462,7 +488,8 @@ class _CategoryBudgetsPage extends StatelessWidget {
             children: [
               Center(
                 child: Container(
-                  width: 40, height: 4,
+                  width: 40,
+                  height: 4,
                   decoration: BoxDecoration(
                     color: Colors.grey.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(2),
@@ -472,7 +499,8 @@ class _CategoryBudgetsPage extends StatelessWidget {
               const SizedBox(height: 20),
               Row(children: [
                 Container(
-                  width: 40, height: 40,
+                  width: 40,
+                  height: 40,
                   decoration: BoxDecoration(
                     color: Color(cat.colorValue).withOpacity(0.15),
                     borderRadius: BorderRadius.circular(12),
@@ -544,15 +572,13 @@ class _WalletsPage extends StatelessWidget {
             isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
         title: const Text('Wallets'),
         actions: [
-          // Quick transfer button
           if (wallets.length >= 2)
             IconButton(
               icon: const Icon(Icons.swap_horiz_rounded),
               tooltip: 'Transfer',
               onPressed: () => Navigator.push(
                 context,
-                MaterialPageRoute(
-                    builder: (_) => const TransferScreen()),
+                MaterialPageRoute(builder: (_) => const TransferScreen()),
               ),
             ),
         ],
@@ -564,8 +590,7 @@ class _WalletsPage extends StatelessWidget {
                 children: [
                   Icon(Icons.account_balance_wallet_outlined,
                       size: 64,
-                      color:
-                          theme.colorScheme.onSurface.withOpacity(0.2)),
+                      color: theme.colorScheme.onSurface.withOpacity(0.2)),
                   const SizedBox(height: 12),
                   Text('No wallets yet',
                       style: TextStyle(
@@ -578,7 +603,6 @@ class _WalletsPage extends StatelessWidget {
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
               children: [
-                // Total balance card
                 Container(
                   padding: const EdgeInsets.all(20),
                   margin: const EdgeInsets.only(bottom: 12),
@@ -624,7 +648,6 @@ class _WalletsPage extends StatelessWidget {
                           ],
                         ),
                       ),
-                      // Transfer button
                       if (wallets.length >= 2)
                         GestureDetector(
                           onTap: () => Navigator.push(
@@ -639,9 +662,9 @@ class _WalletsPage extends StatelessWidget {
                               color: Colors.white.withOpacity(0.2),
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: Row(
+                            child: const Row(
                               mainAxisSize: MainAxisSize.min,
-                              children: const [
+                              children: [
                                 Icon(Icons.swap_horiz_rounded,
                                     color: Colors.white, size: 18),
                                 SizedBox(width: 6),
@@ -657,8 +680,6 @@ class _WalletsPage extends StatelessWidget {
                     ],
                   ),
                 ),
-
-                // Wallet tiles
                 ...wallets.map((wallet) => _WalletTile(
                       wallet: wallet,
                       symbol: symbol,
@@ -719,7 +740,8 @@ class _WalletTile extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 48, height: 48,
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
               color: color.withOpacity(0.15),
               borderRadius: BorderRadius.circular(14),
@@ -806,24 +828,16 @@ class _WalletSheetState extends State<_WalletSheet> {
   late Color _selectedColor;
 
   static const List<Color> _palette = [
-    Color(0xFF4CAF50), // green (cash default)
-    Color(0xFF1E3A5F), // navy (card default)
-    Color(0xFF2196F3), // blue (bank default)
-    Color(0xFF9C27B0), // purple (savings default)
-    Color(0xFFE57373), // red
-    Color(0xFFFF9800), // orange
-    Color(0xFF00BCD4), // cyan
-    Color(0xFFFF6B6B), // coral
-    Color(0xFF4ECDC4), // teal
-    Color(0xFFFFBE76), // yellow
-    Color(0xFF6C63FF), // indigo
-    Color(0xFFE91E63), // pink
+    Color(0xFF4CAF50), Color(0xFF1E3A5F), Color(0xFF2196F3),
+    Color(0xFF9C27B0), Color(0xFFE57373), Color(0xFFFF9800),
+    Color(0xFF00BCD4), Color(0xFFFF6B6B), Color(0xFF4ECDC4),
+    Color(0xFFFFBE76), Color(0xFF6C63FF), Color(0xFFE91E63),
   ];
 
   final List<Map<String, dynamic>> _types = [
-    {'type': 'cash', 'label': 'Cash', 'icon': Icons.payments_rounded},
-    {'type': 'card', 'label': 'Card', 'icon': Icons.credit_card_rounded},
-    {'type': 'bank', 'label': 'Bank', 'icon': Icons.account_balance_rounded},
+    {'type': 'cash',    'label': 'Cash',    'icon': Icons.payments_rounded},
+    {'type': 'card',    'label': 'Card',    'icon': Icons.credit_card_rounded},
+    {'type': 'bank',    'label': 'Bank',    'icon': Icons.account_balance_rounded},
     {'type': 'savings', 'label': 'Savings', 'icon': Icons.savings_rounded},
   ];
 
@@ -849,7 +863,6 @@ class _WalletSheetState extends State<_WalletSheet> {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) return;
     final provider = context.read<WalletProvider>();
-    // Balance always preserved from existing, or starts at 0 for new wallets
     final balance = widget.existing?.balance ?? 0;
     final wallet = WalletModel(
       id: widget.existing?.id ?? AppUtils.generateId(),
@@ -871,7 +884,6 @@ class _WalletSheetState extends State<_WalletSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final settings = context.read<SettingsProvider>();
 
     return Padding(
       padding: EdgeInsets.only(
@@ -890,7 +902,8 @@ class _WalletSheetState extends State<_WalletSheet> {
             children: [
               Center(
                 child: Container(
-                  width: 40, height: 4,
+                  width: 40,
+                  height: 4,
                   decoration: BoxDecoration(
                     color: Colors.grey.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(2),
@@ -911,21 +924,20 @@ class _WalletSheetState extends State<_WalletSheet> {
                   prefixIcon: Icon(Icons.label_rounded),
                 ),
               ),
-              const SizedBox(height: 12),
               const SizedBox(height: 16),
               const Text('Type',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  style: TextStyle(
+                      fontWeight: FontWeight.w600, fontSize: 14)),
               const SizedBox(height: 10),
               Row(
                 children: _types.map((t) {
                   final isSelected = _selectedType == t['type'];
-                  final color = Color(WalletProvider.colorForType(t['type'] as String));
                   return Expanded(
                     child: GestureDetector(
                       onTap: () => setState(() {
                         _selectedType = t['type'] as String;
-                        // Reset to type default color
-                        _selectedColor = Color(WalletProvider.colorForType(_selectedType));
+                        _selectedColor = Color(
+                            WalletProvider.colorForType(_selectedType));
                       }),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
@@ -939,7 +951,9 @@ class _WalletSheetState extends State<_WalletSheet> {
                                   : Colors.grey.shade100),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: isSelected ? _selectedColor : Colors.transparent,
+                            color: isSelected
+                                ? _selectedColor
+                                : Colors.transparent,
                             width: 1.5,
                           ),
                         ),
@@ -948,7 +962,8 @@ class _WalletSheetState extends State<_WalletSheet> {
                             Icon(t['icon'] as IconData,
                                 color: isSelected
                                     ? _selectedColor
-                                    : theme.colorScheme.onSurface.withOpacity(0.35),
+                                    : theme.colorScheme.onSurface
+                                        .withOpacity(0.35),
                                 size: 20),
                             const SizedBox(height: 4),
                             Text(t['label'] as String,
@@ -957,7 +972,8 @@ class _WalletSheetState extends State<_WalletSheet> {
                                     fontWeight: FontWeight.w600,
                                     color: isSelected
                                         ? _selectedColor
-                                        : theme.colorScheme.onSurface.withOpacity(0.4))),
+                                        : theme.colorScheme.onSurface
+                                            .withOpacity(0.4))),
                           ],
                         ),
                       ),
@@ -965,10 +981,10 @@ class _WalletSheetState extends State<_WalletSheet> {
                   );
                 }).toList(),
               ),
-
               const SizedBox(height: 20),
               const Text('Color',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  style: TextStyle(
+                      fontWeight: FontWeight.w600, fontSize: 14)),
               const SizedBox(height: 10),
               Wrap(
                 spacing: 10,
@@ -976,22 +992,28 @@ class _WalletSheetState extends State<_WalletSheet> {
                 children: _palette.map((color) {
                   final isSelected = _selectedColor.value == color.value;
                   return GestureDetector(
-                    onTap: () => setState(() => _selectedColor = color),
+                    onTap: () =>
+                        setState(() => _selectedColor = color),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 180),
-                      width: 38, height: 38,
+                      width: 38,
+                      height: 38,
                       decoration: BoxDecoration(
                         color: color,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: isSelected ? Colors.white : Colors.transparent,
+                          color: isSelected
+                              ? Colors.white
+                              : Colors.transparent,
                           width: 3,
                         ),
                         boxShadow: isSelected
-                            ? [BoxShadow(
-                                color: color.withOpacity(0.6),
-                                blurRadius: 10,
-                                spreadRadius: 2)]
+                            ? [
+                                BoxShadow(
+                                    color: color.withOpacity(0.6),
+                                    blurRadius: 10,
+                                    spreadRadius: 2)
+                              ]
                             : null,
                       ),
                       child: isSelected
@@ -1071,7 +1093,8 @@ class _CategoriesPage extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Color(cat.colorValue).withOpacity(0.15),
+                        color:
+                            Color(cat.colorValue).withOpacity(0.15),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text('Default',
@@ -1194,7 +1217,8 @@ class _CategoriesPage extends StatelessWidget {
                             setState(() => selectedColor = color),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 180),
-                          width: 36, height: 36,
+                          width: 36,
+                          height: 36,
                           decoration: BoxDecoration(
                             color: color,
                             shape: BoxShape.circle,
@@ -1228,7 +1252,9 @@ class _CategoriesPage extends StatelessWidget {
                       onPressed: () {
                         final name = nameCtrl.text.trim();
                         if (name.isEmpty) return;
-                        ctx.read<CategoryProvider>().addCustomCategory(
+                        ctx
+                            .read<CategoryProvider>()
+                            .addCustomCategory(
                           CategoryModel(
                             id: AppUtils.generateId(),
                             name: name,
@@ -1309,7 +1335,8 @@ class _SettingTile extends StatelessWidget {
       child: ListTile(
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16)),
-        leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
+        leading:
+            Icon(icon, color: Theme.of(context).colorScheme.primary),
         title: Text(title,
             style: TextStyle(
                 fontWeight: FontWeight.w600, color: titleColor)),
@@ -1324,14 +1351,15 @@ class _SettingTile extends StatelessWidget {
   }
 }
 
-// ── Currency Picker Sheet with Search ─────────────────────────────────────────
+// ── Currency Picker Sheet ─────────────────────────────────────────────────────
 
 class _CurrencyPickerSheet extends StatefulWidget {
   final SettingsProvider settings;
   const _CurrencyPickerSheet({required this.settings});
 
   @override
-  State<_CurrencyPickerSheet> createState() => _CurrencyPickerSheetState();
+  State<_CurrencyPickerSheet> createState() =>
+      _CurrencyPickerSheetState();
 }
 
 class _CurrencyPickerSheetState extends State<_CurrencyPickerSheet> {
@@ -1341,8 +1369,13 @@ class _CurrencyPickerSheetState extends State<_CurrencyPickerSheet> {
   static const Map<String, List<String>> _regions = {
     'Americas': ['USD', 'CAD', 'AUD', 'BRL', 'MXN'],
     'Europe': ['EUR', 'GBP', 'CHF', 'RUB', 'TRY', 'SEK', 'NOK'],
-    'Middle East & Africa': ['AED', 'SAR', 'IRR', 'AFN', 'IQD', 'KWD', 'QAR'],
-    'Asia': ['JPY', 'CNY', 'KRW', 'INR', 'PKR', 'BDT', 'THB', 'VND', 'SGD', 'HKD'],
+    'Middle East & Africa': [
+      'AED', 'SAR', 'IRR', 'AFN', 'IQD', 'KWD', 'QAR'
+    ],
+    'Asia': [
+      'JPY', 'CNY', 'KRW', 'INR', 'PKR', 'BDT', 'THB', 'VND',
+      'SGD', 'HKD'
+    ],
   };
 
   @override
@@ -1359,7 +1392,6 @@ class _CurrencyPickerSheetState extends State<_CurrencyPickerSheet> {
       for (final c in SettingsProvider.currencies) c['code']!: c['label']!
     };
 
-    // Build filtered list
     final isSearching = _query.isNotEmpty;
     final filtered = isSearching
         ? SettingsProvider.currencies
@@ -1381,14 +1413,14 @@ class _CurrencyPickerSheetState extends State<_CurrencyPickerSheet> {
         ),
         child: Column(
           children: [
-            // ── Header ──────────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
               child: Column(
                 children: [
                   Center(
                     child: Container(
-                      width: 40, height: 4,
+                      width: 40,
+                      height: 4,
                       decoration: BoxDecoration(
                         color: Colors.grey.withOpacity(0.3),
                         borderRadius: BorderRadius.circular(2),
@@ -1400,13 +1432,15 @@ class _CurrencyPickerSheetState extends State<_CurrencyPickerSheet> {
                     children: [
                       const Text('Select Currency',
                           style: TextStyle(
-                              fontSize: 20, fontWeight: FontWeight.w700)),
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700)),
                       const Spacer(),
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.primary.withOpacity(0.1),
+                          color: theme.colorScheme.primary
+                              .withOpacity(0.1),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
@@ -1420,14 +1454,13 @@ class _CurrencyPickerSheetState extends State<_CurrencyPickerSheet> {
                     ],
                   ),
                   const SizedBox(height: 14),
-
-                  // ── Search bar ────────────────────────────────────────
                   TextField(
                     controller: _searchCtrl,
                     onChanged: (v) =>
                         setState(() => _query = v.toLowerCase().trim()),
                     decoration: InputDecoration(
-                      hintText: 'Search currency (e.g. USD, Euro, Yen...)',
+                      hintText:
+                          'Search currency (e.g. USD, Euro, Yen...)',
                       prefixIcon: const Icon(Icons.search_rounded),
                       suffixIcon: _query.isNotEmpty
                           ? IconButton(
@@ -1444,11 +1477,8 @@ class _CurrencyPickerSheetState extends State<_CurrencyPickerSheet> {
                 ],
               ),
             ),
-
-            // ── Currency list ────────────────────────────────────────────
             Expanded(
               child: isSearching
-                  // ── Flat search results ──────────────────────────────
                   ? filtered.isEmpty
                       ? Center(
                           child: Column(
@@ -1488,7 +1518,6 @@ class _CurrencyPickerSheetState extends State<_CurrencyPickerSheet> {
                             );
                           },
                         )
-                  // ── Grouped by region ────────────────────────────────
                   : ListView(
                       controller: controller,
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
@@ -1509,7 +1538,8 @@ class _CurrencyPickerSheetState extends State<_CurrencyPickerSheet> {
                               ),
                             ),
                             ...region.value.map((code) {
-                              final label = allCurrencies[code] ?? code;
+                              final label =
+                                  allCurrencies[code] ?? code;
                               return _CurrencyTile(
                                 code: code,
                                 label: label,
@@ -1534,8 +1564,6 @@ class _CurrencyPickerSheetState extends State<_CurrencyPickerSheet> {
     );
   }
 }
-
-// ── Currency Tile ─────────────────────────────────────────────────────────────
 
 class _CurrencyTile extends StatelessWidget {
   final String code;
@@ -1566,7 +1594,9 @@ class _CurrencyTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: isSelected
               ? theme.colorScheme.primary.withOpacity(0.08)
-              : (isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade50),
+              : (isDark
+                  ? const Color(0xFF2A2A2A)
+                  : Colors.grey.shade50),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: isSelected
@@ -1577,7 +1607,6 @@ class _CurrencyTile extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Currency code badge
             Container(
               width: 44,
               height: 28,
@@ -1607,8 +1636,7 @@ class _CurrencyTile extends StatelessWidget {
                   fontSize: 14,
                   fontWeight:
                       isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color:
-                      isSelected ? theme.colorScheme.primary : null,
+                  color: isSelected ? theme.colorScheme.primary : null,
                 ),
               ),
             ),

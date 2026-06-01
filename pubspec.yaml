@@ -29,7 +29,7 @@ dependencies:
   printing: ^5.13.1
   flutter_local_notifications: ^17.2.3
   timezone: ^0.9.4
-  
+  local_auth: ^2.3.0
 
 
 dev_dependencies:

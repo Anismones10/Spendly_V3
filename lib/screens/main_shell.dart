@@ -12,6 +12,7 @@ import 'settings_screen.dart';
 import 'statistics_screen.dart';
 import 'loans_screen.dart';
 import 'global_search_screen.dart';
+import 'lock_screen.dart';
 
 class _TabDef {
   final String id;
@@ -72,7 +73,6 @@ final List<_TabDef> _allTabs = [
     activeIcon: Icons.bar_chart_rounded,
     screen: const StatisticsScreen(),
   ),
-  // Search is a real tab — customizable, hideable like any other
   _TabDef(
     id: 'search',
     label: 'Search',
@@ -104,38 +104,90 @@ class MainShell extends StatefulWidget {
   State<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
+class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   late List<String> _visibleTabIds;
   late int _currentIndex;
   int _previousIndex = 0;
   final Box _settingsBox = Hive.box('settings');
 
+  // ── Lock state ────────────────────────────────────────────────────────────
+  bool _locked = false;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadTabPrefs();
+    _checkLockOnStart();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // ── Check lock on app start ───────────────────────────────────────────────
+  void _checkLockOnStart() {
+    final lockEnabled =
+        _settingsBox.get('lockEnabled', defaultValue: false) as bool;
+    if (!lockEnabled) return;
+
+    final lastActive =
+        _settingsBox.get('lockLastActive', defaultValue: 0) as int;
+    final timeoutMins =
+        _settingsBox.get('lockTimeout', defaultValue: 30) as int;
+    final now     = DateTime.now().millisecondsSinceEpoch;
+    final elapsed = (now - lastActive) ~/ 1000 ~/ 60; // minutes
+
+    if (lastActive == 0 || elapsed >= timeoutMins) {
+      setState(() => _locked = true);
+    }
+  }
+
+  // ── Listen for background / foreground ───────────────────────────────────
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final lockEnabled =
+        _settingsBox.get('lockEnabled', defaultValue: false) as bool;
+    if (!lockEnabled) return;
+
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      _settingsBox.put(
+          'lockLastActive', DateTime.now().millisecondsSinceEpoch);
+    }
+
+    if (state == AppLifecycleState.resumed) {
+      final lastActive =
+          _settingsBox.get('lockLastActive', defaultValue: 0) as int;
+      final timeoutMins =
+          _settingsBox.get('lockTimeout', defaultValue: 30) as int;
+      final now     = DateTime.now().millisecondsSinceEpoch;
+      final elapsed = (now - lastActive) ~/ 1000 ~/ 60;
+
+      if (elapsed >= timeoutMins) {
+        setState(() => _locked = true);
+      }
+    }
   }
 
   void _loadTabPrefs() {
     final saved = _settingsBox.get('visibleTabs') as List?;
     if (saved != null && saved.length >= 2) {
-      _visibleTabIds = List<String>.from(saved)
-        ..remove('settings');
+      _visibleTabIds = List<String>.from(saved)..remove('settings');
     } else {
       _visibleTabIds = List<String>.from(_defaultTabOrder);
     }
-    // settings is never shown in bottom nav
     _visibleTabIds.remove('settings');
-    // home always first
     _visibleTabIds.remove('home');
     _visibleTabIds.insert(0, 'home');
-    _currentIndex = 0;
+    _currentIndex  = 0;
     _previousIndex = 0;
   }
 
   void _saveTabPrefs() {
-    final toSave = List<String>.from(_visibleTabIds)
-      ..remove('settings');
+    final toSave = List<String>.from(_visibleTabIds)..remove('settings');
     _settingsBox.put('visibleTabs', toSave);
   }
 
@@ -145,18 +197,18 @@ class _MainShellState extends State<MainShell> {
 
   void _goTo(int index) {
     if (index == _currentIndex) return;
-    final haptic = _settingsBox.get('hapticEnabled',
-        defaultValue: true) as bool;
+    final haptic =
+        _settingsBox.get('hapticEnabled', defaultValue: true) as bool;
     if (haptic) HapticFeedback.lightImpact();
     setState(() {
       _previousIndex = _currentIndex;
-      _currentIndex = index;
+      _currentIndex  = index;
     });
   }
 
   void _showMoreMenu() {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final theme      = Theme.of(context);
+    final isDark     = theme.brightness == Brightness.dark;
     final hiddenTabs = _allTabs
         .where((t) =>
             !_visibleTabIds.contains(t.id) && t.id != 'settings')
@@ -186,8 +238,7 @@ class _MainShellState extends State<MainShell> {
               children: [
                 Center(
                   child: Container(
-                    width: 40,
-                    height: 4,
+                    width: 40, height: 4,
                     decoration: BoxDecoration(
                       color: Colors.grey.withOpacity(0.3),
                       borderRadius: BorderRadius.circular(2),
@@ -264,16 +315,15 @@ class _MainShellState extends State<MainShell> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _TabCustomizerSheet(
-        // Exclude settings only — search is a normal customizable tab
         allTabs: _allTabs.where((t) => t.id != 'settings').toList(),
         visibleTabIds: List<String>.from(_visibleTabIds),
         onSave: (newIds) {
           setState(() {
             _visibleTabIds = newIds;
-            final currentId = _visibleTabs.isNotEmpty &&
-                    _currentIndex < _visibleTabs.length
-                ? _visibleTabs[_currentIndex].id
-                : 'home';
+            final currentId =
+                _visibleTabs.isNotEmpty && _currentIndex < _visibleTabs.length
+                    ? _visibleTabs[_currentIndex].id
+                    : 'home';
             final newIndex = newIds.indexOf(currentId);
             _currentIndex =
                 newIndex >= 0 ? newIndex : newIds.indexOf('home');
@@ -288,9 +338,16 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    // ── Show lock screen if locked ─────────────────────────────────────────
+    if (_locked) {
+      return LockScreen(
+        onUnlocked: () => setState(() => _locked = false),
+      );
+    }
+
+    final theme  = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final tabs = _visibleTabs;
+    final tabs   = _visibleTabs;
 
     Widget currentScreen;
     final currentId =
@@ -312,7 +369,6 @@ class _MainShellState extends State<MainShell> {
 
     final hasOwnMoreButton =
         ['home', 'expenses', 'income'].contains(currentId);
-    // Search screen has its own back button, no overlay needed
     final needsMoreOverlay =
         !hasOwnMoreButton && currentId != 'search';
 
@@ -341,7 +397,6 @@ class _MainShellState extends State<MainShell> {
             ),
           ),
 
-          // ••• More button overlay for screens without their own AppBar button
           if (needsMoreOverlay)
             Positioned(
               top: MediaQuery.of(context).padding.top + 10,
@@ -355,17 +410,13 @@ class _MainShellState extends State<MainShell> {
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
-                        color:
-                            theme.colorScheme.primary.withOpacity(0.15),
+                        color: theme.colorScheme.primary.withOpacity(0.15),
                         blurRadius: 8,
                       ),
                     ],
                   ),
-                  child: Icon(
-                    Icons.more_horiz_rounded,
-                    color: theme.colorScheme.primary,
-                    size: 20,
-                  ),
+                  child: Icon(Icons.more_horiz_rounded,
+                      color: theme.colorScheme.primary, size: 20),
                 ),
               ),
             ),
@@ -388,25 +439,19 @@ class _MainShellState extends State<MainShell> {
         child: SafeArea(
           top: false,
           child: Padding(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 8, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                // Regular nav tabs — search is just another tab now
-                ...List.generate(tabs.length, (i) {
-                  final tab = tabs[i];
-                  final isSelected = i == _currentIndex;
-                  return _NavButton(
-                    icon: isSelected
-                        ? tab.activeIcon
-                        : tab.icon,
-                    label: tab.label,
-                    isSelected: isSelected,
-                    onTap: () => _goTo(i),
-                  );
-                }),
-              ],
+              children: List.generate(tabs.length, (i) {
+                final tab        = tabs[i];
+                final isSelected = i == _currentIndex;
+                return _NavButton(
+                  icon: isSelected ? tab.activeIcon : tab.icon,
+                  label: tab.label,
+                  isSelected: isSelected,
+                  onTap: () => _goTo(i),
+                );
+              }),
             ),
           ),
         ),
@@ -415,7 +460,7 @@ class _MainShellState extends State<MainShell> {
   }
 }
 
-// ── Regular Nav Button ────────────────────────────────────────────────────────
+// ── Nav Button ────────────────────────────────────────────────────────────────
 
 class _NavButton extends StatelessWidget {
   final IconData icon;
@@ -438,8 +483,7 @@ class _NavButton extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 220),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected
               ? theme.colorScheme.primary.withOpacity(0.1)
@@ -449,21 +493,17 @@ class _NavButton extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: 22,
-              color: isSelected
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.onSurface.withOpacity(0.38),
-            ),
+            Icon(icon, size: 22,
+                color: isSelected
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurface.withOpacity(0.38)),
             const SizedBox(height: 3),
             AnimatedDefaultTextStyle(
               duration: const Duration(milliseconds: 200),
               style: TextStyle(
                 fontSize: 10,
-                fontWeight: isSelected
-                    ? FontWeight.w700
-                    : FontWeight.w400,
+                fontWeight:
+                    isSelected ? FontWeight.w700 : FontWeight.w400,
                 color: isSelected
                     ? theme.colorScheme.primary
                     : theme.colorScheme.onSurface.withOpacity(0.38),
@@ -491,8 +531,7 @@ class _TabCustomizerSheet extends StatefulWidget {
   });
 
   @override
-  State<_TabCustomizerSheet> createState() =>
-      _TabCustomizerSheetState();
+  State<_TabCustomizerSheet> createState() => _TabCustomizerSheetState();
 }
 
 class _TabCustomizerSheetState extends State<_TabCustomizerSheet> {
@@ -518,13 +557,12 @@ class _TabCustomizerSheetState extends State<_TabCustomizerSheet> {
   }
 
   void _resetToDefault() {
-    setState(
-        () => _selected = List<String>.from(_defaultTabOrder));
+    setState(() => _selected = List<String>.from(_defaultTabOrder));
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme  = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
     return Container(
@@ -541,8 +579,7 @@ class _TabCustomizerSheetState extends State<_TabCustomizerSheet> {
         children: [
           Center(
             child: Container(
-              width: 40,
-              height: 4,
+              width: 40, height: 4,
               decoration: BoxDecoration(
                   color: Colors.grey.withOpacity(0.3),
                   borderRadius: BorderRadius.circular(2)),
@@ -561,17 +598,15 @@ class _TabCustomizerSheetState extends State<_TabCustomizerSheet> {
             ],
           ),
           const SizedBox(height: 6),
-          Text(
-            'Choose 3–5 tabs. Home always visible.',
-            style: TextStyle(
-                fontSize: 12,
-                color: theme.colorScheme.onSurface.withOpacity(0.5)),
-          ),
+          Text('Choose 3–5 tabs. Home always visible.',
+              style: TextStyle(
+                  fontSize: 12,
+                  color: theme.colorScheme.onSurface.withOpacity(0.5))),
           const SizedBox(height: 20),
 
           ...widget.allTabs.map((tab) {
             final isSelected = _selected.contains(tab.id);
-            final isHome = tab.id == 'home';
+            final isHome     = tab.id == 'home';
 
             return GestureDetector(
               onTap: () => _toggle(tab.id),
@@ -600,45 +635,37 @@ class _TabCustomizerSheetState extends State<_TabCustomizerSheet> {
                       isSelected ? tab.activeIcon : tab.icon,
                       color: isSelected
                           ? theme.colorScheme.primary
-                          : theme.colorScheme.onSurface
-                              .withOpacity(0.4),
+                          : theme.colorScheme.onSurface.withOpacity(0.4),
                       size: 22,
                     ),
                     const SizedBox(width: 14),
                     Expanded(
-                      child: Text(
-                        tab.label,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 15,
-                          color: isSelected
-                              ? theme.colorScheme.primary
-                              : null,
-                        ),
-                      ),
+                      child: Text(tab.label,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                            color: isSelected
+                                ? theme.colorScheme.primary : null,
+                          )),
                     ),
                     if (isHome)
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.primary
-                              .withOpacity(0.1),
+                          color: theme.colorScheme.primary.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Text(
-                          'Always on',
-                          style: TextStyle(
-                              fontSize: 10,
-                              color: theme.colorScheme.primary,
-                              fontWeight: FontWeight.w600),
-                        ),
+                        child: Text('Always on',
+                            style: TextStyle(
+                                fontSize: 10,
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.w600)),
                       )
                     else
                       AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
-                        width: 22,
-                        height: 22,
+                        width: 22, height: 22,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: isSelected
@@ -647,8 +674,7 @@ class _TabCustomizerSheetState extends State<_TabCustomizerSheet> {
                           border: Border.all(
                             color: isSelected
                                 ? theme.colorScheme.primary
-                                : theme.colorScheme.onSurface
-                                    .withOpacity(0.3),
+                                : theme.colorScheme.onSurface.withOpacity(0.3),
                             width: 2,
                           ),
                         ),
@@ -665,13 +691,10 @@ class _TabCustomizerSheetState extends State<_TabCustomizerSheet> {
 
           const SizedBox(height: 8),
           Center(
-            child: Text(
-              '${_selected.length} / 5 tabs selected',
-              style: TextStyle(
-                  fontSize: 12,
-                  color: theme.colorScheme.onSurface
-                      .withOpacity(0.4)),
-            ),
+            child: Text('${_selected.length} / 5 tabs selected',
+                style: TextStyle(
+                    fontSize: 12,
+                    color: theme.colorScheme.onSurface.withOpacity(0.4))),
           ),
           const SizedBox(height: 16),
           SizedBox(
@@ -707,17 +730,14 @@ class _MoreTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return ListTile(
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 4),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
       leading: Container(
-        width: 42,
-        height: 42,
+        width: 42, height: 42,
         decoration: BoxDecoration(
           color: theme.colorScheme.primary.withOpacity(0.1),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Icon(icon, color: theme.colorScheme.primary,
-            size: 20),
+        child: Icon(icon, color: theme.colorScheme.primary, size: 20),
       ),
       title: Text(label,
           style: const TextStyle(

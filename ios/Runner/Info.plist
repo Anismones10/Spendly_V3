@@ -27,6 +27,9 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Spendly uses Face ID to protect your financial data.</string>
+
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
 		<false/>

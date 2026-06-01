@@ -34,11 +34,10 @@ class PdfHelper {
     PdfColor.fromHex('#78909C'),
     PdfColor.fromHex('#E91E63'),
     PdfColor.fromHex('#00BCD4'),
+
   ];
 
   // ── Safe currency symbol resolver ─────────────────────────────────────────
-  // pw.Text drops '$' on some PDF renderers (PostScript special char).
-  // We map currency codes to ASCII-safe display strings.
   static String _sym(String code) {
     const map = {
       'USD': 'USD ', 'CAD': 'CAD ', 'AUD': 'AUD ', 'BRL': 'BRL ',
@@ -85,13 +84,13 @@ class PdfHelper {
 
   static String _shortMonth(int m) {
     const months = ['Jan','Feb','Mar','Apr','May','Jun',
-      'Jul','Aug','Sep','Oct','Nov','Dec'];
+                    'Jul','Aug','Sep','Oct','Nov','Dec'];
     return months[m - 1];
   }
 
   static bool _inRange(DateTime date, DateTimeRange range) =>
       !date.isBefore(range.start) &&
-          date.isBefore(range.end.add(const Duration(days: 1)));
+      date.isBefore(range.end.add(const Duration(days: 1)));
 
   static PdfColor _pdfColorFromInt(int v) => PdfColor(
     ((v >> 16) & 0xFF) / 255.0,
@@ -209,7 +208,7 @@ class PdfHelper {
     await Printing.layoutPdf(
       onLayout: (_) async => doc.save(),
       name: 'Spendly_Report_' + now.year.toString() +
-          _pad(now.month) + _pad(now.day) + '.pdf',
+            _pad(now.month) + _pad(now.day) + '.pdf',
     );
   }
 
@@ -260,15 +259,15 @@ class PdfHelper {
               child: pw.Center(child: pw.Text(
                 'S',
                 style: pw.TextStyle(
-                    fontSize: 48, fontWeight: pw.FontWeight.bold, color: _navy),
+                  fontSize: 48, fontWeight: pw.FontWeight.bold, color: _navy),
               )),
             ),
             pw.SizedBox(height: 30),
             pw.Text('Spendly',
-                style: pw.TextStyle(
-                    fontSize: 52, fontWeight: pw.FontWeight.bold, color: _white)),
+              style: pw.TextStyle(
+                fontSize: 52, fontWeight: pw.FontWeight.bold, color: _white)),
             pw.Text('Financial Report',
-                style: pw.TextStyle(fontSize: 24, color: _white)),
+              style: pw.TextStyle(fontSize: 24, color: _white)),
             pw.SizedBox(height: 60),
             pw.Container(height: 1, color: PdfColors.white),
             pw.SizedBox(height: 30),
@@ -290,8 +289,8 @@ class PdfHelper {
                 borderRadius: pw.BorderRadius.circular(20),
               ),
               child: pw.Text('Track. Save. Grow.',
-                  style: pw.TextStyle(
-                      fontSize: 13, color: _navy, fontWeight: pw.FontWeight.bold)),
+                style: pw.TextStyle(
+                  fontSize: 13, color: _navy, fontWeight: pw.FontWeight.bold)),
             ),
           ],
         ),
@@ -306,13 +305,13 @@ class PdfHelper {
         pw.TextSpan(
           text: label + ' ',
           style: pw.TextStyle(
-              fontSize: 14, color: PdfColors.white,
-              fontWeight: pw.FontWeight.normal),
+            fontSize: 14, color: PdfColors.white,
+            fontWeight: pw.FontWeight.normal),
         ),
         pw.TextSpan(
           text: value,
           style: pw.TextStyle(
-              fontSize: 14, color: _white, fontWeight: pw.FontWeight.bold),
+            fontSize: 14, color: _white, fontWeight: pw.FontWeight.bold),
         ),
       ]),
     );
@@ -362,11 +361,11 @@ class PdfHelper {
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               pw.Text('Financial Summary',
-                  style: pw.TextStyle(
-                      fontSize: 20, fontWeight: pw.FontWeight.bold, color: _white)),
+                style: pw.TextStyle(
+                  fontSize: 20, fontWeight: pw.FontWeight.bold, color: _white)),
               pw.SizedBox(height: 4),
               pw.Text(dateLabel,
-                  style: pw.TextStyle(fontSize: 12, color: _white)),
+                style: pw.TextStyle(fontSize: 12, color: _white)),
             ],
           ),
         ),
@@ -679,21 +678,21 @@ class PdfHelper {
                   pw.Container(
                     width: 8, height: 8,
                     decoration: pw.BoxDecoration(
-                        color: s.color, shape: pw.BoxShape.circle),
+                      color: s.color, shape: pw.BoxShape.circle),
                   ),
                   pw.SizedBox(width: 5),
                   pw.Expanded(
                     child: pw.Text(label,
-                        style: const pw.TextStyle(fontSize: 8)),
+                      style: const pw.TextStyle(fontSize: 8)),
                   ),
                   pw.Text(pct + '%',
-                      style: pw.TextStyle(
-                          fontSize: 8,
-                          fontWeight: pw.FontWeight.bold,
-                          color: s.color)),
+                    style: pw.TextStyle(
+                      fontSize: 8,
+                      fontWeight: pw.FontWeight.bold,
+                      color: s.color)),
                   pw.SizedBox(width: 4),
                   pw.Text(amtStr,
-                      style: pw.TextStyle(fontSize: 7, color: _grey)),
+                    style: pw.TextStyle(fontSize: 7, color: _grey)),
                 ]),
               );
             }).toList(),
@@ -706,29 +705,55 @@ class PdfHelper {
   static void _drawDonut(PdfGraphics canvas, PdfPoint size,
       List<_Slice> slices, double total) {
     if (total == 0) return;
-    final cx = size.x / 2;
-    final cy = size.y / 2;
-    final r  = math.min(cx, cy) - 2;
-    double a = -math.pi / 2;
+    final cx    = size.x / 2;
+    final cy    = size.y / 2;
+    final r     = math.min(cx, cy) - 2;
+    final inner = r * 0.42;
+    const steps = 72; // 5 degrees per step — very smooth
+
+    double startAngle = -math.pi / 2;
+
     for (final s in slices) {
-      final sweep = (s.value / total) * math.pi * 2;
+      if (s.value <= 0) continue;
+      final sweep    = (s.value / total) * math.pi * 2;
+      final numSteps = math.max(3, (steps * sweep / (math.pi * 2)).ceil());
+      final step     = sweep / numSteps;
+
+      canvas.setFillColor(s.color);
+
+      // Build a single closed path for this slice
+      // 1. Move to outer arc start
+      final ox0 = cx + r * math.cos(startAngle);
+      final oy0 = cy + r * math.sin(startAngle);
+      canvas.moveTo(ox0, oy0);
+
+      // 2. Draw outer arc (forward)
+      for (int i = 1; i <= numSteps; i++) {
+        final a = startAngle + i * step;
+        canvas.lineTo(cx + r * math.cos(a), cy + r * math.sin(a));
+      }
+
+      // 3. Line to inner arc end point
+      final endAngle = startAngle + sweep;
+      canvas.lineTo(
+        cx + inner * math.cos(endAngle),
+        cy + inner * math.sin(endAngle),
+      );
+
+      // 4. Draw inner arc (backward)
+      for (int i = numSteps - 1; i >= 0; i--) {
+        final a = startAngle + i * step;
+        canvas.lineTo(cx + inner * math.cos(a), cy + inner * math.sin(a));
+      }
+
+      // 5. Close back to outer arc start
+      canvas.lineTo(ox0, oy0);
       canvas
-        ..setFillColor(s.color)
-        ..moveTo(cx, cy)
-        ..bezierArc(
-          cx + r * math.cos(a), cy + r * math.sin(a),
-          r, r,
-          cx + r * math.cos(a + sweep), cy + r * math.sin(a + sweep),
-          large: sweep > math.pi, sweep: true,
-        )
         ..closePath()
         ..fillPath();
-      a += sweep;
+
+      startAngle += sweep;
     }
-    canvas
-      ..setFillColor(PdfColors.white)
-      ..drawEllipse(cx, cy, r * 0.44, r * 0.44)
-      ..fillPath();
   }
 
   // ── Bar chart ──────────────────────────────────────────────────────────────
@@ -749,7 +774,7 @@ class PdfHelper {
       children: [
         // Y-axis max label
         pw.Text(_fmt(maxVal, sym),
-            style: pw.TextStyle(fontSize: 7, color: _grey)),
+          style: pw.TextStyle(fontSize: 7, color: _grey)),
         pw.SizedBox(height: 2),
         // Bars
         pw.SizedBox(
@@ -768,7 +793,7 @@ class PdfHelper {
             return pw.Expanded(
               child: pw.Center(
                 child: pw.Text(lbl,
-                    style: pw.TextStyle(fontSize: 7, color: _grey)),
+                  style: pw.TextStyle(fontSize: 7, color: _grey)),
               ),
             );
           }).toList(),
@@ -778,10 +803,10 @@ class PdfHelper {
   }
 
   static void _drawBars(
-      PdfGraphics canvas, PdfPoint size,
-      List<MapEntry<String, double>> entries,
-      double maxVal, PdfColor color,
-      ) {
+    PdfGraphics canvas, PdfPoint size,
+    List<MapEntry<String, double>> entries,
+    double maxVal, PdfColor color,
+  ) {
     final n    = entries.length;
     if (n == 0 || maxVal == 0) return;
     final w    = size.x;
@@ -832,7 +857,7 @@ class PdfHelper {
       pw.SizedBox(
         width: labelW,
         child: pw.Text(label,
-            style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+          style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
       ),
       pw.Stack(children: [
         pw.Container(
@@ -853,8 +878,8 @@ class PdfHelper {
       ]),
       pw.SizedBox(width: 8),
       pw.Text(amtStr,
-          style: pw.TextStyle(
-              fontSize: 9, fontWeight: pw.FontWeight.bold, color: color)),
+        style: pw.TextStyle(
+          fontSize: 9, fontWeight: pw.FontWeight.bold, color: color)),
     ]);
   }
 
@@ -874,16 +899,16 @@ class PdfHelper {
             pw.Container(
               height: 52, width: double.infinity,
               decoration: pw.BoxDecoration(
-                  color: color, borderRadius: pw.BorderRadius.circular(8)),
+                color: color, borderRadius: pw.BorderRadius.circular(8)),
               child: pw.Center(child: pw.Text(pctStr,
-                  style: pw.TextStyle(
-                      color: _white, fontSize: 18, fontWeight: pw.FontWeight.bold))),
+                style: pw.TextStyle(
+                  color: _white, fontSize: 18, fontWeight: pw.FontWeight.bold))),
             ),
             pw.SizedBox(height: 4),
             pw.Text(lbl,
-                style: pw.TextStyle(
-                    fontSize: 8, fontWeight: pw.FontWeight.bold, color: color),
-                textAlign: pw.TextAlign.center),
+              style: pw.TextStyle(
+                fontSize: 8, fontWeight: pw.FontWeight.bold, color: color),
+              textAlign: pw.TextAlign.center),
           ]),
         ),
       );
@@ -910,11 +935,11 @@ class PdfHelper {
             children: [
               pw.Expanded(
                 child: pw.Text(g.name,
-                    style: pw.TextStyle(
-                        fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                  style: pw.TextStyle(
+                    fontSize: 10, fontWeight: pw.FontWeight.bold)),
               ),
               pw.Text(savedStr + ' / ' + targetStr,
-                  style: pw.TextStyle(fontSize: 8, color: _grey)),
+                style: pw.TextStyle(fontSize: 8, color: _grey)),
             ],
           ),
           pw.SizedBox(height: 5),
@@ -938,7 +963,7 @@ class PdfHelper {
           ),
           pw.SizedBox(height: 3),
           pw.Text(pctStr,
-              style: pw.TextStyle(fontSize: 8, color: color)),
+            style: pw.TextStyle(fontSize: 8, color: color)),
         ],
       ),
     );
@@ -971,16 +996,16 @@ class PdfHelper {
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
               pw.Expanded(child: pw.Text(g.name,
-                  style: pw.TextStyle(
-                      fontSize: 13, fontWeight: pw.FontWeight.bold))),
+                style: pw.TextStyle(
+                  fontSize: 13, fontWeight: pw.FontWeight.bold))),
               pw.Container(
                 padding: const pw.EdgeInsets.symmetric(
                     horizontal: 8, vertical: 3),
                 decoration: pw.BoxDecoration(
-                    color: color, borderRadius: pw.BorderRadius.circular(20)),
+                  color: color, borderRadius: pw.BorderRadius.circular(20)),
                 child: pw.Text(status,
-                    style: pw.TextStyle(
-                        fontSize: 8, color: _white, fontWeight: pw.FontWeight.bold)),
+                  style: pw.TextStyle(
+                    fontSize: 8, color: _white, fontWeight: pw.FontWeight.bold)),
               ),
             ],
           ),
@@ -1012,7 +1037,7 @@ class PdfHelper {
           ),
           pw.SizedBox(height: 4),
           pw.Text(pctStr,
-              style: pw.TextStyle(fontSize: 9, color: color)),
+            style: pw.TextStyle(fontSize: 9, color: color)),
         ],
       ),
     );
@@ -1044,14 +1069,14 @@ class PdfHelper {
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               pw.Text(w.name,
-                  style: pw.TextStyle(
-                      fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                style: pw.TextStyle(
+                  fontSize: 11, fontWeight: pw.FontWeight.bold)),
               pw.Text(w.type.toUpperCase(),
-                  style: pw.TextStyle(fontSize: 8, color: color)),
+                style: pw.TextStyle(fontSize: 8, color: color)),
               pw.SizedBox(height: 4),
               pw.Text(balStr,
-                  style: pw.TextStyle(
-                      fontSize: 13, fontWeight: pw.FontWeight.bold, color: color)),
+                style: pw.TextStyle(
+                  fontSize: 13, fontWeight: pw.FontWeight.bold, color: color)),
             ],
           ),
         );
@@ -1061,10 +1086,10 @@ class PdfHelper {
 
   // ── Tables ─────────────────────────────────────────────────────────────────
   static pw.Widget _catTable(
-      List<MapEntry<String, double>> entries,
-      Map<String, CategoryModel> categories,
-      double total, String sym,
-      ) {
+    List<MapEntry<String, double>> entries,
+    Map<String, CategoryModel> categories,
+    double total, String sym,
+  ) {
     return pw.Table(
       border: pw.TableBorder.all(color: _light, width: 0.5),
       columnWidths: {
@@ -1096,10 +1121,10 @@ class PdfHelper {
   }
 
   static pw.Widget _expTable(
-      List<ExpenseModel> expenses,
-      Map<String, CategoryModel> categories,
-      List<WalletModel> wallets, String sym,
-      ) {
+    List<ExpenseModel> expenses,
+    Map<String, CategoryModel> categories,
+    List<WalletModel> wallets, String sym,
+  ) {
     final walletMap = {for (final w in wallets) w.id: w};
     return pw.Table(
       border: pw.TableBorder.all(color: _light, width: 0.5),
@@ -1136,9 +1161,9 @@ class PdfHelper {
   }
 
   static pw.Widget _incTable(
-      List<IncomeModel> income,
-      List<WalletModel> wallets, String sym,
-      ) {
+    List<IncomeModel> income,
+    List<WalletModel> wallets, String sym,
+  ) {
     final walletMap = {for (final w in wallets) w.id: w};
     return pw.Table(
       border: pw.TableBorder.all(color: _light, width: 0.5),
@@ -1212,8 +1237,8 @@ class PdfHelper {
         children: cols.map((h) => pw.Padding(
           padding: const pw.EdgeInsets.all(6),
           child: pw.Text(h,
-              style: pw.TextStyle(
-                  fontSize: 9, fontWeight: pw.FontWeight.bold, color: _white)),
+            style: pw.TextStyle(
+              fontSize: 9, fontWeight: pw.FontWeight.bold, color: _white)),
         )).toList(),
       );
 
@@ -1222,10 +1247,10 @@ class PdfHelper {
       pw.Padding(
         padding: const pw.EdgeInsets.all(5),
         child: pw.Text(text,
-            style: const pw.TextStyle(fontSize: 8),
-            textAlign: right  ? pw.TextAlign.right
-                : center ? pw.TextAlign.center
-                : pw.TextAlign.left),
+          style: const pw.TextStyle(fontSize: 8),
+          textAlign: right  ? pw.TextAlign.right
+              : center ? pw.TextAlign.center
+              : pw.TextAlign.left),
       );
 
   // ── Shared UI helpers ──────────────────────────────────────────────────────
@@ -1277,27 +1302,27 @@ class PdfHelper {
       pw.Container(
         padding: const pw.EdgeInsets.only(top: 6),
         decoration: pw.BoxDecoration(
-            border: pw.Border(
-                top: pw.BorderSide(color: _light, width: 1))),
+          border: pw.Border(
+              top: pw.BorderSide(color: _light, width: 1))),
         child: pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
             pw.Text(
-                'Spendly Financial Report — ' + _fmtDate(now),
-                style: pw.TextStyle(fontSize: 8, color: _grey)),
+              'Spendly Financial Report — ' + _fmtDate(now),
+              style: pw.TextStyle(fontSize: 8, color: _grey)),
             pw.Text(
-                'Page ' + ctx.pageNumber.toString() +
-                    ' of ' + ctx.pagesCount.toString(),
-                style: pw.TextStyle(fontSize: 8, color: _grey)),
+              'Page ' + ctx.pageNumber.toString() +
+              ' of ' + ctx.pagesCount.toString(),
+              style: pw.TextStyle(fontSize: 8, color: _grey)),
           ],
         ),
       );
 
   // ── Slice helpers ──────────────────────────────────────────────────────────
   static List<_Slice> _toSlices(
-      List<MapEntry<String, double>> entries,
-      Map<String, CategoryModel> categories,
-      ) {
+    List<MapEntry<String, double>> entries,
+    Map<String, CategoryModel> categories,
+  ) {
     return entries.asMap().entries.map((e) => _Slice(
       label: categories[e.value.key]?.name ?? e.value.key,
       value: e.value.value,

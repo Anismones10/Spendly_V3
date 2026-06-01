@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:hive/hive.dart';
+import 'package:local_auth/local_auth.dart';
 import '../providers/settings_provider.dart';
 import '../providers/expense_provider.dart';
 import '../providers/category_provider.dart';
@@ -14,12 +16,12 @@ import '../models/wallet_model.dart';
 import '../utils/csv_helper.dart';
 import '../screens/transfer_screen.dart';
 import '../screens/export_screen.dart';
+import '../screens/set_pin_screen.dart';
 import 'about_screen.dart';
+import 'notification_settings_screen.dart';
 import '../utils/category_icons.dart';
 import '../models/category_model.dart';
 import '../utils/app_utils.dart';
-import 'notification_settings_screen.dart';
-
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -27,8 +29,8 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final theme    = Theme.of(context);
+    final isDark   = theme.brightness == Brightness.dark;
 
     return Scaffold(
       backgroundColor:
@@ -55,6 +57,11 @@ class SettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
+          // ── Security ──────────────────────────────────────────────────
+          _SectionHeader('Security'),
+          const _SecuritySection(),
+          const SizedBox(height: 16),
+
           // ── Appearance ────────────────────────────────────────────────
           _SectionHeader('Appearance'),
           _SettingTile(
@@ -67,6 +74,7 @@ class SettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
+          // ── Sound ─────────────────────────────────────────────────────
           _SectionHeader('Sound'),
           _SettingTile(
             icon: Icons.volume_up_rounded,
@@ -86,6 +94,7 @@ class SettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
+          // ── Currency ──────────────────────────────────────────────────
           _SectionHeader('Currency'),
           _SettingTile(
             icon: Icons.currency_exchange_rounded,
@@ -95,6 +104,7 @@ class SettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
+          // ── Wallets ───────────────────────────────────────────────────
           _SectionHeader('Wallets'),
           _SettingTile(
             icon: Icons.account_balance_wallet_rounded,
@@ -113,6 +123,7 @@ class SettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
+          // ── Budget ────────────────────────────────────────────────────
           _SectionHeader('Budget'),
           _SettingTile(
             icon: Icons.pie_chart_rounded,
@@ -122,6 +133,7 @@ class SettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
+          // ── Categories ────────────────────────────────────────────────
           _SectionHeader('Categories'),
           _SettingTile(
             icon: Icons.category_rounded,
@@ -146,7 +158,7 @@ class SettingsScreen extends StatelessWidget {
             title: 'Export Expenses (CSV)',
             subtitle: 'Save expenses as CSV',
             onTap: () async {
-              final expenses = context.read<ExpenseProvider>();
+              final expenses   = context.read<ExpenseProvider>();
               final categories = context.read<CategoryProvider>();
               final catMap = {
                 for (final c in categories.categories) c.id: c
@@ -180,10 +192,10 @@ class SettingsScreen extends StatelessWidget {
             title: 'Export All Data (CSV)',
             subtitle: 'Expenses + Income + Loans in one file',
             onTap: () async {
-              final expenses = context.read<ExpenseProvider>();
+              final expenses   = context.read<ExpenseProvider>();
               final categories = context.read<CategoryProvider>();
-              final income = context.read<IncomeProvider>();
-              final loans = context.read<LoanProvider>();
+              final income     = context.read<IncomeProvider>();
+              final loans      = context.read<LoanProvider>();
               final catMap = {
                 for (final c in categories.categories) c.id: c
               };
@@ -204,6 +216,7 @@ class SettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 32),
 
+          // ── About ─────────────────────────────────────────────────────
           _SectionHeader('About'),
           _SettingTile(
             icon: Icons.info_outline_rounded,
@@ -224,24 +237,19 @@ class SettingsScreen extends StatelessWidget {
                   color: theme.colorScheme.onSurface.withOpacity(0.3)),
             ),
           ),
+          const SizedBox(height: 24),
         ],
       ),
     );
   }
 
-  void _manageCategoryBudgets(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const _CategoryBudgetsPage()),
-    );
-  }
+  void _manageCategoryBudgets(BuildContext context) =>
+      Navigator.push(context,
+          MaterialPageRoute(builder: (_) => const _CategoryBudgetsPage()));
 
-  void _manageWallets(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const _WalletsPage()),
-    );
-  }
+  void _manageWallets(BuildContext context) =>
+      Navigator.push(context,
+          MaterialPageRoute(builder: (_) => const _WalletsPage()));
 
   void _pickCurrency(BuildContext context, SettingsProvider settings) {
     showModalBottomSheet(
@@ -252,12 +260,9 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  void _manageCategories(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const _CategoriesPage()),
-    );
-  }
+  void _manageCategories(BuildContext context) =>
+      Navigator.push(context,
+          MaterialPageRoute(builder: (_) => const _CategoriesPage()));
 
   void _confirmClear(BuildContext context) {
     showDialog(
@@ -293,6 +298,221 @@ class SettingsScreen extends StatelessWidget {
   }
 }
 
+// ── Security Section ──────────────────────────────────────────────────────────
+
+class _SecuritySection extends StatefulWidget {
+  const _SecuritySection();
+
+  @override
+  State<_SecuritySection> createState() => _SecuritySectionState();
+}
+
+class _SecuritySectionState extends State<_SecuritySection> {
+  final Box _box  = Hive.box('settings');
+  final LocalAuthentication _auth = LocalAuthentication();
+
+  bool get _lockEnabled => _box.get('lockEnabled',   defaultValue: false) as bool;
+  bool get _bioEnabled  => _box.get('lockBiometric', defaultValue: true)  as bool;
+  int  get _timeoutMins => _box.get('lockTimeout',   defaultValue: 30)    as int;
+
+  static const _timeoutOptions = [0, 1, 5, 15, 30];
+  static const _timeoutLabels  = ['Immediately', '1 min', '5 min', '15 min', '30 min'];
+
+  Future<void> _toggleLock(bool value) async {
+    if (value) {
+      final result = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(builder: (_) => const SetPinScreen()),
+      );
+      if (result == true) setState(() {});
+    } else {
+      // Must verify PIN before disabling
+      final result = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+            builder: (_) => const SetPinScreen(isChanging: true)),
+      );
+      if (result == true) {
+        _box.put('lockEnabled', false);
+        _box.put('lockPin', '');
+        setState(() {});
+      }
+    }
+  }
+
+  Future<void> _changePin() async {
+    await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+          builder: (_) => const SetPinScreen(isChanging: true)),
+    );
+    setState(() {});
+  }
+
+  Future<void> _toggleBiometric(bool value) async {
+    try {
+      final canCheck = await _auth.canCheckBiometrics;
+      if (value && !canCheck) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Biometrics not available on this device.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        return;
+      }
+    } catch (_) {}
+    _box.put('lockBiometric', value);
+    setState(() {});
+  }
+
+  void _showTimeoutPicker() {
+    final theme  = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: EdgeInsets.fromLTRB(
+            24, 16, 24, MediaQuery.of(ctx).padding.bottom + 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                    color: Colors.grey.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text('Lock After',
+                style: TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            Text('How long in background before locking',
+                style: TextStyle(
+                    fontSize: 12,
+                    color: theme.colorScheme.onSurface.withOpacity(0.45))),
+            const SizedBox(height: 16),
+            ...List.generate(_timeoutOptions.length, (i) {
+              final isSelected = _timeoutMins == _timeoutOptions[i];
+              return GestureDetector(
+                onTap: () {
+                  _box.put('lockTimeout', _timeoutOptions[i]);
+                  setState(() {});
+                  Navigator.pop(ctx);
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? theme.colorScheme.primary.withOpacity(0.08)
+                        : (isDark
+                            ? const Color(0xFF2A2A2A)
+                            : Colors.grey.shade50),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSelected
+                          ? theme.colorScheme.primary.withOpacity(0.35)
+                          : Colors.transparent,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(_timeoutLabels[i],
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: isSelected
+                                ? FontWeight.w700 : FontWeight.w500,
+                            color: isSelected
+                                ? theme.colorScheme.primary : null,
+                          )),
+                      ),
+                      if (isSelected)
+                        Icon(Icons.check_circle_rounded,
+                            color: theme.colorScheme.primary, size: 20),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _timeoutLabel() {
+    final idx = _timeoutOptions.indexOf(_timeoutMins);
+    return idx >= 0 ? _timeoutLabels[idx] : '$_timeoutMins min';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // ── Master lock toggle ──────────────────────────────────────────
+        _SettingTile(
+          icon: Icons.lock_rounded,
+          title: 'App Lock',
+          subtitle: _lockEnabled
+              ? 'PIN required to open Spendly'
+              : 'Tap to enable PIN lock',
+          trailing: Switch.adaptive(
+            value: _lockEnabled,
+            onChanged: _toggleLock,
+          ),
+        ),
+
+        if (_lockEnabled) ...[
+          // ── Change PIN ────────────────────────────────────────────────
+          _SettingTile(
+            icon: Icons.pin_rounded,
+            title: 'Change PIN',
+            subtitle: 'Update your current PIN',
+            onTap: _changePin,
+          ),
+
+          // ── Biometric ─────────────────────────────────────────────────
+          _SettingTile(
+            icon: Icons.fingerprint_rounded,
+            title: 'Biometric Unlock',
+            subtitle: 'Use fingerprint or face to unlock',
+            trailing: Switch.adaptive(
+              value: _bioEnabled,
+              onChanged: _toggleBiometric,
+            ),
+          ),
+
+          // ── Timeout ───────────────────────────────────────────────────
+          _SettingTile(
+            icon: Icons.timer_rounded,
+            title: 'Lock After',
+            subtitle: _timeoutLabel() + ' of background',
+            onTap: _showTimeoutPicker,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 // ── Category Budgets Page ─────────────────────────────────────────────────────
 
 class _CategoryBudgetsPage extends StatelessWidget {
@@ -300,14 +520,14 @@ class _CategoryBudgetsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cats = context.watch<CategoryProvider>().categories;
-    final budgets = context.watch<CategoryBudgetProvider>();
+    final cats     = context.watch<CategoryProvider>().categories;
+    final budgets  = context.watch<CategoryBudgetProvider>();
     final expenses = context.watch<ExpenseProvider>();
     final settings = context.watch<SettingsProvider>();
-    final symbol = settings.currencySymbol;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final theme = Theme.of(context);
-    final now = DateTime.now();
+    final symbol   = settings.currencySymbol;
+    final isDark   = Theme.of(context).brightness == Brightness.dark;
+    final theme    = Theme.of(context);
+    final now      = DateTime.now();
     final catTotals = expenses.getCategoryTotals(now.year, now.month);
 
     return Scaffold(
@@ -348,10 +568,10 @@ class _CategoryBudgetsPage extends StatelessWidget {
             ),
           ),
           ...cats.map((cat) {
-            final hasBudget = budgets.hasBudget(cat.id);
-            final limit = budgets.getLimitFor(cat.id);
-            final spent = catTotals[cat.id] ?? 0;
-            final catColor = Color(cat.colorValue);
+            final hasBudget  = budgets.hasBudget(cat.id);
+            final limit      = budgets.getLimitFor(cat.id);
+            final spent      = catTotals[cat.id] ?? 0;
+            final catColor   = Color(cat.colorValue);
             final statusColor = hasBudget
                 ? budgets.getStatusColor(cat.id, spent)
                 : catColor;
@@ -367,8 +587,7 @@ class _CategoryBudgetsPage extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 8)
+                      color: Colors.black.withOpacity(0.05), blurRadius: 8)
                 ],
               ),
               child: Column(
@@ -376,8 +595,7 @@ class _CategoryBudgetsPage extends StatelessWidget {
                   Row(
                     children: [
                       Container(
-                        width: 40,
-                        height: 40,
+                        width: 40, height: 40,
                         decoration: BoxDecoration(
                           color: catColor.withOpacity(0.15),
                           borderRadius: BorderRadius.circular(12),
@@ -423,8 +641,7 @@ class _CategoryBudgetsPage extends StatelessWidget {
                         IconButton(
                           icon: const Icon(Icons.close_rounded,
                               size: 18, color: Colors.red),
-                          onPressed: () =>
-                              budgets.removeBudget(cat.id),
+                          onPressed: () => budgets.removeBudget(cat.id),
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(),
                         ),
@@ -488,8 +705,7 @@ class _CategoryBudgetsPage extends StatelessWidget {
             children: [
               Center(
                 child: Container(
-                  width: 40,
-                  height: 4,
+                  width: 40, height: 4,
                   decoration: BoxDecoration(
                     color: Colors.grey.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(2),
@@ -499,8 +715,7 @@ class _CategoryBudgetsPage extends StatelessWidget {
               const SizedBox(height: 20),
               Row(children: [
                 Container(
-                  width: 40,
-                  height: 40,
+                  width: 40, height: 40,
                   decoration: BoxDecoration(
                     color: Color(cat.colorValue).withOpacity(0.15),
                     borderRadius: BorderRadius.circular(12),
@@ -516,8 +731,8 @@ class _CategoryBudgetsPage extends StatelessWidget {
               const SizedBox(height: 20),
               TextField(
                 controller: ctrl,
-                keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
                 autofocus: true,
                 decoration: InputDecoration(
                   hintText: 'Monthly limit',
@@ -532,8 +747,7 @@ class _CategoryBudgetsPage extends StatelessWidget {
                   onPressed: () {
                     final limit = double.tryParse(ctrl.text);
                     if (limit != null && limit > 0) {
-                      ctx
-                          .read<CategoryBudgetProvider>()
+                      ctx.read<CategoryBudgetProvider>()
                           .setBudget(cat.id, limit);
                     }
                     Navigator.pop(ctx);
@@ -558,11 +772,11 @@ class _WalletsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final walletProvider = context.watch<WalletProvider>();
-    final wallets = walletProvider.wallets;
+    final wallets  = walletProvider.wallets;
     final settings = context.watch<SettingsProvider>();
-    final symbol = settings.currencySymbol;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final theme = Theme.of(context);
+    final symbol   = settings.currencySymbol;
+    final isDark   = Theme.of(context).brightness == Brightness.dark;
+    final theme    = Theme.of(context);
 
     return Scaffold(
       backgroundColor:
@@ -576,10 +790,8 @@ class _WalletsPage extends StatelessWidget {
             IconButton(
               icon: const Icon(Icons.swap_horiz_rounded),
               tooltip: 'Transfer',
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const TransferScreen()),
-              ),
+              onPressed: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const TransferScreen())),
             ),
         ],
       ),
@@ -594,8 +806,7 @@ class _WalletsPage extends StatelessWidget {
                   const SizedBox(height: 12),
                   Text('No wallets yet',
                       style: TextStyle(
-                          color:
-                              theme.colorScheme.onSurface.withOpacity(0.4),
+                          color: theme.colorScheme.onSurface.withOpacity(0.4),
                           fontSize: 16)),
                 ],
               ),
@@ -619,8 +830,7 @@ class _WalletsPage extends StatelessWidget {
                     boxShadow: [
                       BoxShadow(
                         color: theme.colorScheme.primary.withOpacity(0.3),
-                        blurRadius: 16,
-                        offset: const Offset(0, 6),
+                        blurRadius: 16, offset: const Offset(0, 6),
                       ),
                     ],
                   ),
@@ -640,21 +850,17 @@ class _WalletsPage extends StatelessWidget {
                               AppUtils.formatAmount(
                                   walletProvider.totalBalance, symbol),
                               style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.w800,
-                              ),
+                                color: Colors.white, fontSize: 24,
+                                fontWeight: FontWeight.w800),
                             ),
                           ],
                         ),
                       ),
                       if (wallets.length >= 2)
                         GestureDetector(
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const TransferScreen()),
-                          ),
+                          onTap: () => Navigator.push(context,
+                              MaterialPageRoute(
+                                  builder: (_) => const TransferScreen())),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 8),
@@ -670,8 +876,7 @@ class _WalletsPage extends StatelessWidget {
                                 SizedBox(width: 6),
                                 Text('Transfer',
                                     style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 13,
+                                        color: Colors.white, fontSize: 13,
                                         fontWeight: FontWeight.w700)),
                               ],
                             ),
@@ -681,8 +886,7 @@ class _WalletsPage extends StatelessWidget {
                   ),
                 ),
                 ...wallets.map((wallet) => _WalletTile(
-                      wallet: wallet,
-                      symbol: symbol,
+                      wallet: wallet, symbol: symbol,
                       onEdit: () =>
                           _showWalletSheet(context, existing: wallet),
                       onDelete: wallets.length > 1
@@ -716,16 +920,14 @@ class _WalletTile extends StatelessWidget {
   final VoidCallback? onDelete;
 
   const _WalletTile({
-    required this.wallet,
-    required this.symbol,
-    required this.onEdit,
-    this.onDelete,
+    required this.wallet, required this.symbol,
+    required this.onEdit, this.onDelete,
   });
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final color = Color(wallet.colorValue);
+    final color  = Color(wallet.colorValue);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -733,15 +935,13 @@ class _WalletTile extends StatelessWidget {
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.05), blurRadius: 8)
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8)
         ],
       ),
       child: Row(
         children: [
           Container(
-            width: 48,
-            height: 48,
+            width: 48, height: 48,
             decoration: BoxDecoration(
               color: color.withOpacity(0.15),
               borderRadius: BorderRadius.circular(14),
@@ -759,8 +959,7 @@ class _WalletTile extends StatelessWidget {
                         fontWeight: FontWeight.w700, fontSize: 15)),
                 Text(wallet.type.toUpperCase(),
                     style: TextStyle(
-                        fontSize: 11,
-                        color: color,
+                        fontSize: 11, color: color,
                         fontWeight: FontWeight.w600)),
               ],
             ),
@@ -770,8 +969,7 @@ class _WalletTile extends StatelessWidget {
             children: [
               Text(AppUtils.formatAmount(wallet.balance, symbol),
                   style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 15,
+                      fontWeight: FontWeight.w700, fontSize: 15,
                       color: color)),
               Text('balance',
                   style: TextStyle(
@@ -786,8 +984,7 @@ class _WalletTile extends StatelessWidget {
           Column(
             children: [
               IconButton(
-                icon: Icon(Icons.edit_outlined,
-                    size: 18,
+                icon: Icon(Icons.edit_outlined, size: 18,
                     color: Theme.of(context)
                         .colorScheme
                         .onSurface
@@ -845,32 +1042,26 @@ class _WalletSheetState extends State<_WalletSheet> {
   void initState() {
     super.initState();
     if (widget.existing != null) {
-      _nameCtrl.text = widget.existing!.name;
-      _selectedType = widget.existing!.type;
-      _selectedColor = Color(widget.existing!.colorValue);
+      _nameCtrl.text  = widget.existing!.name;
+      _selectedType   = widget.existing!.type;
+      _selectedColor  = Color(widget.existing!.colorValue);
     } else {
       _selectedColor = Color(WalletProvider.colorForType(_selectedType));
     }
   }
 
   @override
-  void dispose() {
-    _nameCtrl.dispose();
-    super.dispose();
-  }
+  void dispose() { _nameCtrl.dispose(); super.dispose(); }
 
   void _save() {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) return;
     final provider = context.read<WalletProvider>();
-    final balance = widget.existing?.balance ?? 0;
-    final wallet = WalletModel(
+    final balance  = widget.existing?.balance ?? 0;
+    final wallet   = WalletModel(
       id: widget.existing?.id ?? AppUtils.generateId(),
-      name: name,
-      type: _selectedType,
-      balance: balance,
-      colorValue: _selectedColor.value,
-      icon: _selectedType,
+      name: name, type: _selectedType, balance: balance,
+      colorValue: _selectedColor.value, icon: _selectedType,
     );
     if (widget.existing != null) {
       provider.updateWallet(wallet);
@@ -882,7 +1073,7 @@ class _WalletSheetState extends State<_WalletSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme  = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
     return Padding(
@@ -900,22 +1091,16 @@ class _WalletSheetState extends State<_WalletSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
+              Center(child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2)),
+              )),
               const SizedBox(height: 20),
-              Text(
-                widget.existing != null ? 'Edit Wallet' : 'New Wallet',
-                style: const TextStyle(
-                    fontSize: 20, fontWeight: FontWeight.w700),
-              ),
+              Text(widget.existing != null ? 'Edit Wallet' : 'New Wallet',
+                  style: const TextStyle(
+                      fontSize: 20, fontWeight: FontWeight.w700)),
               const SizedBox(height: 20),
               TextField(
                 controller: _nameCtrl,
@@ -926,8 +1111,7 @@ class _WalletSheetState extends State<_WalletSheet> {
               ),
               const SizedBox(height: 16),
               const Text('Type',
-                  style: TextStyle(
-                      fontWeight: FontWeight.w600, fontSize: 14)),
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
               const SizedBox(height: 10),
               Row(
                 children: _types.map((t) {
@@ -935,7 +1119,7 @@ class _WalletSheetState extends State<_WalletSheet> {
                   return Expanded(
                     child: GestureDetector(
                       onTap: () => setState(() {
-                        _selectedType = t['type'] as String;
+                        _selectedType  = t['type'] as String;
                         _selectedColor = Color(
                             WalletProvider.colorForType(_selectedType));
                       }),
@@ -952,8 +1136,7 @@ class _WalletSheetState extends State<_WalletSheet> {
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: isSelected
-                                ? _selectedColor
-                                : Colors.transparent,
+                                ? _selectedColor : Colors.transparent,
                             width: 1.5,
                           ),
                         ),
@@ -983,37 +1166,28 @@ class _WalletSheetState extends State<_WalletSheet> {
               ),
               const SizedBox(height: 20),
               const Text('Color',
-                  style: TextStyle(
-                      fontWeight: FontWeight.w600, fontSize: 14)),
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
               const SizedBox(height: 10),
               Wrap(
-                spacing: 10,
-                runSpacing: 10,
+                spacing: 10, runSpacing: 10,
                 children: _palette.map((color) {
                   final isSelected = _selectedColor.value == color.value;
                   return GestureDetector(
-                    onTap: () =>
-                        setState(() => _selectedColor = color),
+                    onTap: () => setState(() => _selectedColor = color),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 180),
-                      width: 38,
-                      height: 38,
+                      width: 38, height: 38,
                       decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
+                        color: color, shape: BoxShape.circle,
                         border: Border.all(
                           color: isSelected
-                              ? Colors.white
-                              : Colors.transparent,
+                              ? Colors.white : Colors.transparent,
                           width: 3,
                         ),
                         boxShadow: isSelected
-                            ? [
-                                BoxShadow(
-                                    color: color.withOpacity(0.6),
-                                    blurRadius: 10,
-                                    spreadRadius: 2)
-                              ]
+                            ? [BoxShadow(
+                                color: color.withOpacity(0.6),
+                                blurRadius: 10, spreadRadius: 2)]
                             : null,
                       ),
                       child: isSelected
@@ -1030,8 +1204,7 @@ class _WalletSheetState extends State<_WalletSheet> {
                 child: ElevatedButton(
                   onPressed: _save,
                   child: Text(widget.existing != null
-                      ? 'Save Changes'
-                      : 'Add Wallet'),
+                      ? 'Save Changes' : 'Add Wallet'),
                 ),
               ),
               const SizedBox(height: 8),
@@ -1050,7 +1223,7 @@ class _CategoriesPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cats = context.watch<CategoryProvider>();
+    final cats   = context.watch<CategoryProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -1086,15 +1259,13 @@ class _CategoriesPage extends StatelessWidget {
                   ? IconButton(
                       icon: const Icon(Icons.delete_outline_rounded,
                           color: Colors.red),
-                      onPressed: () =>
-                          cats.deleteCustomCategory(cat.id),
+                      onPressed: () => cats.deleteCustomCategory(cat.id),
                     )
                   : Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color:
-                            Color(cat.colorValue).withOpacity(0.15),
+                        color: Color(cat.colorValue).withOpacity(0.15),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text('Default',
@@ -1117,7 +1288,7 @@ class _CategoriesPage extends StatelessWidget {
   void _showAddCategory(BuildContext context) {
     final nameCtrl = TextEditingController();
     String selectedIconKey = 'star';
-    Color selectedColor = const Color(0xFF1E3A5F);
+    Color  selectedColor   = const Color(0xFF1E3A5F);
 
     showModalBottomSheet(
       context: context,
@@ -1130,8 +1301,7 @@ class _CategoriesPage extends StatelessWidget {
           child: Container(
             decoration: BoxDecoration(
               color: Theme.of(ctx).brightness == Brightness.dark
-                  ? const Color(0xFF1E1E1E)
-                  : Colors.white,
+                  ? const Color(0xFF1E1E1E) : Colors.white,
               borderRadius:
                   const BorderRadius.vertical(top: Radius.circular(24)),
             ),
@@ -1156,11 +1326,10 @@ class _CategoriesPage extends StatelessWidget {
                       style: TextStyle(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                    spacing: 8, runSpacing: 8,
                     children: CategoryIcons.pickerIcons.map((item) {
-                      final key = item['key'] as String;
-                      final icon = item['icon'] as IconData;
+                      final key        = item['key'] as String;
+                      final icon       = item['icon'] as IconData;
                       final isSelected = selectedIconKey == key;
                       return GestureDetector(
                         onTap: () =>
@@ -1182,8 +1351,7 @@ class _CategoriesPage extends StatelessWidget {
                           ),
                           child: Icon(icon,
                               color: isSelected
-                                  ? selectedColor
-                                  : Colors.grey,
+                                  ? selectedColor : Colors.grey,
                               size: 24),
                         ),
                       );
@@ -1194,21 +1362,14 @@ class _CategoriesPage extends StatelessWidget {
                       style: TextStyle(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 10),
                   Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
+                    spacing: 10, runSpacing: 10,
                     children: [
-                      const Color(0xFF1E3A5F),
-                      const Color(0xFF4A90E2),
-                      const Color(0xFF2ECC71),
-                      const Color(0xFFE57373),
-                      const Color(0xFFFF9800),
-                      const Color(0xFF9C27B0),
-                      const Color(0xFF00BCD4),
-                      const Color(0xFFFF6B6B),
-                      const Color(0xFF4ECDC4),
-                      const Color(0xFFFFBE76),
-                      const Color(0xFF96CEB4),
-                      const Color(0xFFE91E63),
+                      const Color(0xFF1E3A5F), const Color(0xFF4A90E2),
+                      const Color(0xFF2ECC71), const Color(0xFFE57373),
+                      const Color(0xFFFF9800), const Color(0xFF9C27B0),
+                      const Color(0xFF00BCD4), const Color(0xFFFF6B6B),
+                      const Color(0xFF4ECDC4), const Color(0xFFFFBE76),
+                      const Color(0xFF96CEB4), const Color(0xFFE91E63),
                     ].map((color) {
                       final isSelected =
                           selectedColor.value == color.value;
@@ -1217,24 +1378,18 @@ class _CategoriesPage extends StatelessWidget {
                             setState(() => selectedColor = color),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 180),
-                          width: 36,
-                          height: 36,
+                          width: 36, height: 36,
                           decoration: BoxDecoration(
-                            color: color,
-                            shape: BoxShape.circle,
+                            color: color, shape: BoxShape.circle,
                             border: Border.all(
                               color: isSelected
-                                  ? Colors.white
-                                  : Colors.transparent,
+                                  ? Colors.white : Colors.transparent,
                               width: 3,
                             ),
                             boxShadow: isSelected
-                                ? [
-                                    BoxShadow(
-                                        color: color.withOpacity(0.5),
-                                        blurRadius: 8,
-                                        spreadRadius: 2)
-                                  ]
+                                ? [BoxShadow(
+                                    color: color.withOpacity(0.5),
+                                    blurRadius: 8, spreadRadius: 2)]
                                 : null,
                           ),
                           child: isSelected
@@ -1252,9 +1407,7 @@ class _CategoriesPage extends StatelessWidget {
                       onPressed: () {
                         final name = nameCtrl.text.trim();
                         if (name.isEmpty) return;
-                        ctx
-                            .read<CategoryProvider>()
-                            .addCustomCategory(
+                        ctx.read<CategoryProvider>().addCustomCategory(
                           CategoryModel(
                             id: AppUtils.generateId(),
                             name: name,
@@ -1279,7 +1432,7 @@ class _CategoriesPage extends StatelessWidget {
   }
 }
 
-// ── Shared widgets ────────────────────────────────────────────────────────────
+// ── Shared Widgets ────────────────────────────────────────────────────────────
 
 class _SectionHeader extends StatelessWidget {
   final String text;
@@ -1292,8 +1445,7 @@ class _SectionHeader extends StatelessWidget {
       child: Text(
         text.toUpperCase(),
         style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
+          fontSize: 11, fontWeight: FontWeight.w700,
           letterSpacing: 1.2,
           color: Theme.of(context).colorScheme.primary,
         ),
@@ -1311,12 +1463,8 @@ class _SettingTile extends StatelessWidget {
   final Color? titleColor;
 
   const _SettingTile({
-    required this.icon,
-    required this.title,
-    this.subtitle,
-    this.trailing,
-    this.onTap,
-    this.titleColor,
+    required this.icon, required this.title,
+    this.subtitle, this.trailing, this.onTap, this.titleColor,
   });
 
   @override
@@ -1328,15 +1476,14 @@ class _SettingTile extends StatelessWidget {
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.04), blurRadius: 8)
+          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)
         ],
       ),
       child: ListTile(
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16)),
-        leading:
-            Icon(icon, color: Theme.of(context).colorScheme.primary),
+        leading: Icon(icon,
+            color: Theme.of(context).colorScheme.primary),
         title: Text(title,
             style: TextStyle(
                 fontWeight: FontWeight.w600, color: titleColor)),
@@ -1358,8 +1505,7 @@ class _CurrencyPickerSheet extends StatefulWidget {
   const _CurrencyPickerSheet({required this.settings});
 
   @override
-  State<_CurrencyPickerSheet> createState() =>
-      _CurrencyPickerSheetState();
+  State<_CurrencyPickerSheet> createState() => _CurrencyPickerSheetState();
 }
 
 class _CurrencyPickerSheetState extends State<_CurrencyPickerSheet> {
@@ -1368,26 +1514,18 @@ class _CurrencyPickerSheetState extends State<_CurrencyPickerSheet> {
 
   static const Map<String, List<String>> _regions = {
     'Americas': ['USD', 'CAD', 'AUD', 'BRL', 'MXN'],
-    'Europe': ['EUR', 'GBP', 'CHF', 'RUB', 'TRY', 'SEK', 'NOK'],
-    'Middle East & Africa': [
-      'AED', 'SAR', 'IRR', 'AFN', 'IQD', 'KWD', 'QAR'
-    ],
-    'Asia': [
-      'JPY', 'CNY', 'KRW', 'INR', 'PKR', 'BDT', 'THB', 'VND',
-      'SGD', 'HKD'
-    ],
+    'Europe':   ['EUR', 'GBP', 'CHF', 'RUB', 'TRY', 'SEK', 'NOK'],
+    'Middle East & Africa': ['AED', 'SAR', 'IRR', 'AFN', 'IQD', 'KWD', 'QAR'],
+    'Asia': ['JPY', 'CNY', 'KRW', 'INR', 'PKR', 'BDT', 'THB', 'VND', 'SGD', 'HKD'],
   };
 
   @override
-  void dispose() {
-    _searchCtrl.dispose();
-    super.dispose();
-  }
+  void dispose() { _searchCtrl.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final theme = Theme.of(context);
+    final theme  = Theme.of(context);
     final allCurrencies = {
       for (final c in SettingsProvider.currencies) c['code']!: c['label']!
     };
@@ -1417,39 +1555,31 @@ class _CurrencyPickerSheetState extends State<_CurrencyPickerSheet> {
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
               child: Column(
                 children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
+                  Center(child: Container(
+                    width: 40, height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(2)),
+                  )),
                   const SizedBox(height: 16),
                   Row(
                     children: [
                       const Text('Select Currency',
                           style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w700)),
+                              fontSize: 20, fontWeight: FontWeight.w700)),
                       const Spacer(),
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.primary
-                              .withOpacity(0.1),
+                          color: theme.colorScheme.primary.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Text(
-                          widget.settings.currency,
-                          style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: theme.colorScheme.primary,
-                              fontSize: 13),
-                        ),
+                        child: Text(widget.settings.currency,
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: theme.colorScheme.primary,
+                                fontSize: 13)),
                       ),
                     ],
                   ),
@@ -1459,8 +1589,7 @@ class _CurrencyPickerSheetState extends State<_CurrencyPickerSheet> {
                     onChanged: (v) =>
                         setState(() => _query = v.toLowerCase().trim()),
                     decoration: InputDecoration(
-                      hintText:
-                          'Search currency (e.g. USD, Euro, Yen...)',
+                      hintText: 'Search currency (e.g. USD, Euro, Yen...)',
                       prefixIcon: const Icon(Icons.search_rounded),
                       suffixIcon: _query.isNotEmpty
                           ? IconButton(
@@ -1484,8 +1613,7 @@ class _CurrencyPickerSheetState extends State<_CurrencyPickerSheet> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.search_off_rounded,
-                                  size: 48,
+                              Icon(Icons.search_off_rounded, size: 48,
                                   color: theme.colorScheme.onSurface
                                       .withOpacity(0.2)),
                               const SizedBox(height: 12),
@@ -1498,19 +1626,15 @@ class _CurrencyPickerSheetState extends State<_CurrencyPickerSheet> {
                         )
                       : ListView.builder(
                           controller: controller,
-                          padding:
-                              const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                           itemCount: filtered.length,
                           itemBuilder: (ctx, i) {
-                            final code = filtered[i]['code']!;
+                            final code  = filtered[i]['code']!;
                             final label = filtered[i]['label']!;
                             return _CurrencyTile(
-                              code: code,
-                              label: label,
-                              isSelected:
-                                  widget.settings.currency == code,
-                              theme: theme,
-                              isDark: isDark,
+                              code: code, label: label,
+                              isSelected: widget.settings.currency == code,
+                              theme: theme, isDark: isDark,
                               onTap: () {
                                 Navigator.pop(context);
                                 widget.settings.setCurrency(code);
@@ -1526,27 +1650,20 @@ class _CurrencyPickerSheetState extends State<_CurrencyPickerSheet> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Padding(
-                              padding:
-                                  const EdgeInsets.fromLTRB(4, 16, 4, 8),
-                              child: Text(
-                                region.key.toUpperCase(),
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 1.2,
-                                    color: theme.colorScheme.primary),
-                              ),
+                              padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
+                              child: Text(region.key.toUpperCase(),
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 1.2,
+                                      color: theme.colorScheme.primary)),
                             ),
                             ...region.value.map((code) {
-                              final label =
-                                  allCurrencies[code] ?? code;
+                              final label = allCurrencies[code] ?? code;
                               return _CurrencyTile(
-                                code: code,
-                                label: label,
-                                isSelected:
-                                    widget.settings.currency == code,
-                                theme: theme,
-                                isDark: isDark,
+                                code: code, label: label,
+                                isSelected: widget.settings.currency == code,
+                                theme: theme, isDark: isDark,
                                 onTap: () {
                                   Navigator.pop(context);
                                   widget.settings.setCurrency(code);
@@ -1574,12 +1691,8 @@ class _CurrencyTile extends StatelessWidget {
   final VoidCallback onTap;
 
   const _CurrencyTile({
-    required this.code,
-    required this.label,
-    required this.isSelected,
-    required this.theme,
-    required this.isDark,
-    required this.onTap,
+    required this.code, required this.label, required this.isSelected,
+    required this.theme, required this.isDark, required this.onTap,
   });
 
   @override
@@ -1589,14 +1702,11 @@ class _CurrencyTile extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         margin: const EdgeInsets.only(bottom: 6),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: isSelected
               ? theme.colorScheme.primary.withOpacity(0.08)
-              : (isDark
-                  ? const Color(0xFF2A2A2A)
-                  : Colors.grey.shade50),
+              : (isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade50),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: isSelected
@@ -1608,8 +1718,7 @@ class _CurrencyTile extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 44,
-              height: 28,
+              width: 44, height: 28,
               decoration: BoxDecoration(
                 color: isSelected
                     ? theme.colorScheme.primary.withOpacity(0.12)
@@ -1617,28 +1726,22 @@ class _CurrencyTile extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
               ),
               alignment: Alignment.center,
-              child: Text(
-                code,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: isSelected
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.onSurface.withOpacity(0.5),
-                ),
-              ),
+              child: Text(code,
+                  style: TextStyle(
+                      fontSize: 11, fontWeight: FontWeight.w800,
+                      color: isSelected
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurface.withOpacity(0.5))),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight:
-                      isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: isSelected ? theme.colorScheme.primary : null,
-                ),
-              ),
+              child: Text(label,
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: isSelected
+                          ? FontWeight.w700 : FontWeight.w500,
+                      color: isSelected
+                          ? theme.colorScheme.primary : null)),
             ),
             if (isSelected)
               Icon(Icons.check_circle_rounded,

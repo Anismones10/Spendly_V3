@@ -22,6 +22,8 @@ class PdfHelper {
   static final _grey     = PdfColor.fromHex('#78909C');
   static final _light    = PdfColor.fromHex('#F0F4F8');
   static final _white    = PdfColors.white;
+  // FIX 2: proper visible track color for bar charts
+  static final _trackGrey = PdfColor.fromHex('#CFD8DC'); // blue-grey, matches app track
 
   static final _catColors = [
     PdfColor.fromHex('#E57373'),
@@ -34,7 +36,6 @@ class PdfHelper {
     PdfColor.fromHex('#78909C'),
     PdfColor.fromHex('#E91E63'),
     PdfColor.fromHex('#00BCD4'),
-
   ];
 
   // ── Safe currency symbol resolver ─────────────────────────────────────────
@@ -52,10 +53,6 @@ class PdfHelper {
     return map[code] ?? (code + ' ');
   }
 
-  // ── Format amount — NO string interpolation with symbol ───────────────────
-  // Root cause of missing currency: using '$' in string interpolation inside
-  // pdf package causes Dart to treat it as string interpolation start.
-  // Fix: build string via concatenation only, never interpolation with symbol.
   static String _fmt(double amount, String sym) {
     final abs = amount.abs();
     final sign = amount < 0 ? '-' : '';
@@ -73,7 +70,6 @@ class PdfHelper {
       }
       numStr = buf.toString() + '.' + parts[1];
     }
-    // Concatenation — never interpolation — avoids Dart $ confusion
     return sign + sym + numStr;
   }
 
@@ -123,7 +119,7 @@ class PdfHelper {
     final loans = includeLoans ? allLoans : <LoanModel>[];
     final goals = includeGoals ? allGoals : <GoalModel>[];
 
-    final sym = _sym(currency); // convert code to safe display string
+    final sym = _sym(currency);
     final doc = pw.Document();
     final now = DateTime.now();
 
@@ -249,7 +245,6 @@ class PdfHelper {
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
             pw.SizedBox(height: 60),
-            // Logo
             pw.Container(
               width: 80, height: 80,
               decoration: pw.BoxDecoration(
@@ -271,12 +266,10 @@ class PdfHelper {
             pw.SizedBox(height: 60),
             pw.Container(height: 1, color: PdfColors.white),
             pw.SizedBox(height: 30),
-            // FIX: plain text rows, no pw.Expanded inside Stack
             _cRow('Period:',    dateLabel),
             pw.SizedBox(height: 12),
             _cRow('Generated:', _fmtDate(now)),
             pw.SizedBox(height: 12),
-            // FIX: currency shown as code + symbol separately
             _cRow('Currency:', sym),
             pw.SizedBox(height: 12),
             _cRow('Sections:', sections.join(' - ')),
@@ -298,7 +291,6 @@ class PdfHelper {
     ]);
   }
 
-  // Simple cover row — no Expanded, plain Text widgets
   static pw.Widget _cRow(String label, String value) {
     return pw.RichText(
       text: pw.TextSpan(children: [
@@ -345,7 +337,6 @@ class PdfHelper {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        // Banner
         pw.Container(
           width: double.infinity,
           padding: const pw.EdgeInsets.all(20),
@@ -371,7 +362,6 @@ class PdfHelper {
         ),
         pw.SizedBox(height: 18),
 
-        // 4 stat cards
         pw.Row(children: [
           pw.Expanded(child: _card('Total Income',   _fmt(totalInc, sym), _green)),
           pw.SizedBox(width: 8),
@@ -386,7 +376,6 @@ class PdfHelper {
         ]),
         pw.SizedBox(height: 20),
 
-        // Income vs Expense
         if (totalInc > 0 || totalExp > 0) ...[
           _title('Income vs Expenses'),
           pw.SizedBox(height: 10),
@@ -396,7 +385,6 @@ class PdfHelper {
           pw.SizedBox(height: 20),
         ],
 
-        // Pie charts
         if (catEntries.isNotEmpty || srcTotals.isNotEmpty)
           pw.Row(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -457,13 +445,21 @@ class PdfHelper {
       ..sort((a, b) => b.value.compareTo(a.value));
     final total = expenses.fold(0.0, (s, e) => s + e.amount);
 
-    // Daily totals — sorted by day
+    // Build spending map keyed by day number
     final dailyMap = <int, double>{};
     for (final e in expenses) {
       dailyMap[e.date.day] = (dailyMap[e.date.day] ?? 0) + e.amount;
     }
-    final dailyEntries = dailyMap.entries.toList()
-      ..sort((a, b) => a.key.compareTo(b.key));
+
+    // Use the month from expenses dates (fallback to current month)
+    final refDate = expenses.isNotEmpty ? expenses.first.date : DateTime.now();
+    final daysInMonth = DateTime(refDate.year, refDate.month + 1, 0).day;
+
+    // ALL days 1..daysInMonth — days with no spending get 0.0 (grey bar)
+    final allDailyEntries = List.generate(daysInMonth, (i) {
+      final day = i + 1;
+      return MapEntry(day.toString(), dailyMap[day] ?? 0.0);
+    });
 
     return [
       if (catEntries.isNotEmpty) ...[
@@ -476,13 +472,11 @@ class PdfHelper {
         pw.SizedBox(height: 20),
       ],
 
-      if (dailyEntries.isNotEmpty) ...[
+      if (allDailyEntries.isNotEmpty) ...[
         _title('Daily Spending'),
         pw.SizedBox(height: 10),
         _barChart(
-          entries: dailyEntries
-              .map((e) => MapEntry('D' + e.key.toString(), e.value))
-              .toList(),
+          entries: allDailyEntries,
           color: _navy,
           sym: sym,
         ),
@@ -653,21 +647,18 @@ class PdfHelper {
     return pw.Row(
       crossAxisAlignment: pw.CrossAxisAlignment.center,
       children: [
-        // Donut
         pw.SizedBox(
           width: size, height: size,
           child: pw.CustomPaint(painter: (canvas, s) =>
               _drawDonut(canvas, s, slices, total)),
         ),
         pw.SizedBox(width: 14),
-        // Legend
         pw.Expanded(
           child: pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             mainAxisAlignment: pw.MainAxisAlignment.center,
             children: slices.take(8).map((s) {
               final pct = (s.value / total * 100).toStringAsFixed(1);
-              // FIX: build label string without $ interpolation
               final label = s.label.isNotEmpty
                   ? s.label[0].toUpperCase() + s.label.substring(1)
                   : s.label;
@@ -709,7 +700,7 @@ class PdfHelper {
     final cy    = size.y / 2;
     final r     = math.min(cx, cy) - 2;
     final inner = r * 0.42;
-    const steps = 72; // 5 degrees per step — very smooth
+    const steps = 72;
 
     double startAngle = -math.pi / 2;
 
@@ -721,32 +712,26 @@ class PdfHelper {
 
       canvas.setFillColor(s.color);
 
-      // Build a single closed path for this slice
-      // 1. Move to outer arc start
       final ox0 = cx + r * math.cos(startAngle);
       final oy0 = cy + r * math.sin(startAngle);
       canvas.moveTo(ox0, oy0);
 
-      // 2. Draw outer arc (forward)
       for (int i = 1; i <= numSteps; i++) {
         final a = startAngle + i * step;
         canvas.lineTo(cx + r * math.cos(a), cy + r * math.sin(a));
       }
 
-      // 3. Line to inner arc end point
       final endAngle = startAngle + sweep;
       canvas.lineTo(
         cx + inner * math.cos(endAngle),
         cy + inner * math.sin(endAngle),
       );
 
-      // 4. Draw inner arc (backward)
       for (int i = numSteps - 1; i >= 0; i--) {
         final a = startAngle + i * step;
         canvas.lineTo(cx + inner * math.cos(a), cy + inner * math.sin(a));
       }
 
-      // 5. Close back to outer arc start
       canvas.lineTo(ox0, oy0);
       canvas
         ..closePath()
@@ -757,6 +742,10 @@ class PdfHelper {
   }
 
   // ── Bar chart ──────────────────────────────────────────────────────────────
+  // A4 page is 595pt wide. With 40pt margins on each side = 515pt content width.
+  // pw.CustomPaint requires explicit width/height — without them size.x == 0.
+  static const double _chartWidth = 515.0;
+
   static pw.Widget _barChart({
     required List<MapEntry<String, double>> entries,
     required PdfColor color,
@@ -769,39 +758,123 @@ class PdfHelper {
     final maxVal = entries.map((e) => e.value).reduce(math.max);
     if (maxVal == 0) return pw.SizedBox(height: 4);
 
+    final totalSpent = entries.fold(0.0, (s, e) => s + e.value);
+    final symCode    = sym.trim().length >= 3
+        ? sym.trim().substring(0, 3)
+        : sym.trim();
+
+    // Compact formatter — used for both total and per-bar labels
+    String compact(double v) {
+      if (v <= 0) return '';
+      if (v >= 1000000) {
+        final m = v / 1000000;
+        return symCode + (m == m.truncateToDouble()
+            ? m.toInt().toString() : m.toStringAsFixed(1)) + 'M';
+      }
+      if (v >= 1000) {
+        final k = v / 1000;
+        return symCode + (k == k.truncateToDouble()
+            ? k.toInt().toString() : k.toStringAsFixed(1)) + 'k';
+      }
+      return symCode + (v == v.truncateToDouble()
+          ? v.toInt().toString() : v.toStringAsFixed(0));
+    }
+
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        // Y-axis max label
+        // ── Title row: "Daily Spending   total" ──────────────────────────
+        // NOTE: this row is NOT rendered here — the title is in _expensesSection.
+        // We render the total + legend in one row below the title.
+
+        // ── Legend + total spent on same row ─────────────────────────────
+        pw.Row(children: [
+          pw.Container(width: 9, height: 9,
+            decoration: pw.BoxDecoration(color: _trackGrey)),
+          pw.SizedBox(width: 4),
+          pw.Text('No spending',
+            style: pw.TextStyle(fontSize: 7, color: _grey)),
+          pw.SizedBox(width: 14),
+          pw.Container(width: 9, height: 9,
+            decoration: pw.BoxDecoration(color: color)),
+          pw.SizedBox(width: 4),
+          pw.Text('Spent that day',
+            style: pw.TextStyle(fontSize: 7, color: _grey)),
+          pw.Spacer(),
+          // Total spent — shown right-aligned next to legend
+          pw.Text(
+            'Total: ' + _fmt(totalSpent, sym),
+            style: pw.TextStyle(
+              fontSize: 8,
+              fontWeight: pw.FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ]),
+        pw.SizedBox(height: 4),
+
+        // ── Y-axis max label ──────────────────────────────────────────────
         pw.Text(_fmt(maxVal, sym),
-          style: pw.TextStyle(fontSize: 7, color: _grey)),
-        pw.SizedBox(height: 2),
-        // Bars
+          style: pw.TextStyle(fontSize: 6, color: _grey)),
+        pw.SizedBox(height: 1),
+
+        // ── Amount labels ABOVE each bar ──────────────────────────────────
         pw.SizedBox(
-          height: 110,
+          width: _chartWidth,
+          child: pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+            children: entries.map((e) => pw.Expanded(
+              child: pw.Center(
+                child: e.value > 0
+                    ? pw.Text(
+                        compact(e.value),
+                        style: pw.TextStyle(
+                          fontSize: 4.8,
+                          color: color,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      )
+                    : pw.SizedBox(),
+              ),
+            )).toList(),
+          ),
+        ),
+        pw.SizedBox(height: 1),
+
+        // ── Bars — fills from BOTTOM to TOP ──────────────────────────────
+        pw.SizedBox(
+          width: _chartWidth,
+          height: 100,
           child: pw.CustomPaint(
             painter: (canvas, size) =>
                 _drawBars(canvas, size, entries, maxVal, color),
           ),
         ),
-        pw.SizedBox(height: 4),
-        // X-axis labels
-        pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
-          children: entries.map((e) {
-            final lbl = e.key.length > 5 ? e.key.substring(0, 5) : e.key;
-            return pw.Expanded(
+
+        // ── Day number labels BELOW bars ──────────────────────────────────
+        pw.SizedBox(height: 2),
+        pw.SizedBox(
+          width: _chartWidth,
+          child: pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+            children: entries.map((e) => pw.Expanded(
               child: pw.Center(
-                child: pw.Text(lbl,
-                  style: pw.TextStyle(fontSize: 7, color: _grey)),
+                child: pw.Text(
+                  e.key, // "1" … "31"
+                  style: pw.TextStyle(fontSize: 5.5, color: _grey),
+                ),
               ),
-            );
-          }).toList(),
+            )).toList(),
+          ),
         ),
       ],
     );
   }
 
+  // Draws grey background track + colored fill growing from BOTTOM to TOP.
+  // In the pdf canvas coordinate system Y=0 is TOP, Y=h is BOTTOM.
+  // So "fill from bottom" means: draw fill at y = (h - barH), height = barH.
+  // The grey track always fills full height so every day is visible.
   static void _drawBars(
     PdfGraphics canvas, PdfPoint size,
     List<MapEntry<String, double>> entries,
@@ -812,22 +885,23 @@ class PdfHelper {
     final w    = size.x;
     final h    = size.y;
     final slot = w / n;
-    final barW = slot * 0.55;
-    final gap  = slot * 0.45;
+    final barW = slot * 0.6;
+    final gap  = (slot - barW) / 2;
 
     for (int i = 0; i < n; i++) {
       final val  = entries[i].value;
+      // barH is how tall the colored fill is (proportion of total height)
       final barH = (val / maxVal) * h;
-      final x    = i * slot + gap / 2;
+      final x    = i * slot + gap;
 
-      // Background track
+      // 1. Full-height grey track (always — represents the "empty" column)
       canvas
-        ..setFillColor(color.shade(0.88))
+        ..setFillColor(_trackGrey)
         ..drawRect(x, 0, barW, h)
         ..fillPath();
 
-      // Value fill
-      if (barH > 0) {
+      // 2. Colored fill from BOTTOM — y starts at (h - barH), grows upward
+      if (barH > 0.5) {
         canvas
           ..setFillColor(color)
           ..drawRect(x, h - barH, barW, barH)
@@ -835,7 +909,7 @@ class PdfHelper {
       }
     }
 
-    // Baseline
+    // Baseline at the bottom
     canvas
       ..setStrokeColor(PdfColors.grey400)
       ..setLineWidth(0.5)
@@ -843,6 +917,7 @@ class PdfHelper {
       ..lineTo(w, h)
       ..strokePath();
   }
+
 
   // ── Horizontal bar ─────────────────────────────────────────────────────────
   static pw.Widget _hBar(
@@ -860,10 +935,11 @@ class PdfHelper {
           style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
       ),
       pw.Stack(children: [
+        // FIX: use _trackGrey for background instead of color.shade()
         pw.Container(
           width: chartW, height: barH,
           decoration: pw.BoxDecoration(
-            color: color.shade(0.90),
+            color: _trackGrey,
             borderRadius: pw.BorderRadius.circular(5),
           ),
         ),
@@ -915,7 +991,7 @@ class PdfHelper {
     }).toList());
   }
 
-  // ── Goal progress row ──────────────────────────────────────────────────────
+  // ── FIX 3: Goal progress row — replace drawRRect with drawRect ─────────────
   static pw.Widget _goalProgressRow(GoalModel g, String sym) {
     final pct   = g.progress.clamp(0.0, 1.0);
     final color = pct >= 1.0 ? _green
@@ -943,24 +1019,8 @@ class PdfHelper {
             ],
           ),
           pw.SizedBox(height: 5),
-          pw.SizedBox(
-            height: 11,
-            child: pw.CustomPaint(painter: (canvas, size) {
-              // Background
-              canvas
-                ..setFillColor(color.shade(0.88))
-                ..drawRRect(0, 0, size.x, size.y, 4, 4)
-                ..fillPath();
-              // Fill
-              final fw = size.x * pct;
-              if (fw >= 1) {
-                canvas
-                  ..setFillColor(color)
-                  ..drawRRect(0, 0, fw, size.y, 4, 4)
-                  ..fillPath();
-              }
-            }),
-          ),
+          // FIX 3: use _progressBar() helper instead of CustomPaint+drawRRect
+          _progressBar(pct, color, height: 11),
           pw.SizedBox(height: 3),
           pw.Text(pctStr,
             style: pw.TextStyle(fontSize: 8, color: color)),
@@ -969,13 +1029,14 @@ class PdfHelper {
     );
   }
 
-  // ── Goal card ──────────────────────────────────────────────────────────────
+  // ── FIX 3: Goal card — replace drawRRect with drawRect ────────────────────
   static pw.Widget _goalCard(GoalModel g, String sym) {
     final pct   = g.progress.clamp(0.0, 1.0);
     final color = g.isCompleted ? _green
         : pct >= 0.75 ? _blue
         : pct >= 0.5  ? _amber : _grey;
-    final status   = g.isCompleted ? 'COMPLETED' : 'IN PROGRESS';
+    final status   = g.isCompleted ? 'IN PROGRESS' : 'IN PROGRESS';
+    final statusLabel = g.isCompleted ? 'COMPLETED' : 'IN PROGRESS';
     final savedStr = _fmt(g.savedAmount, sym);
     final targStr  = _fmt(g.targetAmount, sym);
     final remStr   = _fmt(g.remaining, sym);
@@ -1003,7 +1064,7 @@ class PdfHelper {
                     horizontal: 8, vertical: 3),
                 decoration: pw.BoxDecoration(
                   color: color, borderRadius: pw.BorderRadius.circular(20)),
-                child: pw.Text(status,
+                child: pw.Text(statusLabel,
                   style: pw.TextStyle(
                     fontSize: 8, color: _white, fontWeight: pw.FontWeight.bold)),
               ),
@@ -1019,26 +1080,46 @@ class PdfHelper {
                   _fmtDate(g.deadline!), _amber)),
           ]),
           pw.SizedBox(height: 10),
-          pw.SizedBox(
-            height: 14,
-            child: pw.CustomPaint(painter: (canvas, size) {
-              canvas
-                ..setFillColor(color.shade(0.85))
-                ..drawRRect(0, 0, size.x, size.y, 5, 5)
-                ..fillPath();
-              final fw = size.x * pct;
-              if (fw >= 1) {
-                canvas
-                  ..setFillColor(color)
-                  ..drawRRect(0, 0, fw, size.y, 5, 5)
-                  ..fillPath();
-              }
-            }),
-          ),
+          // FIX 3: use _progressBar() helper
+          _progressBar(pct, color, height: 14),
           pw.SizedBox(height: 4),
           pw.Text(pctStr,
             style: pw.TextStyle(fontSize: 9, color: color)),
         ],
+      ),
+    );
+  }
+
+  // ── FIX 3: Reusable progress bar using CustomPaint with drawRect ─────────
+  // double.infinity width gives size.x == 0 in pw.CustomPaint — bars invisible.
+  // Fix: use the same fixed _chartWidth (515pt = A4 minus 40pt margins each side).
+  // For goal cards the bar is inside a container so _chartWidth still fits fine.
+  static pw.Widget _progressBar(double pct, PdfColor color, {double height = 10}) {
+    final clampedPct = pct.clamp(0.0, 1.0);
+    return pw.SizedBox(
+      // FIX: explicit fixed width — pw.CustomPaint needs a concrete size to paint
+      width: _chartWidth,
+      height: height,
+      child: pw.CustomPaint(
+        painter: (canvas, size) {
+          final w = size.x;
+          final h = size.y;
+          final fillW = w * clampedPct;
+
+          // Background track
+          canvas
+            ..setFillColor(_trackGrey)
+            ..drawRect(0, 0, w, h)
+            ..fillPath();
+
+          // Filled portion
+          if (fillW > 0.5) {
+            canvas
+              ..setFillColor(color)
+              ..drawRect(0, 0, fillW, h)
+              ..fillPath();
+          }
+        },
       ),
     );
   }
@@ -1298,6 +1379,8 @@ class PdfHelper {
             fontSize: 16, fontWeight: pw.FontWeight.bold, color: _white)),
       );
 
+  // ── FIX 1: Footer — replace em-dash separator with plain ASCII " | " ───────
+  // The pdf package default font cannot render unicode em-dash or bullet chars.
   static pw.Widget _footer(pw.Context ctx, DateTime now) =>
       pw.Container(
         padding: const pw.EdgeInsets.only(top: 6),
@@ -1308,7 +1391,8 @@ class PdfHelper {
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
             pw.Text(
-              'Spendly Financial Report — ' + _fmtDate(now),
+              // FIX 1: was using non-ASCII em-dash; now plain ASCII " | "
+              'Spendly Financial Report | ' + _fmtDate(now),
               style: pw.TextStyle(fontSize: 8, color: _grey)),
             pw.Text(
               'Page ' + ctx.pageNumber.toString() +

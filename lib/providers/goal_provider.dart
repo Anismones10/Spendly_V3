@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import '../models/goal_model.dart';
-import 'package:hive/hive.dart';
 import '../utils/notification_helper.dart';
 
 class GoalProvider extends ChangeNotifier {

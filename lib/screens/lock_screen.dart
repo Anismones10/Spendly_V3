@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import '../utils/pin_helper.dart';
 import 'package:flutter/services.dart';
 import 'package:hive/hive.dart';
-import 'package:local_auth/local_auth.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'dart:math';
+import '../utils/pin_helper.dart';
+import '../utils/biometric_service.dart';
 
 class LockScreen extends StatefulWidget {
   final VoidCallback onUnlocked;
@@ -16,121 +15,144 @@ class LockScreen extends StatefulWidget {
 
 class _LockScreenState extends State<LockScreen>
     with TickerProviderStateMixin {
-  final LocalAuthentication _auth = LocalAuthentication();
   final Box _box = Hive.box('settings');
 
-  String _entered = '';
-  bool _hasError = false;
-  bool _biometricAvailable = false;
+  String    _entered  = '';
+  _PinState _pinState = _PinState.idle;
+
   late AnimationController _shakeCtrl;
-  late Animation<double> _shakeAnim;
+  late Animation<double>   _shakeAnim;
+  late AnimationController _resultCtrl;
+  late Animation<double>   _resultScale;
+
+  bool     _biometricAvailable = false;
+  BioIcon _bioIcon            = BioIcon.fingerprint;
+
+  static const int _pinLength = 4;
 
   @override
   void initState() {
     super.initState();
+
     _shakeCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 500));
+    _shakeAnim = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0,   end: -14), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: -14, end: 14),  weight: 2),
+      TweenSequenceItem(tween: Tween(begin: 14,  end: -10), weight: 2),
+      TweenSequenceItem(tween: Tween(begin: -10, end: 10),  weight: 2),
+      TweenSequenceItem(tween: Tween(begin: 10,  end: 0),   weight: 1),
+    ]).animate(CurvedAnimation(
+        parent: _shakeCtrl, curve: Curves.easeInOut));
+
+    _resultCtrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 400));
-    _shakeAnim = Tween<double>(begin: 0, end: 1).animate(_shakeCtrl);
-    _checkBiometric();
+    _resultScale = CurvedAnimation(
+        parent: _resultCtrl, curve: Curves.elasticOut);
+
+    _initBiometric();
   }
 
   @override
   void dispose() {
     _shakeCtrl.dispose();
+    _resultCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _checkBiometric() async {
-    try {
-      final canCheck  = await _auth.canCheckBiometrics;
-      final isSupported = await _auth.isDeviceSupported();
-      final biometricEnabled =
-          _box.get('lockBiometric', defaultValue: true) as bool;
+  Future<void> _initBiometric() async {
+    final bioEnabled =
+        _box.get('lockBiometric', defaultValue: true) as bool;
+    if (!bioEnabled) return;
 
-      if (mounted) {
-        setState(() =>
-            _biometricAvailable = canCheck && isSupported && biometricEnabled);
-      }
+    final available = await BiometricService.isAvailable();
+    final icon      = await BiometricService.getIcon();
 
-      // Auto-trigger biometric on open
-      if (_biometricAvailable) {
-        await Future.delayed(const Duration(milliseconds: 300));
-        _tryBiometric();
-      }
-    } catch (_) {}
+    if (mounted) {
+      setState(() {
+        _biometricAvailable = available;
+        _bioIcon            = icon;
+      });
+    }
+
+    // Auto-trigger on open
+    if (available) {
+      await Future.delayed(const Duration(milliseconds: 400));
+      _tryBiometric();
+    }
   }
 
   Future<void> _tryBiometric() async {
-    try {
-      final authenticated = await _auth.authenticate(
-        localizedReason: 'Authenticate to access Spendly',
-        options: const AuthenticationOptions(
-          biometricOnly: false,
-          stickyAuth: true,
-        ),
-      );
-      if (authenticated && mounted) {
-        _unlock();
-      }
-    } catch (_) {}
+    if (_pinState != _PinState.idle) return;
+    final success = await BiometricService.authenticate();
+    if (success && mounted) _onSuccess();
   }
 
+  // ── Key input ──────────────────────────────────────────────────────────────
   void _onKey(String key) {
+    if (_pinState != _PinState.idle) return;
+
     if (key == '⌫') {
       if (_entered.isNotEmpty) {
-        setState(() {
-          _entered = _entered.substring(0, _entered.length - 1);
-          _hasError = false;
-        });
+        setState(() => _entered =
+            _entered.substring(0, _entered.length - 1));
       }
       return;
     }
 
-    if (_entered.length >= 6) return;
-
+    if (_entered.length >= _pinLength) return;
     setState(() => _entered += key);
 
-    // Auto-submit when PIN length matches saved PIN
-    final savedPin = _box.get('lockPin', defaultValue: '') as String;
-    // Saved pin is stored as hash of original — check length by trying
-    // We try submit when entered length is 4, 5, or 6
-    if (_entered.length >= 4) {
-      _checkPin();
-    }
+    if (_entered.length == _pinLength) _checkPin();
   }
 
   void _checkPin() {
     final savedHash = _box.get('lockPin', defaultValue: '') as String;
-    final enteredHash = hashPin(_entered);
-
-    if (enteredHash == savedHash) {
-      _unlock();
-    } else if (_entered.length >= 6) {
-      _onWrongPin();
+    if (hashPin(_entered) == savedHash) {
+      _onSuccess();
+    } else {
+      _onError();
     }
   }
 
-  void _onWrongPin() {
-    HapticFeedback.heavyImpact();
-    setState(() => _hasError = true);
-    _shakeCtrl.forward(from: 0);
-    Future.delayed(const Duration(milliseconds: 600), () {
-      if (mounted) setState(() { _entered = ''; _hasError = false; });
+  void _onSuccess() {
+    HapticFeedback.lightImpact();
+    setState(() => _pinState = _PinState.success);
+    _resultCtrl.forward(from: 0);
+
+    Future.delayed(const Duration(milliseconds: 700), () {
+      if (mounted) {
+        _box.put('lockLastActive',
+            DateTime.now().millisecondsSinceEpoch);
+        widget.onUnlocked();
+      }
     });
   }
 
-  void _unlock() {
-    HapticFeedback.lightImpact();
-    // Update last active time
-    _box.put('lockLastActive', DateTime.now().millisecondsSinceEpoch);
-    widget.onUnlocked();
+  void _onError() {
+    HapticFeedback.heavyImpact();
+    Future.delayed(const Duration(milliseconds: 80),
+        () => HapticFeedback.heavyImpact());
+    Future.delayed(const Duration(milliseconds: 160),
+        () => HapticFeedback.heavyImpact());
+
+    setState(() => _pinState = _PinState.error);
+    _resultCtrl.forward(from: 0);
+    _shakeCtrl.forward(from: 0);
+
+    Future.delayed(const Duration(milliseconds: 900), () {
+      if (mounted) {
+        setState(() { _entered = ''; _pinState = _PinState.idle; });
+        _resultCtrl.reset();
+      }
+    });
   }
 
+  // ── Build ──────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme  = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final pinLength = _getPinLength();
 
     return Scaffold(
       backgroundColor:
@@ -140,89 +162,60 @@ class _LockScreenState extends State<LockScreen>
           children: [
             const Spacer(),
 
-            // ── App icon + title ───────────────────────────────────────
-            Column(
-              children: [
-                Container(
-                  width: 80, height: 80,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: theme.colorScheme.primary.withOpacity(0.2),
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Icon(
-                    Icons.account_balance_wallet_rounded,
-                    color: theme.colorScheme.primary, size: 38),
-                ).animate().scale(
-                    begin: const Offset(0.8, 0.8),
-                    duration: 400.ms, curve: Curves.elasticOut),
-                const SizedBox(height: 16),
-                Text('Spendly',
-                  style: TextStyle(
+            Container(
+              width: 80, height: 80,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: theme.colorScheme.primary.withOpacity(0.2),
+                  width: 1.5),
+              ),
+              child: Icon(Icons.account_balance_wallet_rounded,
+                  color: theme.colorScheme.primary, size: 38),
+            ).animate().scale(
+                begin: const Offset(0.8, 0.8),
+                duration: 400.ms, curve: Curves.elasticOut),
+
+            const SizedBox(height: 16),
+
+            Text('Spendly',
+                style: TextStyle(
                     fontSize: 28, fontWeight: FontWeight.w800,
                     color: theme.colorScheme.onSurface,
-                    letterSpacing: -0.5,
-                  )).animate().fadeIn(delay: 150.ms),
-                const SizedBox(height: 8),
-                Text('Enter your PIN to continue',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: theme.colorScheme.onSurface.withOpacity(0.5),
-                  )).animate().fadeIn(delay: 200.ms),
-              ],
-            ),
+                    letterSpacing: -0.5))
+                .animate().fadeIn(delay: 100.ms),
 
-            const SizedBox(height: 40),
+            const SizedBox(height: 8),
 
-            // ── PIN dots ───────────────────────────────────────────────
-            AnimatedBuilder(
-              animation: _shakeAnim,
-              builder: (_, child) {
-                final offset = sin(_shakeAnim.value * pi * 6) * 10;
-                return Transform.translate(
-                  offset: Offset(offset, 0), child: child);
-              },
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(pinLength > 0 ? pinLength : 4, (i) {
-                  final filled = i < _entered.length;
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    margin: const EdgeInsets.symmetric(horizontal: 8),
-                    width: 16, height: 16,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: _hasError
-                          ? const Color(0xFFE57373)
-                          : filled
-                              ? theme.colorScheme.primary
-                              : theme.colorScheme.onSurface.withOpacity(0.15),
-                      boxShadow: filled && !_hasError
-                          ? [BoxShadow(
-                              color: theme.colorScheme.primary.withOpacity(0.4),
-                              blurRadius: 8)]
-                          : null,
-                    ),
-                  );
-                }),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: Text(
+                key: ValueKey(_pinState),
+                _pinState == _PinState.error
+                    ? 'Incorrect PIN. Try again.'
+                    : _pinState == _PinState.success
+                        ? 'Unlocked!'
+                        : 'Enter your PIN to continue',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: _pinState != _PinState.idle
+                      ? FontWeight.w600 : FontWeight.w400,
+                  color: _pinState == _PinState.error
+                      ? const Color(0xFFE57373)
+                      : _pinState == _PinState.success
+                          ? const Color(0xFF2ECC71)
+                          : theme.colorScheme.onSurface.withOpacity(0.5),
+                ),
               ),
-            ).animate().fadeIn(delay: 250.ms),
+            ).animate().fadeIn(delay: 150.ms),
 
-            if (_hasError) ...[
-              const SizedBox(height: 12),
-              Text('Incorrect PIN',
-                style: const TextStyle(
-                  color: Color(0xFFE57373),
-                  fontSize: 13, fontWeight: FontWeight.w600,
-                )).animate().fadeIn(),
-            ],
+            const SizedBox(height: 48),
+
+            _buildPinIndicator(theme),
 
             const Spacer(),
 
-            // ── Keypad ─────────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 48),
               child: Column(
@@ -236,12 +229,11 @@ class _LockScreenState extends State<LockScreen>
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      // Biometric button
                       _biometricAvailable
-                          ? _bioKey(theme, isDark)
+                          ? _bioKey(theme)
                           : const SizedBox(width: 72, height: 72),
                       _numKey('0', theme, isDark),
-                      _backKey(theme, isDark),
+                      _backKey(theme),
                     ],
                   ),
                 ],
@@ -255,28 +247,70 @@ class _LockScreenState extends State<LockScreen>
     );
   }
 
-  // Get pin length from stored hash (try 4 first, then allow up to 6)
-  int _getPinLength() {
-    // We don't store PIN length separately, so we use dots = max entered
-    // Show 4 dots minimum, expand as user types
-    return max(4, _entered.length);
-  }
+  Widget _buildPinIndicator(ThemeData theme) {
+    if (_pinState == _PinState.success || _pinState == _PinState.error) {
+      final isSuccess = _pinState == _PinState.success;
+      final color =
+          isSuccess ? const Color(0xFF2ECC71) : const Color(0xFFE57373);
+      return ScaleTransition(
+        scale: _resultScale,
+        child: Container(
+          width: 68, height: 68,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.12),
+            shape: BoxShape.circle,
+            border: Border.all(color: color, width: 2.5),
+          ),
+          child: Icon(
+            isSuccess ? Icons.check_rounded : Icons.close_rounded,
+            color: color, size: 38),
+        ),
+      );
+    }
 
-  Widget _keyRow(List<String> keys, ThemeData theme, bool isDark) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: keys.map((k) => _numKey(k, theme, isDark)).toList(),
+    return AnimatedBuilder(
+      animation: _shakeAnim,
+      builder: (_, child) => Transform.translate(
+        offset: Offset(_shakeAnim.value, 0), child: child),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(_pinLength, (i) {
+          final filled = i < _entered.length;
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            margin: const EdgeInsets.symmetric(horizontal: 10),
+            width: 18, height: 18,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: filled
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurface.withOpacity(0.15),
+              boxShadow: filled
+                  ? [BoxShadow(
+                      color: theme.colorScheme.primary.withOpacity(0.45),
+                      blurRadius: 10)]
+                  : null,
+            ),
+          );
+        }),
+      ),
     );
   }
+
+  Widget _keyRow(List<String> keys, ThemeData theme, bool isDark) =>
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: keys.map((k) => _numKey(k, theme, isDark)).toList(),
+      );
 
   Widget _numKey(String digit, ThemeData theme, bool isDark) {
     return GestureDetector(
       onTap: () {
+        if (_pinState != _PinState.idle) return;
         HapticFeedback.lightImpact();
         _onKey(digit);
       },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 100),
+      child: Container(
         width: 72, height: 72,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
@@ -285,41 +319,39 @@ class _LockScreenState extends State<LockScreen>
             color: Colors.black.withOpacity(0.08),
             blurRadius: 10, offset: const Offset(0, 3))],
         ),
-        child: Center(
-          child: Text(digit,
-            style: TextStyle(
-              fontSize: 24, fontWeight: FontWeight.w600,
-              color: theme.colorScheme.onSurface,
-            )),
-        ),
+        child: Center(child: Text(digit,
+          style: TextStyle(
+            fontSize: 24, fontWeight: FontWeight.w600,
+            color: theme.colorScheme.onSurface))),
       ),
     );
   }
 
-  Widget _backKey(ThemeData theme, bool isDark) {
+  Widget _backKey(ThemeData theme) {
     return GestureDetector(
       onTap: () {
+        if (_pinState != _PinState.idle) return;
         HapticFeedback.lightImpact();
         _onKey('⌫');
       },
-      child: SizedBox(
-        width: 72, height: 72,
-        child: Center(
-          child: Icon(Icons.backspace_outlined,
-            color: theme.colorScheme.onSurface.withOpacity(0.6), size: 24)),
-      ),
+      child: SizedBox(width: 72, height: 72,
+        child: Center(child: Icon(Icons.backspace_outlined,
+          color: theme.colorScheme.onSurface.withOpacity(0.6),
+          size: 24))),
     );
   }
 
-  Widget _bioKey(ThemeData theme, bool isDark) {
+  Widget _bioKey(ThemeData theme) {
     return GestureDetector(
       onTap: _tryBiometric,
-      child: SizedBox(
-        width: 72, height: 72,
-        child: Center(
-          child: Icon(Icons.fingerprint_rounded,
-            color: theme.colorScheme.primary, size: 34)),
-      ),
+      child: SizedBox(width: 72, height: 72,
+        child: Center(child: Icon(
+          _bioIcon == BioIcon.face
+              ? Icons.face_rounded
+              : Icons.fingerprint_rounded,
+          color: theme.colorScheme.primary, size: 36))),
     );
   }
 }
+
+enum _PinState { idle, success, error }

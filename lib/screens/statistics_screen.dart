@@ -114,44 +114,44 @@ class _StatisticsScreenState extends State<StatisticsScreen>
         ),
       ),
       body: _mainTabController.index == 0
-          // ── Expense sub-tabs ────────────────────────────────────────
+      // ── Expense sub-tabs ────────────────────────────────────────
           ? TabBarView(
-              controller: _expenseTabController,
-              children: [
-                _OverviewTab(expenses: expenses, settings: settings, now: now),
-                _CategoriesTab(
-                  expenses: expenses, settings: settings, now: now,
-                  touchedIndex: _touchedPieIndex,
-                  onTouch: (i) => setState(() => _touchedPieIndex = i),
-                ),
-                _CompareTab(
-                  expenses: expenses, settings: settings, now: now,
-                  period: _comparePeriod,
-                  onPeriodChanged: (p) => setState(() => _comparePeriod = p),
-                ),
-                const CalendarScreen(embedded: true),
-              ],
-            )
-          // ── Income sub-tabs ─────────────────────────────────────────
+        controller: _expenseTabController,
+        children: [
+          _OverviewTab(expenses: expenses, settings: settings, now: now),
+          _CategoriesTab(
+            expenses: expenses, settings: settings, now: now,
+            touchedIndex: _touchedPieIndex,
+            onTouch: (i) => setState(() => _touchedPieIndex = i),
+          ),
+          _CompareTab(
+            expenses: expenses, settings: settings, now: now,
+            period: _comparePeriod,
+            onPeriodChanged: (p) => setState(() => _comparePeriod = p),
+          ),
+          const CalendarScreen(embedded: true),
+        ],
+      )
+      // ── Income sub-tabs ─────────────────────────────────────────
           : TabBarView(
-              controller: _incomeTabController,
-              children: [
-                _IncomeOverviewTab(income: income, expenses: expenses, settings: settings, now: now),
-                _IncomeBySourceTab(
-                  income: income, settings: settings, now: now,
-                  touchedIndex: _touchedIncomePieIndex,
-                  onTouch: (i) => setState(() => _touchedIncomePieIndex = i),
-                ),
-                _IncomeTrendTab(income: income, settings: settings, now: now),
-              ],
-            ),
+        controller: _incomeTabController,
+        children: [
+          _IncomeOverviewTab(income: income, expenses: expenses, settings: settings, now: now),
+          _IncomeBySourceTab(
+            income: income, settings: settings, now: now,
+            touchedIndex: _touchedIncomePieIndex,
+            onTouch: (i) => setState(() => _touchedIncomePieIndex = i),
+          ),
+          _IncomeTrendTab(income: income, settings: settings, now: now),
+        ],
+      ),
     );
   }
 }
 
 // ── Overview Tab ──────────────────────────────────────────────────────────────
 
-class _OverviewTab extends StatelessWidget {
+class _OverviewTab extends StatefulWidget {
   final ExpenseProvider expenses;
   final SettingsProvider settings;
   final DateTime now;
@@ -163,24 +163,70 @@ class _OverviewTab extends StatelessWidget {
   });
 
   @override
+  State<_OverviewTab> createState() => _OverviewTabState();
+}
+
+class _OverviewTabState extends State<_OverviewTab> {
+  late DateTime _selectedMonth;
+
+  @override
+  void initState() {
+    super.initState();
+    // Start at current month
+    _selectedMonth = DateTime(widget.now.year, widget.now.month);
+  }
+
+  void _prevMonth() {
+    setState(() {
+      _selectedMonth = DateTime(
+        _selectedMonth.month == 1 ? _selectedMonth.year - 1 : _selectedMonth.year,
+        _selectedMonth.month == 1 ? 12 : _selectedMonth.month - 1,
+      );
+    });
+  }
+
+  void _nextMonth() {
+    final now = widget.now;
+    final isCurrentMonth = _selectedMonth.year == now.year &&
+        _selectedMonth.month == now.month;
+    if (!isCurrentMonth) {
+      setState(() {
+        _selectedMonth = DateTime(
+          _selectedMonth.month == 12 ? _selectedMonth.year + 1 : _selectedMonth.year,
+          _selectedMonth.month == 12 ? 1 : _selectedMonth.month + 1,
+        );
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final now = widget.now;
+    final expenses = widget.expenses;
+    final settings = widget.settings;
     final symbol = settings.currencySymbol;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final incomeProvider = context.watch<IncomeProvider>();
     final categories = context.watch<CategoryProvider>();
 
-    final thisMonth = expenses.getTotalForMonth(now.year, now.month);
+    // Use _selectedMonth for all calculations
+    final selYear  = _selectedMonth.year;
+    final selMonth = _selectedMonth.month;
+
+    final isCurrentMonth = selYear == now.year && selMonth == now.month;
+
+    final thisMonth = expenses.getTotalForMonth(selYear, selMonth);
     final lastMonth = expenses.getTotalForMonth(
-      now.month == 1 ? now.year - 1 : now.year,
-      now.month == 1 ? 12 : now.month - 1,
+      selMonth == 1 ? selYear - 1 : selYear,
+      selMonth == 1 ? 12 : selMonth - 1,
     );
     final thisWeek = expenses.getTotalForWeek();
-    final today = expenses.getTotalForDay(now);
-    final thisMonthIncome = incomeProvider.getTotalForMonth(now.year, now.month);
-    final balance = thisMonthIncome - thisMonth;
+    final today    = expenses.getTotalForDay(now);
+    final thisMonthIncome = incomeProvider.getTotalForMonth(selYear, selMonth);
+    final balance  = thisMonthIncome - thisMonth;
 
-    final dailyTotals = expenses.getDailyTotals(now.year, now.month);
+    final dailyTotals = expenses.getDailyTotals(selYear, selMonth);
     final maxVal = dailyTotals.isEmpty
         ? 1.0
         : dailyTotals.values.reduce((a, b) => a > b ? a : b);
@@ -190,7 +236,7 @@ class _OverviewTab extends StatelessWidget {
     final avgDaily = daysWithExpense > 0 ? thisMonth / daysWithExpense : 0.0;
 
     // Top 3 categories this month
-    final catTotals = expenses.getCategoryTotals(now.year, now.month);
+    final catTotals = expenses.getCategoryTotals(selYear, selMonth);
     final topCats = catTotals.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
@@ -205,10 +251,55 @@ class _OverviewTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+
+        // ── Month navigation ──────────────────────────────────────────
+        Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [BoxShadow(
+                color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              IconButton(
+                onPressed: _prevMonth,
+                icon: Icon(Icons.chevron_left_rounded,
+                    color: theme.colorScheme.primary),
+              ),
+              Column(
+                children: [
+                  Text(
+                    _monthName(selMonth),
+                    style: TextStyle(
+                        fontSize: 17, fontWeight: FontWeight.w800,
+                        color: theme.colorScheme.onSurface),
+                  ),
+                  Text('$selYear',
+                      style: TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w500,
+                          color: theme.colorScheme.onSurface.withOpacity(0.45))),
+                ],
+              ),
+              IconButton(
+                onPressed: isCurrentMonth ? null : _nextMonth,
+                icon: Icon(Icons.chevron_right_rounded,
+                    color: isCurrentMonth
+                        ? theme.colorScheme.onSurface.withOpacity(0.2)
+                        : theme.colorScheme.primary),
+              ),
+            ],
+          ),
+        ),
+
         // ── 4 stat cards ──────────────────────────────────────────────
         Row(children: [
           Expanded(child: _StatCard(
-            label: 'This Month', value: AppUtils.formatAmount(thisMonth, symbol),
+            label: isCurrentMonth ? 'This Month' : _monthName(selMonth),
+            value: AppUtils.formatAmount(thisMonth, symbol),
             icon: Icons.calendar_view_month_rounded, color: theme.colorScheme.primary,
           ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.2)),
           const SizedBox(width: 12),
@@ -245,21 +336,21 @@ class _OverviewTab extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('This Month Summary',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15,
-                    color: theme.colorScheme.onSurface)),
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15,
+                        color: theme.colorScheme.onSurface)),
                 const SizedBox(height: 14),
                 Row(children: [
                   Expanded(child: _MiniStat(
-                    label: 'Income', value: AppUtils.formatAmount(thisMonthIncome, symbol),
-                    color: const Color(0xFF2ECC71))),
+                      label: 'Income', value: AppUtils.formatAmount(thisMonthIncome, symbol),
+                      color: const Color(0xFF2ECC71))),
                   Expanded(child: _MiniStat(
-                    label: 'Balance', align: TextAlign.center,
-                    value: '${balance >= 0 ? '+' : ''}${AppUtils.formatAmount(balance.abs(), symbol)}',
-                    color: balance >= 0 ? const Color(0xFF2ECC71) : const Color(0xFFE57373))),
+                      label: 'Balance', align: TextAlign.center,
+                      value: '${balance >= 0 ? '+' : ''}${AppUtils.formatAmount(balance.abs(), symbol)}',
+                      color: balance >= 0 ? const Color(0xFF2ECC71) : const Color(0xFFE57373))),
                   Expanded(child: _MiniStat(
-                    label: 'Expenses', align: TextAlign.end,
-                    value: AppUtils.formatAmount(thisMonth, symbol),
-                    color: const Color(0xFFE57373))),
+                      label: 'Expenses', align: TextAlign.end,
+                      value: AppUtils.formatAmount(thisMonth, symbol),
+                      color: const Color(0xFFE57373))),
                 ]),
                 const SizedBox(height: 12),
                 ClipRRect(
@@ -270,10 +361,10 @@ class _OverviewTab extends StatelessWidget {
                       widthFactor: thisMonthIncome > 0
                           ? (thisMonth / thisMonthIncome).clamp(0.0, 1.0) : 0,
                       child: Container(height: 8,
-                        decoration: BoxDecoration(
-                          color: thisMonth > thisMonthIncome
-                              ? const Color(0xFFE57373) : const Color(0xFF2ECC71),
-                          borderRadius: BorderRadius.circular(6))),
+                          decoration: BoxDecoration(
+                              color: thisMonth > thisMonthIncome
+                                  ? const Color(0xFFE57373) : const Color(0xFF2ECC71),
+                              borderRadius: BorderRadius.circular(6))),
                     ),
                   ]),
                 ),
@@ -282,12 +373,12 @@ class _OverviewTab extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      '${(thisMonth / thisMonthIncome * 100).toStringAsFixed(1)}% of income spent',
-                      style: TextStyle(fontSize: 11,
-                        color: theme.colorScheme.onSurface.withOpacity(0.45))),
+                        '${(thisMonth / thisMonthIncome * 100).toStringAsFixed(1)}% of income spent',
+                        style: TextStyle(fontSize: 11,
+                            color: theme.colorScheme.onSurface.withOpacity(0.45))),
                     Text('Avg/day: ${AppUtils.formatAmount(avgDaily, symbol)}',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
-                        color: theme.colorScheme.primary)),
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                            color: theme.colorScheme.primary)),
                   ],
                 ),
               ],
@@ -326,23 +417,23 @@ class _OverviewTab extends StatelessWidget {
                 Text(
                   hasPrevData
                       ? (isMore
-                          ? 'Spending up $pctStr vs last month'
-                          : diff == 0
-                              ? 'Same spending as last month'
-                              : 'Spending down $pctStr vs last month')
+                      ? 'Spending up $pctStr vs last month'
+                      : diff == 0
+                      ? 'Same spending as last month'
+                      : 'Spending down $pctStr vs last month')
                       : (thisMonth > 0
-                          ? 'First month tracked — great start!'
-                          : 'No expenses this month yet'),
+                      ? 'First month tracked — great start!'
+                      : 'No expenses this month yet'),
                   style: TextStyle(
-                    fontWeight: FontWeight.w700, fontSize: 14,
-                    color: isMore ? const Color(0xFFE57373) : const Color(0xFF2ECC71)),
+                      fontWeight: FontWeight.w700, fontSize: 14,
+                      color: isMore ? const Color(0xFFE57373) : const Color(0xFF2ECC71)),
                 ),
                 if (hasPrevData && diff != 0) ...[
                   const SizedBox(height: 4),
                   Text(
-                    '${isMore ? '+' : '-'}${AppUtils.formatAmount(diff.abs(), symbol)} compared to last month',
-                    style: TextStyle(fontSize: 12,
-                      color: theme.colorScheme.onSurface.withOpacity(0.55))),
+                      '${isMore ? '+' : '-'}${AppUtils.formatAmount(diff.abs(), symbol)} compared to last month',
+                      style: TextStyle(fontSize: 12,
+                          color: theme.colorScheme.onSurface.withOpacity(0.55))),
                 ],
               ],
             )),
@@ -364,7 +455,7 @@ class _OverviewTab extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('Top Categories',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
                 const SizedBox(height: 14),
                 ...topCats.take(3).map((e) {
                   final cat = categories.getById(e.key);
@@ -374,11 +465,11 @@ class _OverviewTab extends StatelessWidget {
                     padding: const EdgeInsets.only(bottom: 12),
                     child: Row(children: [
                       Container(width: 36, height: 36,
-                        decoration: BoxDecoration(
-                          color: color.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(10)),
-                        child: Icon(CategoryIcons.resolve(cat?.icon ?? ''),
-                          color: color, size: 18)),
+                          decoration: BoxDecoration(
+                              color: color.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(10)),
+                          child: Icon(CategoryIcons.resolve(cat?.icon ?? ''),
+                              color: color, size: 18)),
                       const SizedBox(width: 12),
                       Expanded(child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -387,10 +478,10 @@ class _OverviewTab extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(cat?.name ?? e.key,
-                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                               Text(AppUtils.formatAmount(e.value, symbol),
-                                style: TextStyle(fontWeight: FontWeight.w700,
-                                  fontSize: 13, color: color)),
+                                  style: TextStyle(fontWeight: FontWeight.w700,
+                                      fontSize: 13, color: color)),
                             ],
                           ),
                           const SizedBox(height: 5),
@@ -417,15 +508,15 @@ class _OverviewTab extends StatelessWidget {
         if (dailyTotals.isNotEmpty) ...[
           Row(children: [
             const Text('Daily Spending',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
             const SizedBox(width: 8),
-            Text(AppUtils.formatMonthYear(now),
-              style: TextStyle(fontSize: 13,
-                color: theme.colorScheme.onSurface.withOpacity(0.45))),
+            Text(AppUtils.formatMonthYear(_selectedMonth),
+                style: TextStyle(fontSize: 13,
+                    color: theme.colorScheme.onSurface.withOpacity(0.45))),
           ]),
           const SizedBox(height: 12),
           Builder(builder: (ctx) {
-            final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+            final daysInMonth = DateTime(selYear, selMonth + 1, 0).day;
             final chartMax = maxVal > 0
                 ? (maxVal * 1.25).ceilToDouble()
                 : 100.0;
@@ -433,16 +524,16 @@ class _OverviewTab extends StatelessWidget {
             final rawInterval = chartMax / 4;
             final magnitude = rawInterval > 0
                 ? (rawInterval / (10 * (rawInterval / 10).floor())).isNaN
-                    ? 1.0
-                    : 1.0
+                ? 1.0
+                : 1.0
                 : 1.0;
             final yInterval = rawInterval <= 50
                 ? (rawInterval / 10).ceil() * 10.0
                 : rawInterval <= 500
-                    ? (rawInterval / 50).ceil() * 50.0
-                    : rawInterval <= 5000
-                        ? (rawInterval / 500).ceil() * 500.0
-                        : (rawInterval / 5000).ceil() * 5000.0;
+                ? (rawInterval / 50).ceil() * 50.0
+                : rawInterval <= 5000
+                ? (rawInterval / 500).ceil() * 500.0
+                : (rawInterval / 5000).ceil() * 5000.0;
             const double barWidth = 14.0;
             const double barSpacing = 8.0;
             const double leftAxisWidth = 44.0;
@@ -478,7 +569,7 @@ class _OverviewTab extends StatelessWidget {
                             getTooltipItem: (g, gi, rod, ri) => BarTooltipItem(
                               'Day ${g.x}  ${AppUtils.formatAmount(rod.toY, symbol)}',
                               const TextStyle(color: Colors.white,
-                                fontWeight: FontWeight.w700, fontSize: 11),
+                                  fontWeight: FontWeight.w700, fontSize: 11),
                             ),
                           ),
                         ),
@@ -487,20 +578,20 @@ class _OverviewTab extends StatelessWidget {
                             showTitles: true, reservedSize: 26,
                             getTitlesWidget: (v, meta) {
                               final d = v.toInt();
-                              final isToday = d == now.day;
+                              final isToday = isCurrentMonth && d == now.day;
                               final hasExpense = dailyTotals.containsKey(d);
                               return Padding(
                                 padding: const EdgeInsets.only(top: 6),
                                 child: Text('$d',
-                                  style: TextStyle(
-                                    fontSize: 9,
-                                    fontWeight: isToday || hasExpense ? FontWeight.w800 : FontWeight.w400,
-                                    color: isToday
-                                        ? theme.colorScheme.primary
-                                        : hasExpense
-                                            ? theme.colorScheme.primary.withOpacity(0.7)
-                                            : theme.colorScheme.onSurface.withOpacity(0.3),
-                                  )),
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: isToday || hasExpense ? FontWeight.w800 : FontWeight.w400,
+                                      color: isToday
+                                          ? theme.colorScheme.primary
+                                          : hasExpense
+                                          ? theme.colorScheme.primary.withOpacity(0.7)
+                                          : theme.colorScheme.onSurface.withOpacity(0.3),
+                                    )),
                               );
                             },
                           )),
@@ -517,8 +608,8 @@ class _OverviewTab extends StatelessWidget {
                               return Padding(
                                 padding: const EdgeInsets.only(right: 6),
                                 child: Text(label, style: TextStyle(fontSize: 9,
-                                  fontWeight: FontWeight.w500,
-                                  color: theme.colorScheme.onSurface.withOpacity(0.4))),
+                                    fontWeight: FontWeight.w500,
+                                    color: theme.colorScheme.onSurface.withOpacity(0.4))),
                               );
                             },
                           )),
@@ -529,21 +620,21 @@ class _OverviewTab extends StatelessWidget {
                           show: true, drawVerticalLine: false,
                           horizontalInterval: yInterval,
                           getDrawingHorizontalLine: (v) => FlLine(
-                            color: theme.colorScheme.onSurface.withOpacity(0.06), strokeWidth: 1),
+                              color: theme.colorScheme.onSurface.withOpacity(0.06), strokeWidth: 1),
                         ),
                         borderData: FlBorderData(show: false),
                         barGroups: List.generate(daysInMonth, (i) {
                           final day = i + 1;
                           final value = dailyTotals[day] ?? 0.0;
-                          final isToday = day == now.day;
+                          final isToday = isCurrentMonth && day == now.day;
                           return BarChartGroupData(x: day, barRods: [
                             BarChartRodData(
                               toY: value,
                               color: isToday
                                   ? theme.colorScheme.primary
                                   : value > 0
-                                      ? theme.colorScheme.primary.withOpacity(0.55)
-                                      : Colors.transparent,
+                                  ? theme.colorScheme.primary.withOpacity(0.55)
+                                  : Colors.transparent,
                               width: barWidth,
                               borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
                               backDrawRodData: BackgroundBarChartRodData(
@@ -564,6 +655,12 @@ class _OverviewTab extends StatelessWidget {
         ],
       ],
     );
+  }
+
+  String _monthName(int m) {
+    const names = ['January','February','March','April','May','June',
+      'July','August','September','October','November','December'];
+    return names[m - 1];
   }
 }
 
@@ -586,16 +683,16 @@ class _MiniStat extends StatelessWidget {
       crossAxisAlignment: align == TextAlign.end
           ? CrossAxisAlignment.end
           : align == TextAlign.center
-              ? CrossAxisAlignment.center
-              : CrossAxisAlignment.start,
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
       children: [
         Text(label,
-          style: TextStyle(fontSize: 11,
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
-          textAlign: align),
+            style: TextStyle(fontSize: 11,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+            textAlign: align),
         Text(value,
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: color),
-          textAlign: align, maxLines: 1, overflow: TextOverflow.ellipsis),
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: color),
+            textAlign: align, maxLines: 1, overflow: TextOverflow.ellipsis),
       ],
     );
   }
@@ -669,7 +766,7 @@ class _CategoriesTab extends StatelessWidget {
                               if (event is FlLongPressStart ||
                                   event is FlLongPressMoveUpdate) {
                                 onTouch(response?.touchedSection
-                                        ?.touchedSectionIndex ?? -1);
+                                    ?.touchedSectionIndex ?? -1);
                               } else if (event is FlLongPressEnd ||
                                   event is FlPointerExitEvent ||
                                   event is FlTapUpEvent) {
@@ -707,13 +804,13 @@ class _CategoriesTab extends StatelessWidget {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text('${pct.toStringAsFixed(1)}%',
-                                  style: TextStyle(
-                                    fontSize: 14, fontWeight: FontWeight.w800,
-                                    color: color)),
+                                    style: TextStyle(
+                                        fontSize: 14, fontWeight: FontWeight.w800,
+                                        color: color)),
                                 Text(AppUtils.formatAmount(e.value, symbol),
-                                  style: TextStyle(
-                                    fontSize: 10, fontWeight: FontWeight.w600,
-                                    color: color.withOpacity(0.8))),
+                                    style: TextStyle(
+                                        fontSize: 10, fontWeight: FontWeight.w600,
+                                        color: color.withOpacity(0.8))),
                               ],
                             );
                           }),
@@ -742,7 +839,7 @@ class _CategoriesTab extends StatelessWidget {
                               Container(
                                 width: 10, height: 10,
                                 decoration: BoxDecoration(
-                                  color: color, shape: BoxShape.circle),
+                                    color: color, shape: BoxShape.circle),
                               ),
                               const SizedBox(width: 8),
                               Expanded(
@@ -750,18 +847,18 @@ class _CategoriesTab extends StatelessWidget {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(cat?.name ?? e.key,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: theme.colorScheme.onSurface,
-                                      ),
-                                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: theme.colorScheme.onSurface,
+                                        ),
+                                        maxLines: 1, overflow: TextOverflow.ellipsis),
                                     Text(
-                                      '${pct.toStringAsFixed(1)}% · ${AppUtils.formatAmount(e.value, symbol)}',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: theme.colorScheme.onSurface.withOpacity(0.5),
-                                      )),
+                                        '${pct.toStringAsFixed(1)}% · ${AppUtils.formatAmount(e.value, symbol)}',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: theme.colorScheme.onSurface.withOpacity(0.5),
+                                        )),
                                   ],
                                 ),
                               ),
@@ -813,11 +910,11 @@ class _CategoriesTab extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(cat?.name ?? e.value.key,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: theme.colorScheme.onSurface,
-                        )),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: theme.colorScheme.onSurface,
+                          )),
                       const SizedBox(height: 4),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(4),
@@ -836,11 +933,11 @@ class _CategoriesTab extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(AppUtils.formatAmount(e.value.value, symbol),
-                      style: TextStyle(fontWeight: FontWeight.w700,
-                          fontSize: 14, color: color)),
+                        style: TextStyle(fontWeight: FontWeight.w700,
+                            fontSize: 14, color: color)),
                     Text('${pct.toStringAsFixed(1)}%',
-                      style: TextStyle(fontSize: 11,
-                          color: theme.colorScheme.onSurface.withOpacity(0.4))),
+                        style: TextStyle(fontSize: 11,
+                            color: theme.colorScheme.onSurface.withOpacity(0.4))),
                   ],
                 ),
               ],
@@ -959,7 +1056,7 @@ class _CompareTab extends StatelessWidget {
                     Text(
                       '${trend >= 0 ? '+' : ''}${trend.toStringAsFixed(1)}%',
                       style: const TextStyle(
-                        color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800),
+                          color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800),
                     ),
                     Text(
                       trend <= 0
@@ -994,78 +1091,78 @@ class _CompareTab extends StatelessWidget {
                 height: 200,
                 child: maxVal == 0
                     ? Center(child: Text('No data yet',
-                        style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.4))))
+                    style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.4))))
                     : LineChart(LineChartData(
-                        minY: 0, maxY: safeMax,
-                        lineTouchData: LineTouchData(
-                          touchTooltipData: LineTouchTooltipData(
-                            tooltipRoundedRadius: 10,
-                            getTooltipItems: (spots) => spots.map((s) =>
-                              LineTooltipItem(
-                                '${data[s.x.toInt()].label}\n$symbol${s.y.toStringAsFixed(0)}',
-                                const TextStyle(color: Colors.white,
-                                  fontWeight: FontWeight.w700, fontSize: 12),
-                              ),
-                            ).toList(),
+                  minY: 0, maxY: safeMax,
+                  lineTouchData: LineTouchData(
+                    touchTooltipData: LineTouchTooltipData(
+                      tooltipRoundedRadius: 10,
+                      getTooltipItems: (spots) => spots.map((s) =>
+                          LineTooltipItem(
+                            '${data[s.x.toInt()].label}\n$symbol${s.y.toStringAsFixed(0)}',
+                            const TextStyle(color: Colors.white,
+                                fontWeight: FontWeight.w700, fontSize: 12),
                           ),
-                        ),
-                        titlesData: FlTitlesData(
-                          bottomTitles: AxisTitles(sideTitles: SideTitles(
-                            showTitles: true,
-                            interval: period == 'month' ? 2 : 1,
-                            getTitlesWidget: (v, _) {
-                              final idx = v.toInt();
-                              if (idx < 0 || idx >= data.length) return const SizedBox();
-                              return Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: Text(data[idx].label,
-                                  style: TextStyle(fontSize: 10,
-                                    color: theme.colorScheme.onSurface.withOpacity(0.5))),
-                              );
-                            },
-                          )),
-                          leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                        ),
-                        gridData: FlGridData(
-                          show: true, drawVerticalLine: false,
-                          horizontalInterval: safeMax / 4,
-                          getDrawingHorizontalLine: (_) => FlLine(
-                            color: theme.colorScheme.onSurface.withOpacity(0.07), strokeWidth: 1),
-                        ),
-                        borderData: FlBorderData(show: false),
-                        lineBarsData: [
-                          LineChartBarData(
-                            spots: data.asMap().entries
-                                .map((e) => FlSpot(e.key.toDouble(), e.value.total))
-                                .toList(),
-                            isCurved: true,
-                            color: color,
-                            barWidth: 3,
-                            dotData: FlDotData(
-                              getDotPainter: (spot, pct, bar, idx) =>
-                                FlDotCirclePainter(
-                                  radius: idx == data.length - 1 ? 5 : 3,
-                                  color: color,
-                                  strokeWidth: 2,
-                                  strokeColor: Colors.white,
-                                ),
+                      ).toList(),
+                    ),
+                  ),
+                  titlesData: FlTitlesData(
+                    bottomTitles: AxisTitles(sideTitles: SideTitles(
+                      showTitles: true,
+                      interval: period == 'month' ? 2 : 1,
+                      getTitlesWidget: (v, _) {
+                        final idx = v.toInt();
+                        if (idx < 0 || idx >= data.length) return const SizedBox();
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(data[idx].label,
+                              style: TextStyle(fontSize: 10,
+                                  color: theme.colorScheme.onSurface.withOpacity(0.5))),
+                        );
+                      },
+                    )),
+                    leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  ),
+                  gridData: FlGridData(
+                    show: true, drawVerticalLine: false,
+                    horizontalInterval: safeMax / 4,
+                    getDrawingHorizontalLine: (_) => FlLine(
+                        color: theme.colorScheme.onSurface.withOpacity(0.07), strokeWidth: 1),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: data.asMap().entries
+                          .map((e) => FlSpot(e.key.toDouble(), e.value.total))
+                          .toList(),
+                      isCurved: true,
+                      color: color,
+                      barWidth: 3,
+                      dotData: FlDotData(
+                        getDotPainter: (spot, pct, bar, idx) =>
+                            FlDotCirclePainter(
+                              radius: idx == data.length - 1 ? 5 : 3,
+                              color: color,
+                              strokeWidth: 2,
+                              strokeColor: Colors.white,
                             ),
-                            belowBarData: BarAreaData(
-                              show: true,
-                              gradient: LinearGradient(
-                                colors: [
-                                  color.withOpacity(0.3),
-                                  color.withOpacity(0.0),
-                                ],
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                              ),
-                            ),
-                          ),
-                        ],
-                      )),
+                      ),
+                      belowBarData: BarAreaData(
+                        show: true,
+                        gradient: LinearGradient(
+                          colors: [
+                            color.withOpacity(0.3),
+                            color.withOpacity(0.0),
+                          ],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                      ),
+                    ),
+                  ],
+                )),
               ),
               const SizedBox(height: 16),
               // Monthly amounts below chart
@@ -1087,17 +1184,17 @@ class _CompareTab extends StatelessWidget {
                     child: Column(
                       children: [
                         Text(e.value.label,
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: isLatest ? color : theme.colorScheme.onSurface.withOpacity(0.45),
-                            fontWeight: FontWeight.w600,
-                          )),
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: isLatest ? color : theme.colorScheme.onSurface.withOpacity(0.45),
+                              fontWeight: FontWeight.w600,
+                            )),
                         Text(AppUtils.formatAmount(e.value.total, symbol),
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: isLatest ? FontWeight.w800 : FontWeight.w600,
-                            color: isLatest ? color : theme.colorScheme.onSurface.withOpacity(0.6),
-                          )),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: isLatest ? FontWeight.w800 : FontWeight.w600,
+                              color: isLatest ? color : theme.colorScheme.onSurface.withOpacity(0.6),
+                            )),
                       ],
                     ),
                   );
@@ -1112,7 +1209,7 @@ class _CompareTab extends StatelessWidget {
 
   String _shortMonth(int m) {
     const months = ['Jan','Feb','Mar','Apr','May','Jun',
-                    'Jul','Aug','Sep','Oct','Nov','Dec'];
+      'Jul','Aug','Sep','Oct','Nov','Dec'];
     return months[m - 1];
   }
 }
@@ -1314,8 +1411,8 @@ class _IncomeOverviewTab extends StatelessWidget {
                         color: savingsRate >= 20
                             ? const Color(0xFF2ECC71)
                             : savingsRate >= 10
-                                ? const Color(0xFFFF9800)
-                                : const Color(0xFFE57373),
+                            ? const Color(0xFFFF9800)
+                            : const Color(0xFFE57373),
                       )),
                 ],
               ),
@@ -1330,8 +1427,8 @@ class _IncomeOverviewTab extends StatelessWidget {
                     savingsRate >= 20
                         ? const Color(0xFF2ECC71)
                         : savingsRate >= 10
-                            ? const Color(0xFFFF9800)
-                            : const Color(0xFFE57373),
+                        ? const Color(0xFFFF9800)
+                        : const Color(0xFFE57373),
                   ),
                 ),
               ),
@@ -1340,10 +1437,10 @@ class _IncomeOverviewTab extends StatelessWidget {
                 savingsRate >= 20
                     ? '🎉 Excellent! You save more than 20% of income.'
                     : savingsRate >= 10
-                        ? '👍 Good. Aim for 20%+ savings rate.'
-                        : savingsRate > 0
-                            ? '⚠️ Low savings rate. Try reducing expenses.'
-                            : '❌ Spending exceeds income this month.',
+                    ? '👍 Good. Aim for 20%+ savings rate.'
+                    : savingsRate > 0
+                    ? '⚠️ Low savings rate. Try reducing expenses.'
+                    : '❌ Spending exceeds income this month.',
                 style: TextStyle(
                   fontSize: 12,
                   color: theme.colorScheme.onSurface.withOpacity(0.55),
@@ -1389,8 +1486,8 @@ class _IncomeOverviewTab extends StatelessWidget {
                       getTitlesWidget: (v, _) => Padding(
                         padding: const EdgeInsets.only(top: 8),
                         child: Text(barData[v.toInt()].month,
-                          style: TextStyle(fontSize: 11,
-                            color: theme.colorScheme.onSurface.withOpacity(0.5))),
+                            style: TextStyle(fontSize: 11,
+                                color: theme.colorScheme.onSurface.withOpacity(0.5))),
                       ),
                     )),
                     leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -1401,22 +1498,22 @@ class _IncomeOverviewTab extends StatelessWidget {
                     show: true, drawVerticalLine: false,
                     horizontalInterval: safeMax / 4,
                     getDrawingHorizontalLine: (_) => FlLine(
-                      color: theme.colorScheme.onSurface.withOpacity(0.07), strokeWidth: 1),
+                        color: theme.colorScheme.onSurface.withOpacity(0.07), strokeWidth: 1),
                   ),
                   borderData: FlBorderData(show: false),
                   barGroups: barData.asMap().entries.map((e) =>
-                    BarChartGroupData(x: e.key, barRods: [
-                      BarChartRodData(
-                        toY: e.value.income, width: 10,
-                        borderRadius: BorderRadius.circular(6),
-                        color: const Color(0xFF2ECC71),
-                      ),
-                      BarChartRodData(
-                        toY: e.value.expense, width: 10,
-                        borderRadius: BorderRadius.circular(6),
-                        color: const Color(0xFFE57373),
-                      ),
-                    ]),
+                      BarChartGroupData(x: e.key, barRods: [
+                        BarChartRodData(
+                          toY: e.value.income, width: 10,
+                          borderRadius: BorderRadius.circular(6),
+                          color: const Color(0xFF2ECC71),
+                        ),
+                        BarChartRodData(
+                          toY: e.value.expense, width: 10,
+                          borderRadius: BorderRadius.circular(6),
+                          color: const Color(0xFFE57373),
+                        ),
+                      ]),
                   ).toList(),
                 )),
               ),
@@ -1438,7 +1535,7 @@ class _IncomeOverviewTab extends StatelessWidget {
 
   String _shortMonth(int m) {
     const months = ['Jan','Feb','Mar','Apr','May','Jun',
-                    'Jul','Aug','Sep','Oct','Nov','Dec'];
+      'Jul','Aug','Sep','Oct','Nov','Dec'];
     return months[m - 1];
   }
 }
@@ -1518,7 +1615,7 @@ class _IncomeBySourceTab extends StatelessWidget {
                               if (event is FlLongPressStart ||
                                   event is FlLongPressMoveUpdate) {
                                 onTouch(response?.touchedSection
-                                        ?.touchedSectionIndex ?? -1);
+                                    ?.touchedSectionIndex ?? -1);
                               } else if (event is FlLongPressEnd ||
                                   event is FlPointerExitEvent ||
                                   event is FlTapUpEvent) {
@@ -1550,13 +1647,13 @@ class _IncomeBySourceTab extends StatelessWidget {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text('${pct.toStringAsFixed(1)}%',
-                                  style: TextStyle(
-                                    fontSize: 14, fontWeight: FontWeight.w800,
-                                    color: color)),
+                                    style: TextStyle(
+                                        fontSize: 14, fontWeight: FontWeight.w800,
+                                        color: color)),
                                 Text(AppUtils.formatAmount(e.value, symbol),
-                                  style: TextStyle(
-                                    fontSize: 10, fontWeight: FontWeight.w600,
-                                    color: color.withOpacity(0.8))),
+                                    style: TextStyle(
+                                        fontSize: 10, fontWeight: FontWeight.w600,
+                                        color: color.withOpacity(0.8))),
                               ],
                             );
                           }),
@@ -1582,7 +1679,7 @@ class _IncomeBySourceTab extends StatelessWidget {
                               Container(
                                 width: 10, height: 10,
                                 decoration: BoxDecoration(
-                                  color: color, shape: BoxShape.circle),
+                                    color: color, shape: BoxShape.circle),
                               ),
                               const SizedBox(width: 8),
                               Expanded(
@@ -1590,18 +1687,18 @@ class _IncomeBySourceTab extends StatelessWidget {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(e.value.key,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: theme.colorScheme.onSurface,
-                                      ),
-                                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: theme.colorScheme.onSurface,
+                                        ),
+                                        maxLines: 1, overflow: TextOverflow.ellipsis),
                                     Text(
-                                      '${pct.toStringAsFixed(1)}% · ${AppUtils.formatAmount(e.value.value, symbol)}',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: theme.colorScheme.onSurface.withOpacity(0.5),
-                                      )),
+                                        '${pct.toStringAsFixed(1)}% · ${AppUtils.formatAmount(e.value.value, symbol)}',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: theme.colorScheme.onSurface.withOpacity(0.5),
+                                        )),
                                   ],
                                 ),
                               ),
@@ -1634,18 +1731,18 @@ class _IncomeBySourceTab extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: 10, height: 10,
-                  decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                    width: 10, height: 10,
+                    decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(e.value.key,
-                        style: TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.w600,
-                          color: theme.colorScheme.onSurface,
-                        )),
+                          style: TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w600,
+                            color: theme.colorScheme.onSurface,
+                          )),
                       const SizedBox(height: 4),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(4),
@@ -1663,10 +1760,10 @@ class _IncomeBySourceTab extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(AppUtils.formatAmount(e.value.value, symbol),
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: color)),
+                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: color)),
                     Text('${pct.toStringAsFixed(1)}%',
-                      style: TextStyle(fontSize: 11,
-                          color: theme.colorScheme.onSurface.withOpacity(0.4))),
+                        style: TextStyle(fontSize: 11,
+                            color: theme.colorScheme.onSurface.withOpacity(0.4))),
                   ],
                 ),
               ],
@@ -1755,7 +1852,7 @@ class _IncomeTrendTab extends StatelessWidget {
                     Text(
                       '${trend >= 0 ? '+' : ''}${trend.toStringAsFixed(1)}%',
                       style: const TextStyle(
-                        color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800),
+                          color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800),
                     ),
                     Text(
                       trend >= 0
@@ -1794,11 +1891,11 @@ class _IncomeTrendTab extends StatelessWidget {
                     touchTooltipData: LineTouchTooltipData(
                       tooltipRoundedRadius: 10,
                       getTooltipItems: (spots) => spots.map((s) =>
-                        LineTooltipItem(
-                          '${months[s.x.toInt()].label}\n$symbol${s.y.toStringAsFixed(0)}',
-                          const TextStyle(color: Colors.white,
-                            fontWeight: FontWeight.w700, fontSize: 12),
-                        ),
+                          LineTooltipItem(
+                            '${months[s.x.toInt()].label}\n$symbol${s.y.toStringAsFixed(0)}',
+                            const TextStyle(color: Colors.white,
+                                fontWeight: FontWeight.w700, fontSize: 12),
+                          ),
                       ).toList(),
                     ),
                   ),
@@ -1811,8 +1908,8 @@ class _IncomeTrendTab extends StatelessWidget {
                         return Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: Text(months[idx].label,
-                            style: TextStyle(fontSize: 10,
-                              color: theme.colorScheme.onSurface.withOpacity(0.5))),
+                              style: TextStyle(fontSize: 10,
+                                  color: theme.colorScheme.onSurface.withOpacity(0.5))),
                         );
                       },
                     )),
@@ -1824,7 +1921,7 @@ class _IncomeTrendTab extends StatelessWidget {
                     show: true, drawVerticalLine: false,
                     horizontalInterval: safeMax / 4,
                     getDrawingHorizontalLine: (_) => FlLine(
-                      color: theme.colorScheme.onSurface.withOpacity(0.07), strokeWidth: 1),
+                        color: theme.colorScheme.onSurface.withOpacity(0.07), strokeWidth: 1),
                   ),
                   borderData: FlBorderData(show: false),
                   lineBarsData: [
@@ -1837,12 +1934,12 @@ class _IncomeTrendTab extends StatelessWidget {
                       barWidth: 3,
                       dotData: FlDotData(
                         getDotPainter: (spot, pct, bar, idx) =>
-                          FlDotCirclePainter(
-                            radius: idx == months.length - 1 ? 5 : 3,
-                            color: const Color(0xFF2ECC71),
-                            strokeWidth: 2,
-                            strokeColor: Colors.white,
-                          ),
+                            FlDotCirclePainter(
+                              radius: idx == months.length - 1 ? 5 : 3,
+                              color: const Color(0xFF2ECC71),
+                              strokeWidth: 2,
+                              strokeColor: Colors.white,
+                            ),
                       ),
                       belowBarData: BarAreaData(
                         show: true,
@@ -1879,24 +1976,24 @@ class _IncomeTrendTab extends StatelessWidget {
                     child: Column(
                       children: [
                         Text(e.value.label,
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: isLatest
-                                ? const Color(0xFF2ECC71)
-                                : theme.colorScheme.onSurface.withOpacity(0.45),
-                            fontWeight: FontWeight.w600,
-                          )),
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: isLatest
+                                  ? const Color(0xFF2ECC71)
+                                  : theme.colorScheme.onSurface.withOpacity(0.45),
+                              fontWeight: FontWeight.w600,
+                            )),
                         Text(
-                          e.value.amount > 0
-                              ? AppUtils.formatAmount(e.value.amount, symbol)
-                              : '—',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: isLatest ? FontWeight.w800 : FontWeight.w600,
-                            color: isLatest
-                                ? const Color(0xFF2ECC71)
-                                : theme.colorScheme.onSurface.withOpacity(0.6),
-                          )),
+                            e.value.amount > 0
+                                ? AppUtils.formatAmount(e.value.amount, symbol)
+                                : '—',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: isLatest ? FontWeight.w800 : FontWeight.w600,
+                              color: isLatest
+                                  ? const Color(0xFF2ECC71)
+                                  : theme.colorScheme.onSurface.withOpacity(0.6),
+                            )),
                       ],
                     ),
                   );
@@ -1911,7 +2008,7 @@ class _IncomeTrendTab extends StatelessWidget {
 
   String _shortMonth(int m) {
     const months = ['Jan','Feb','Mar','Apr','May','Jun',
-                    'Jul','Aug','Sep','Oct','Nov','Dec'];
+      'Jul','Aug','Sep','Oct','Nov','Dec'];
     return months[m - 1];
   }
 }
@@ -1964,11 +2061,11 @@ class _StatMiniCard extends StatelessWidget {
           Icon(icon, color: color, size: 20),
           const SizedBox(height: 8),
           Text(value,
-            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: color),
-            maxLines: 1, overflow: TextOverflow.ellipsis),
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: color),
+              maxLines: 1, overflow: TextOverflow.ellipsis),
           Text(label,
-            style: TextStyle(fontSize: 11,
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5))),
+              style: TextStyle(fontSize: 11,
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5))),
         ],
       ),
     );
@@ -1984,10 +2081,10 @@ class _ChartLegend extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(children: [
       Container(width: 12, height: 12,
-        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3))),
+          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3))),
       const SizedBox(width: 6),
       Text(label, style: TextStyle(fontSize: 11,
-        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5))),
+          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5))),
     ]);
   }
 }

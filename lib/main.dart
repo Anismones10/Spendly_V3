@@ -50,7 +50,6 @@ void main() async {
   await Hive.openBox<TransferModel>('transfers');
   await Hive.openBox('settings');
   await NotificationHelper.init();
-  await NotificationHelper.init();
 
   final settingsBox = Hive.box('settings');
   final notifEnabled = settingsBox.get('notifEnabled', defaultValue: false) as bool;

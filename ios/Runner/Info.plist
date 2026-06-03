@@ -28,7 +28,7 @@
 	<true/>
 	<key>UIApplicationSceneManifest</key>
 	<key>NSFaceIDUsageDescription</key>
-	<string>Spendly uses Face ID to protect your financial data.</string>
+	<string>Use Face ID to access Spendly</string>
 
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

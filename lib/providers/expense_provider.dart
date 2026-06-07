@@ -241,6 +241,29 @@ class ExpenseProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Updates a recurring parent. If [updateInstances] is true,
+  /// also syncs name/amount/category/note/wallet on all existing instances.
+  void updateRecurringExpense(ExpenseModel expense, bool updateInstances) {
+    _box.put(expense.id, expense);
+
+    if (updateInstances) {
+      final instances = _box.values
+          .where((e) => e.recurringParentId == expense.id)
+          .toList();
+
+      for (final instance in instances) {
+        instance.name       = expense.name;
+        instance.amount     = expense.amount;
+        instance.categoryId = expense.categoryId;
+        instance.note       = expense.note;
+        instance.walletId   = expense.walletId;
+        instance.save();
+      }
+    }
+
+    notifyListeners();
+  }
+
   /// Deletes an expense. If it's a recurring parent, deletes all its instances too.
   void deleteExpense(String id) {
     final expense = _box.get(id);

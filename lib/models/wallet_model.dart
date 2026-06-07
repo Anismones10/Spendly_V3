@@ -14,13 +14,19 @@ class WalletModel extends HiveObject {
   String type; // 'cash', 'card', 'bank', 'savings'
 
   @HiveField(3)
-  double balance; // amount user currently has in this wallet
+  double balance;
 
   @HiveField(4)
   int colorValue;
 
   @HiveField(5)
   String icon;
+
+  /// If true → wallet can go negative (credit card style).
+  /// If false → expense is hard-blocked when balance is insufficient.
+  /// Defaults to true for 'card', false for everything else.
+  @HiveField(6)
+  bool allowOverdraft;
 
   WalletModel({
     required this.id,
@@ -29,5 +35,6 @@ class WalletModel extends HiveObject {
     required this.balance,
     required this.colorValue,
     this.icon = 'wallet',
-  });
+    bool? allowOverdraft,
+  }) : allowOverdraft = allowOverdraft ?? (type == 'card');
 }

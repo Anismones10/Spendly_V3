@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:hive/hive.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../utils/pin_helper.dart';
+import 'package:flutter/services.dart';
 
 class SetPinScreen extends StatefulWidget {
   final bool isChanging;
@@ -18,6 +19,9 @@ class _SetPinScreenState extends State<SetPinScreen>
 
   // Always 4 digits
   static const int _pinLength = 4;
+
+  // Eye toggle for secret word field
+  bool _obscureWord = true;
 
   // Steps: 0 = verify old (only if changing), 1 = enter new, 2 = confirm
   int    _step     = 0;
@@ -85,7 +89,7 @@ class _SetPinScreenState extends State<SetPinScreen>
     }
   }
 
-  void _onSubmit() {
+  Future<void> _onSubmit() async {
     if (_step == 0) {
       // Verify old PIN
       final savedHash = _box.get('lockPin', defaultValue: '') as String;
@@ -109,26 +113,16 @@ class _SetPinScreenState extends State<SetPinScreen>
 
     // Step 2 — confirm
     if (_entered == _firstPin) {
-      _box.put('lockPin',       hashPin(_entered));
-      _box.put('lockPinLength', _pinLength);
-      _box.put('lockEnabled',   true);
-      _box.put('lockLastActive',
-          DateTime.now().millisecondsSinceEpoch);
+      _box.put('lockPin',        hashPin(_entered));
+      _box.put('lockPinLength',  _pinLength);
+      _box.put('lockEnabled',    true);
+      _box.put('lockLastActive', DateTime.now().millisecondsSinceEpoch);
 
       HapticFeedback.lightImpact();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(widget.isChanging
-                ? 'PIN changed successfully!'
-                : 'PIN set successfully!'),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: const Color(0xFF2ECC71),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
-          ),
-        );
-        Navigator.pop(context, true);
+        // Ask user to set a secret word for PIN recovery
+        final saved = await _showSecretWordSetup();
+        if (mounted && saved) Navigator.pop(context, true);
       }
     } else {
       setState(() {
@@ -137,6 +131,173 @@ class _SetPinScreenState extends State<SetPinScreen>
       });
       _showError("PINs don't match. Try again.");
     }
+  }
+
+  Future<bool> _showSecretWordSetup() async {
+    final theme   = Theme.of(context);
+    final isDark  = theme.brightness == Brightness.dark;
+    final wordCtrl = TextEditingController();
+    final hintCtrl = TextEditingController();
+    String? error;
+
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => Dialog(
+          backgroundColor:
+              isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20)),
+          insetPadding: const EdgeInsets.symmetric(
+              horizontal: 24, vertical: 40),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Header ─────────────────────────────────────────
+                Row(
+                  children: [
+                    Container(
+                      width: 36, height: 36,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFF9800).withOpacity(0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.key_rounded,
+                          color: Color(0xFFFF9800), size: 20),
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text('Set Recovery Word',
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                const Text(
+                  'If you forget your PIN, this secret word lets you reset it without losing data.',
+                  style: TextStyle(fontSize: 13, height: 1.5),
+                ),
+                const SizedBox(height: 16),
+
+                // ── Secret word ─────────────────────────────────────
+                StatefulBuilder(
+                  builder: (_, setEye) => TextField(
+                    controller: wordCtrl,
+                    obscureText: _obscureWord,
+                    decoration: InputDecoration(
+                      labelText: 'Secret word',
+                      hintText: 'e.g. Sunshine, Pizza, MyDog',
+                      errorText: error,
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                      prefixIcon:
+                          const Icon(Icons.lock_outline_rounded),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscureWord
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                          size: 20,
+                        ),
+                        onPressed: () {
+                          setEye(() =>
+                              _obscureWord = !_obscureWord);
+                        },
+                      ),
+                    ),
+                    onChanged: (_) {
+                      final w = wordCtrl.text.trim();
+                      if (w.isNotEmpty) hintCtrl.text = buildHint(w);
+                      setLocal(() => error = null);
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // ── Hint (auto-filled, editable) ────────────────────
+                TextField(
+                  controller: hintCtrl,
+                  decoration: InputDecoration(
+                    labelText: 'Hint (shown on lock screen)',
+                    hintText: 'Auto-generated from your word',
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                    prefixIcon:
+                        const Icon(Icons.visibility_outlined),
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withOpacity(0.07),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline_rounded,
+                          size: 14, color: theme.colorScheme.primary),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          "The hint is visible on the lock screen. Don't make it too obvious.",
+                          style: TextStyle(fontSize: 11, height: 1.4),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // ── Buttons ─────────────────────────────────────────
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text('Skip'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          final word = wordCtrl.text.trim();
+                          if (word.length < 3) {
+                            setLocal(() =>
+                                error = 'At least 3 characters');
+                            return;
+                          }
+                          _box.put('secretWordHash',
+                              hashSecretWord(word));
+                          _box.put(
+                            'secretWordHint',
+                            hintCtrl.text.trim().isNotEmpty
+                                ? hintCtrl.text.trim()
+                                : buildHint(word),
+                          );
+                          Navigator.pop(ctx, true);
+                        },
+                        child: const Text('Save'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    return result ?? false;
   }
 
   void _showError(String msg) {
@@ -166,9 +327,17 @@ class _SetPinScreenState extends State<SetPinScreen>
         title: Text(widget.isChanging ? 'Change PIN' : 'Set PIN'),
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            const Spacer(),
+        child: SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: MediaQuery.of(context).size.height -
+                  MediaQuery.of(context).padding.top -
+                  MediaQuery.of(context).padding.bottom - kToolbarHeight,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(height: 24),
 
             // ── Step indicator (only when changing) ────────────────────
             if (widget.isChanging) ...[
@@ -268,7 +437,7 @@ class _SetPinScreenState extends State<SetPinScreen>
               ),
             ),
 
-            const Spacer(),
+            const SizedBox(height: 24),
 
             // ── Keypad ─────────────────────────────────────────────────
             Padding(
@@ -294,7 +463,9 @@ class _SetPinScreenState extends State<SetPinScreen>
             ),
 
             const SizedBox(height: 40),
-          ],
+              ],
+            ),
+          ),
         ),
       ),
     );

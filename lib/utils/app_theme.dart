@@ -1,166 +1,193 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  // ── Light theme colors ──────────────────────────────────────
-  static const Color lightPrimary     = Color(0xFF1E3A5F);
-  static const Color lightBackground  = Color(0xFFF5F7FA);
-  static const Color lightCard        = Color(0xFFFFFFFF);
-  static const Color lightText        = Color(0xFF1A1A1A);
-  static const Color lightIncome      = Color(0xFF2ECC71);
-  static const Color lightExpense     = Color(0xFFE57373);
+  // ── Light theme ────────────────────────────────────────────────────────────
+  static ThemeData light(Color primary) {
+    final scheme = ColorScheme.fromSeed(
+      seedColor: primary,
+      brightness: Brightness.light,
+    ).copyWith(primary: primary);
 
-  // ── Dark theme colors ───────────────────────────────────────
-  static const Color darkPrimary      = Color(0xFF4A90E2);
-  static const Color darkBackground   = Color(0xFF121212);
-  static const Color darkCard         = Color(0xFF1E1E1E);
-  static const Color darkText         = Color(0xFFEAEAEA);
-  static const Color darkIncome       = Color(0xFF27AE60);
-  static const Color darkExpense      = Color(0xFFE57373); // kept soft, same as light
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: scheme,
+      brightness: Brightness.light,
+      scaffoldBackgroundColor: const Color(0xFFF5F7FA),
+      appBarTheme: AppBarTheme(
+        backgroundColor: const Color(0xFFF5F7FA),
+        elevation: 0,
+        centerTitle: true,
+        titleTextStyle: const TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF1A1A2E),
+        ),
+        iconTheme: IconThemeData(color: primary),
+      ),
+      cardColor: Colors.white,
+      cardTheme: CardThemeData(
+        color: Colors.white,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16)),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: primary,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14)),
+          padding:
+          const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          textStyle: const TextStyle(
+              fontSize: 15, fontWeight: FontWeight.w700),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: primary,
+          side: BorderSide(color: primary),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14)),
+          padding:
+          const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.grey.shade100,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: Colors.grey.shade200),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: primary, width: 2),
+        ),
+        contentPadding:
+        const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith(
+                (s) => s.contains(WidgetState.selected) ? primary : null),
+        trackColor: WidgetStateProperty.resolveWith(
+                (s) => s.contains(WidgetState.selected)
+                ? primary.withOpacity(0.4)
+                : null),
+      ),
+      dividerTheme: const DividerThemeData(
+          color: Color(0xFFEEEEEE), thickness: 1, space: 1),
+      textTheme: const TextTheme(
+        bodyLarge:  TextStyle(color: Color(0xFF1A1A2E)),
+        bodyMedium: TextStyle(color: Color(0xFF1A1A2E)),
+        bodySmall:  TextStyle(color: Color(0xFF666680)),
+      ),
+    );
+  }
 
-  // ── Shared ──────────────────────────────────────────────────
-  static const Color incomeColor   = lightIncome;
-  static const Color expenseColor  = lightExpense;
+  // ── Dark theme ─────────────────────────────────────────────────────────────
+  static ThemeData dark(Color primary) {
+    // Lighten the primary slightly for dark mode so it pops on dark bg
+    final darkPrimary = Color.lerp(primary, Colors.white, 0.15)!;
 
-  static ThemeData get lightTheme => ThemeData(
-        useMaterial3: true,
-        scaffoldBackgroundColor: lightBackground,
-        colorScheme: const ColorScheme.light(
-          primary: lightPrimary,
-          secondary: lightIncome,
-          error: lightExpense,
-          surface: lightCard,
-          onPrimary: Colors.white,
-          onSurface: lightText,
-        ),
-        textTheme: GoogleFonts.poppinsTextTheme().apply(
-          bodyColor: lightText,
-          displayColor: lightText,
-        ),
-        appBarTheme: AppBarTheme(
-          elevation: 0,
-          centerTitle: true,
-          backgroundColor: lightBackground,
-          foregroundColor: lightText,
-          titleTextStyle: GoogleFonts.poppins(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: lightText,
-          ),
-        ),
-        cardTheme: CardThemeData(
-          elevation: 4,
-          color: lightCard,
-          shadowColor: lightPrimary.withOpacity(0.08),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: const Color(0xFFEEF1F5),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(color: lightPrimary, width: 2),
-          ),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: lightPrimary,
-            foregroundColor: Colors.white,
-            elevation: 4,
-            shadowColor: lightPrimary.withOpacity(0.35),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16)),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-            textStyle: GoogleFonts.poppins(
-                fontWeight: FontWeight.w600, fontSize: 16),
-          ),
-        ),
-        switchTheme: SwitchThemeData(
-          thumbColor: WidgetStateProperty.resolveWith(
-              (s) => s.contains(WidgetState.selected) ? lightPrimary : Colors.grey),
-          trackColor: WidgetStateProperty.resolveWith(
-              (s) => s.contains(WidgetState.selected)
-                  ? lightPrimary.withOpacity(0.4)
-                  : Colors.grey.withOpacity(0.3)),
-        ),
-      );
+    final scheme = ColorScheme.fromSeed(
+      seedColor: darkPrimary,
+      brightness: Brightness.dark,
+    ).copyWith(
+      primary: darkPrimary,
+      surface: const Color(0xFF1E1E1E),
+      background: const Color(0xFF121212),
+    );
 
-  static ThemeData get darkTheme => ThemeData(
-        useMaterial3: true,
-        scaffoldBackgroundColor: darkBackground,
-        colorScheme: const ColorScheme.dark(
-          primary: darkPrimary,
-          secondary: darkIncome,
-          error: darkExpense,
-          surface: darkCard,
-          onPrimary: Colors.white,
-          onSurface: darkText,
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: scheme,
+      brightness: Brightness.dark,
+      scaffoldBackgroundColor: const Color(0xFF121212),
+      appBarTheme: AppBarTheme(
+        backgroundColor: const Color(0xFF121212),
+        elevation: 0,
+        centerTitle: true,
+        titleTextStyle: const TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
         ),
-        textTheme: GoogleFonts.poppinsTextTheme(
-          ThemeData.dark().textTheme,
-        ).apply(
-          bodyColor: darkText,
-          displayColor: darkText,
+        iconTheme: IconThemeData(color: darkPrimary),
+      ),
+      cardColor: const Color(0xFF1E1E1E),
+      cardTheme: CardThemeData(
+        color: const Color(0xFF1E1E1E),
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16)),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: darkPrimary,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14)),
+          padding:
+          const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          textStyle: const TextStyle(
+              fontSize: 15, fontWeight: FontWeight.w700),
         ),
-        appBarTheme: AppBarTheme(
-          elevation: 0,
-          centerTitle: true,
-          backgroundColor: darkBackground,
-          foregroundColor: darkText,
-          titleTextStyle: GoogleFonts.poppins(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: darkText,
-          ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: darkPrimary,
+          side: BorderSide(color: darkPrimary),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14)),
+          padding:
+          const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
         ),
-        cardTheme: CardThemeData(
-          elevation: 4,
-          color: darkCard,
-          shadowColor: Colors.black.withOpacity(0.4),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: const Color(0xFF2A2A2A),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide.none,
         ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: const Color(0xFF2A2A2A),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(color: darkPrimary, width: 2),
-          ),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide:
+          const BorderSide(color: Color(0xFF3A3A3A)),
         ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: darkPrimary,
-            foregroundColor: Colors.white,
-            elevation: 4,
-            shadowColor: darkPrimary.withOpacity(0.35),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16)),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-            textStyle: GoogleFonts.poppins(
-                fontWeight: FontWeight.w600, fontSize: 16),
-          ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: darkPrimary, width: 2),
         ),
-        switchTheme: SwitchThemeData(
-          thumbColor: WidgetStateProperty.resolveWith(
-              (s) => s.contains(WidgetState.selected) ? darkPrimary : Colors.grey),
-          trackColor: WidgetStateProperty.resolveWith(
-              (s) => s.contains(WidgetState.selected)
-                  ? darkPrimary.withOpacity(0.4)
-                  : Colors.grey.withOpacity(0.3)),
-        ),
-      );
+        contentPadding:
+        const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith(
+                (s) => s.contains(WidgetState.selected)
+                ? darkPrimary
+                : null),
+        trackColor: WidgetStateProperty.resolveWith(
+                (s) => s.contains(WidgetState.selected)
+                ? darkPrimary.withOpacity(0.4)
+                : null),
+      ),
+      dividerTheme: const DividerThemeData(
+          color: Color(0xFF2A2A2A), thickness: 1, space: 1),
+      textTheme: const TextTheme(
+        bodyLarge:  TextStyle(color: Colors.white),
+        bodyMedium: TextStyle(color: Colors.white),
+        bodySmall:  TextStyle(color: Color(0xFFAAAAAA)),
+      ),
+    );
+  }
+
+  // ── Legacy static getters (keep for any code still using them) ─────────────
+  static ThemeData get lightTheme => light(const Color(0xFF2196F3));
+  static ThemeData get darkTheme  => dark(const Color(0xFF2196F3));
 }

@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'services/auth_service.dart';
+import 'services/sync_service.dart';
+import 'screens/login_screen.dart';
 import 'models/expense_model.dart';
 import 'models/category_model.dart';
 import 'models/goal_model.dart';
@@ -27,6 +32,12 @@ import 'utils/notification_helper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // ── Firebase init ────────────────────────────────────────────────────────
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   await Hive.initFlutter();
 
   Hive.registerAdapter(ExpenseModelAdapter());

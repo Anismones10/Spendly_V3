@@ -62,7 +62,6 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       final e = widget.existing!;
       _nameController.text = e.name;
       _amountController.text = e.amount.toString();
-      _noteController.text = e.note ?? '';
       _selectedCategoryId = e.categoryId;
       _selectedWalletId = e.walletId;
       _selectedDate = e.date;
@@ -70,6 +69,40 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       _recurringType = e.recurringType ?? 'monthly';
       if (e.timeHour != null && e.timeMinute != null) {
         _selectedTime = TimeOfDay(hour: e.timeHour!, minute: e.timeMinute!);
+      }
+
+      // ── Restore multi-items from note if it was saved as bullet list ──────
+      final note = e.note ?? '';
+      final lines = note
+          .split('\n')
+          .where((l) => l.trim().startsWith('• '))
+          .toList();
+
+      if (lines.length >= 2) {
+        // Note contains item list — restore them
+        _useItems = true;
+        for (final line in lines) {
+          final withoutBullet = line.trim().substring(2); // remove "• "
+          final lastColon = withoutBullet.lastIndexOf(': ');
+          if (lastColon != -1) {
+            final itemName   = withoutBullet.substring(0, lastColon).trim();
+            final itemAmount = withoutBullet.substring(lastColon + 2).trim();
+            final item = _ExpenseItem();
+            item.nameCtrl.text   = itemName;
+            item.amountCtrl.text = itemAmount;
+            _items.add(item);
+          }
+        }
+        // Remove item lines from note — keep any extra note text
+        final extraNote = note
+            .split('\n')
+            .where((l) => !l.trim().startsWith('• '))
+            .join('\n')
+            .trim();
+        _noteController.text = extraNote;
+      } else {
+        // Normal note — no items
+        _noteController.text = note;
       }
     } else {
       // Default time to now
@@ -269,104 +302,190 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       return;
     }
 
-    // Wallet balance check
+    // ── Wallet balance check ─────────────────────────────────────────────────
     if (_selectedWalletId != null) {
-      final remaining = _getWalletRemaining();
+      final remaining    = _getWalletRemaining();
       if (amount > remaining) {
-        final wallets = context.read<WalletProvider>();
-        final wallet = wallets.getById(_selectedWalletId!);
-        final symbol =
-            context.read<SettingsProvider>().currencySymbol;
+        final wallets      = context.read<WalletProvider>();
+        final wallet       = wallets.getById(_selectedWalletId!);
+        final symbol       = context.read<SettingsProvider>().currencySymbol;
+        final canOverdraft = wallet?.allowOverdraft ?? false;
 
-        final shouldProceed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20)),
-            title: Row(children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color:
-                      const Color(0xFFE57373).withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                    Icons.account_balance_wallet_rounded,
-                    color: Color(0xFFE57373),
-                    size: 22),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Text('Insufficient Balance',
-                    style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 17)),
-              ),
-            ]),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${wallet?.name ?? 'This wallet'} doesn\'t have enough balance.',
-                  style:
-                      const TextStyle(fontSize: 14, height: 1.5),
-                ),
-                const SizedBox(height: 12),
+        if (canOverdraft) {
+          // ── Soft warning — credit card mode ────────────────────────────
+          final shouldProceed = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20)),
+              title: Row(children: [
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE57373).withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                        color: const Color(0xFFE57373)
-                            .withOpacity(0.2)),
+                    color: const Color(0xFFFF9800).withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Column(
-                    children: [
-                      _BalanceRow(
-                          label: 'Available',
-                          value: AppUtils.formatAmount(
-                              remaining < 0 ? 0 : remaining,
-                              symbol),
-                          color: const Color(0xFF2ECC71)),
-                      const SizedBox(height: 6),
-                      _BalanceRow(
-                          label: 'This expense',
-                          value: AppUtils.formatAmount(
-                              amount, symbol),
-                          color: const Color(0xFFE57373)),
-                      const Divider(height: 14),
-                      _BalanceRow(
-                          label: 'Shortfall',
-                          value: AppUtils.formatAmount(
-                              amount -
-                                  (remaining < 0 ? 0 : remaining),
-                              symbol),
-                          color: const Color(0xFFE57373),
-                          bold: true),
-                    ],
+                  child: const Icon(Icons.credit_card_rounded,
+                      color: Color(0xFFFF9800), size: 22),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text('Balance Warning',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700, fontSize: 17)),
+                ),
+              ]),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${wallet?.name ?? 'This wallet'} will go negative.',
+                    style: const TextStyle(fontSize: 14, height: 1.5),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF9800).withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                          color: const Color(0xFFFF9800).withOpacity(0.2)),
+                    ),
+                    child: Column(
+                      children: [
+                        _BalanceRow(
+                            label: 'Available',
+                            value: AppUtils.formatAmount(
+                                remaining < 0 ? 0 : remaining, symbol),
+                            color: const Color(0xFF2ECC71)),
+                        const SizedBox(height: 6),
+                        _BalanceRow(
+                            label: 'This expense',
+                            value: AppUtils.formatAmount(amount, symbol),
+                            color: const Color(0xFFFF9800)),
+                        const Divider(height: 14),
+                        _BalanceRow(
+                            label: 'Shortfall',
+                            value: AppUtils.formatAmount(
+                                amount - (remaining < 0 ? 0 : remaining),
+                                symbol),
+                            color: const Color(0xFFE57373), bold: true),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Cancel')),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFF9800)),
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Proceed Anyway'),
+                ),
+              ],
+            ),
+          );
+          if (shouldProceed != true) return;
+
+        } else {
+          // ── Hard block — cannot proceed ────────────────────────────────
+          await showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20)),
+              title: Row(children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE57373).withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.block_rounded,
+                      color: Color(0xFFE57373), size: 22),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text('Insufficient Balance',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700, fontSize: 17)),
+                ),
+              ]),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${wallet?.name ?? 'This wallet'} doesn\'t have enough balance.',
+                    style: const TextStyle(fontSize: 14, height: 1.5),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE57373).withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                          color: const Color(0xFFE57373).withOpacity(0.2)),
+                    ),
+                    child: Column(
+                      children: [
+                        _BalanceRow(
+                            label: 'Available',
+                            value: AppUtils.formatAmount(
+                                remaining < 0 ? 0 : remaining, symbol),
+                            color: const Color(0xFF2ECC71)),
+                        const SizedBox(height: 6),
+                        _BalanceRow(
+                            label: 'This expense',
+                            value: AppUtils.formatAmount(amount, symbol),
+                            color: const Color(0xFFE57373)),
+                        const Divider(height: 14),
+                        _BalanceRow(
+                            label: 'Shortfall',
+                            value: AppUtils.formatAmount(
+                                amount - (remaining < 0 ? 0 : remaining),
+                                symbol),
+                            color: const Color(0xFFE57373), bold: true),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(children: [
+                    const Icon(Icons.info_outline_rounded,
+                        size: 14, color: Colors.grey),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Enable overdraft in wallet settings to allow this.',
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade500),
+                      ),
+                    ),
+                  ]),
+                ],
+              ),
+              actions: [
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('OK'),
                   ),
                 ),
               ],
             ),
-            actions: [
-              TextButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('Cancel')),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFE57373)),
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Save Anyway'),
-              ),
-            ],
-          ),
-        );
-        if (shouldProceed != true) return;
+          );
+          return; // hard block
+        }
       }
     }
+
 
     // Category budget overspend check
     if (_selectedCategoryId != null) {
@@ -499,7 +618,17 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
     final provider = context.read<ExpenseProvider>();
     if (widget.existing != null) {
-      provider.updateExpense(expense);
+      // If editing a recurring parent → ask user what to update
+      final isRecurringParent = expense.isRecurring &&
+          expense.recurringParentId == null;
+
+      if (isRecurringParent) {
+        final updateAll = await _showRecurringUpdateDialog();
+        if (updateAll == null) return; // user cancelled
+        provider.updateRecurringExpense(expense, updateAll);
+      } else {
+        provider.updateExpense(expense);
+      }
     } else {
       provider.addExpense(expense);
       await SoundHelper.playChaChing();
@@ -1471,6 +1600,64 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// Shows a dialog asking whether to update only the template
+  /// or also all already-generated instances.
+  /// Returns true = update all, false = template only, null = cancelled.
+  Future<bool?> _showRecurringUpdateDialog() async {
+    final theme  = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor:
+            isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              width: 36, height: 36,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withOpacity(0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.repeat_rounded,
+                  color: theme.colorScheme.primary, size: 20),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text('Update Recurring Expense',
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ),
+        content: const Text(
+          'This is a recurring template. How would you like to apply your changes?',
+          style: TextStyle(fontSize: 13, height: 1.5),
+        ),
+        actions: [
+          // Cancel
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, null),
+            child: const Text('Cancel'),
+          ),
+          // Template only
+          OutlinedButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Template only'),
+          ),
+          // Update all
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Update all'),
+          ),
+        ],
       ),
     );
   }

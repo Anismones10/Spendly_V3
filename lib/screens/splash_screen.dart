@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'onboarding_screen.dart';
-import 'main_shell.dart';
 import 'package:hive/hive.dart';
+import '../services/auth_service.dart';
+import '../services/sync_service.dart';
+import 'main_shell.dart';
+import 'login_screen.dart';
+import 'lock_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -19,132 +22,106 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _navigate() async {
-    // Wait for animations to play
-    await Future.delayed(const Duration(milliseconds: 2400));
+    // Show splash for minimum 1.5 seconds
+    await Future.delayed(const Duration(milliseconds: 1500));
     if (!mounted) return;
 
-    final box = Hive.box('settings');
-    final hasSeenOnboarding = box.get('onboardingDone', defaultValue: false);
+    // Run nightly sync if needed (non-blocking)
+    SyncService.syncIfNeeded();
 
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        pageBuilder: (_, __, ___) =>
-            hasSeenOnboarding ? const MainShell() : const OnboardingScreen(),
-        transitionsBuilder: (_, animation, __, child) => FadeTransition(
-          opacity: animation,
-          child: child,
+    // Check app lock
+    final box        = Hive.box('settings');
+    final lockEnabled = box.get('lockEnabled', defaultValue: false) as bool;
+    final hasPin      = (box.get('lockPin', defaultValue: '') as String).isNotEmpty;
+
+    if (lockEnabled && hasPin) {
+      // Show lock screen first
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => LockScreen(
+            onUnlocked: () => _goToApp(),
+          ),
         ),
-        transitionDuration: const Duration(milliseconds: 600),
-      ),
-    );
+      );
+      return;
+    }
+
+    _goToApp();
+  }
+
+  void _goToApp() {
+    if (!mounted) return;
+
+    // Check if user is logged in
+    if (AuthService.isLoggedIn) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const MainShell()),
+      );
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final theme  = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
       backgroundColor:
-          isDark ? const Color(0xFF121212) : Colors.white,
+          isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // App icon / logo — bigger, no clashing bg in dark
             Container(
-              width: 150,
-              height: 150,
-              clipBehavior: Clip.antiAlias,
+              width: 100, height: 100,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(36),
-                boxShadow: [
-                  BoxShadow(
-                    color: isDark
-                        ? Colors.black.withOpacity(0.4)
-                        : const Color(0xFF1E3A5F).withOpacity(0.15),
-                    blurRadius: 30,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
+                color: theme.colorScheme.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(
+                  color: theme.colorScheme.primary.withOpacity(0.2),
+                  width: 2,
+                ),
               ),
-              child: Image.asset(
-                isDark
-                    ? 'assets/images/logo_dark.png'
-                    : 'assets/images/logo_light.png',
-                fit: BoxFit.cover,
-                width: 150,
-                height: 150,
+              child: Icon(Icons.account_balance_wallet_rounded,
+                  color: theme.colorScheme.primary, size: 52),
+            ).animate().scale(
+                begin: const Offset(0.8, 0.8),
+                duration: 500.ms, curve: Curves.elasticOut),
+
+            const SizedBox(height: 20),
+
+            Text('Spendly',
+                style: TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w800,
+                  color: theme.colorScheme.onSurface,
+                  letterSpacing: -1,
+                )).animate().fadeIn(delay: 200.ms),
+
+            const SizedBox(height: 8),
+
+            Text('Your personal finance companion',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: theme.colorScheme.onSurface.withOpacity(0.45),
+                )).animate().fadeIn(delay: 350.ms),
+
+            const SizedBox(height: 48),
+
+            SizedBox(
+              width: 24, height: 24,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: theme.colorScheme.primary.withOpacity(0.5),
               ),
-            )
-                .animate()
-                .scale(
-                    begin: const Offset(0.5, 0.5),
-                    end: const Offset(1.0, 1.0),
-                    duration: 600.ms,
-                    curve: Curves.elasticOut)
-                .fadeIn(duration: 400.ms),
-
-            const SizedBox(height: 28),
-
-            // App name
-            Text(
-              'Spendly',
-              style: TextStyle(
-                color: isDark ? Colors.white : const Color(0xFF1E3A5F),
-                fontSize: 38,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -1,
-              ),
-            )
-                .animate()
-                .fadeIn(delay: 400.ms, duration: 500.ms)
-                .slideY(begin: 0.3, end: 0),
-
-            const SizedBox(height: 10),
-
-            // Tagline — both themes, different colors
-            Text(
-              'Track. Save. Grow.',
-              style: TextStyle(
-                color: isDark
-                    ? Colors.white.withOpacity(0.4)
-                    : const Color(0xFF1E3A5F).withOpacity(0.5),
-                fontSize: 16,
-                fontWeight: FontWeight.w400,
-                letterSpacing: 1.5,
-              ),
-            )
-                .animate()
-                .fadeIn(delay: 700.ms, duration: 500.ms)
-                .slideY(begin: 0.3, end: 0),
-
-            const SizedBox(height: 80),
-
-            // Loading dots
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(3, (i) {
-                return Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? Colors.white.withOpacity(0.4)
-                        : const Color(0xFF1E3A5F).withOpacity(0.4),
-                    shape: BoxShape.circle,
-                  ),
-                )
-                    .animate(
-                      onPlay: (controller) => controller.repeat(),
-                    )
-                    .fadeIn(delay: (900 + i * 150).ms, duration: 300.ms)
-                    .then()
-                    .fadeOut(duration: 300.ms)
-                    .then()
-                    .fadeIn(duration: 300.ms);
-              }),
-            ),
+            ).animate().fadeIn(delay: 500.ms),
           ],
         ),
       ),

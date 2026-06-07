@@ -80,13 +80,13 @@ class PdfHelper {
 
   static String _shortMonth(int m) {
     const months = ['Jan','Feb','Mar','Apr','May','Jun',
-                    'Jul','Aug','Sep','Oct','Nov','Dec'];
+      'Jul','Aug','Sep','Oct','Nov','Dec'];
     return months[m - 1];
   }
 
   static bool _inRange(DateTime date, DateTimeRange range) =>
       !date.isBefore(range.start) &&
-      date.isBefore(range.end.add(const Duration(days: 1)));
+          date.isBefore(range.end.add(const Duration(days: 1)));
 
   static PdfColor _pdfColorFromInt(int v) => PdfColor(
     ((v >> 16) & 0xFF) / 255.0,
@@ -204,7 +204,7 @@ class PdfHelper {
     await Printing.layoutPdf(
       onLayout: (_) async => doc.save(),
       name: 'Spendly_Report_' + now.year.toString() +
-            _pad(now.month) + _pad(now.day) + '.pdf',
+          _pad(now.month) + _pad(now.day) + '.pdf',
     );
   }
 
@@ -254,15 +254,15 @@ class PdfHelper {
               child: pw.Center(child: pw.Text(
                 'S',
                 style: pw.TextStyle(
-                  fontSize: 48, fontWeight: pw.FontWeight.bold, color: _navy),
+                    fontSize: 48, fontWeight: pw.FontWeight.bold, color: _navy),
               )),
             ),
             pw.SizedBox(height: 30),
             pw.Text('Spendly',
-              style: pw.TextStyle(
-                fontSize: 52, fontWeight: pw.FontWeight.bold, color: _white)),
+                style: pw.TextStyle(
+                    fontSize: 52, fontWeight: pw.FontWeight.bold, color: _white)),
             pw.Text('Financial Report',
-              style: pw.TextStyle(fontSize: 24, color: _white)),
+                style: pw.TextStyle(fontSize: 24, color: _white)),
             pw.SizedBox(height: 60),
             pw.Container(height: 1, color: PdfColors.white),
             pw.SizedBox(height: 30),
@@ -282,8 +282,8 @@ class PdfHelper {
                 borderRadius: pw.BorderRadius.circular(20),
               ),
               child: pw.Text('Track. Save. Grow.',
-                style: pw.TextStyle(
-                  fontSize: 13, color: _navy, fontWeight: pw.FontWeight.bold)),
+                  style: pw.TextStyle(
+                      fontSize: 13, color: _navy, fontWeight: pw.FontWeight.bold)),
             ),
           ],
         ),
@@ -297,13 +297,13 @@ class PdfHelper {
         pw.TextSpan(
           text: label + ' ',
           style: pw.TextStyle(
-            fontSize: 14, color: PdfColors.white,
-            fontWeight: pw.FontWeight.normal),
+              fontSize: 14, color: PdfColors.white,
+              fontWeight: pw.FontWeight.normal),
         ),
         pw.TextSpan(
           text: value,
           style: pw.TextStyle(
-            fontSize: 14, color: _white, fontWeight: pw.FontWeight.bold),
+              fontSize: 14, color: _white, fontWeight: pw.FontWeight.bold),
         ),
       ]),
     );
@@ -352,11 +352,11 @@ class PdfHelper {
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               pw.Text('Financial Summary',
-                style: pw.TextStyle(
-                  fontSize: 20, fontWeight: pw.FontWeight.bold, color: _white)),
+                  style: pw.TextStyle(
+                      fontSize: 20, fontWeight: pw.FontWeight.bold, color: _white)),
               pw.SizedBox(height: 4),
               pw.Text(dateLabel,
-                style: pw.TextStyle(fontSize: 12, color: _white)),
+                  style: pw.TextStyle(fontSize: 12, color: _white)),
             ],
           ),
         ),
@@ -669,21 +669,21 @@ class PdfHelper {
                   pw.Container(
                     width: 8, height: 8,
                     decoration: pw.BoxDecoration(
-                      color: s.color, shape: pw.BoxShape.circle),
+                        color: s.color, shape: pw.BoxShape.circle),
                   ),
                   pw.SizedBox(width: 5),
                   pw.Expanded(
                     child: pw.Text(label,
-                      style: const pw.TextStyle(fontSize: 8)),
+                        style: const pw.TextStyle(fontSize: 8)),
                   ),
                   pw.Text(pct + '%',
-                    style: pw.TextStyle(
-                      fontSize: 8,
-                      fontWeight: pw.FontWeight.bold,
-                      color: s.color)),
+                      style: pw.TextStyle(
+                          fontSize: 8,
+                          fontWeight: pw.FontWeight.bold,
+                          color: s.color)),
                   pw.SizedBox(width: 4),
                   pw.Text(amtStr,
-                    style: pw.TextStyle(fontSize: 7, color: _grey)),
+                      style: pw.TextStyle(fontSize: 7, color: _grey)),
                 ]),
               );
             }).toList(),
@@ -746,6 +746,11 @@ class PdfHelper {
   // pw.CustomPaint requires explicit width/height — without them size.x == 0.
   static const double _chartWidth = 515.0;
 
+  // Y-axis label column width
+  static const double _yAxisW   = 44.0;
+  // Chart area width = full content width minus Y-axis column
+  static const double _barAreaW = _chartWidth - _yAxisW;
+
   static pw.Widget _barChart({
     required List<MapEntry<String, double>> entries,
     required PdfColor color,
@@ -755,55 +760,37 @@ class PdfHelper {
       return pw.Text('No data to display',
           style: pw.TextStyle(color: _grey, fontSize: 10));
     }
-    final maxVal = entries.map((e) => e.value).reduce(math.max);
+    final maxVal     = entries.map((e) => e.value).reduce(math.max);
     if (maxVal == 0) return pw.SizedBox(height: 4);
 
     final totalSpent = entries.fold(0.0, (s, e) => s + e.value);
-    final symCode    = sym.trim().length >= 3
-        ? sym.trim().substring(0, 3)
-        : sym.trim();
+    const chartH     = 100.0;
 
-    // Compact formatter — used for both total and per-bar labels
-    String compact(double v) {
-      if (v <= 0) return '';
-      if (v >= 1000000) {
-        final m = v / 1000000;
-        return symCode + (m == m.truncateToDouble()
-            ? m.toInt().toString() : m.toStringAsFixed(1)) + 'M';
-      }
-      if (v >= 1000) {
-        final k = v / 1000;
-        return symCode + (k == k.truncateToDouble()
-            ? k.toInt().toString() : k.toStringAsFixed(1)) + 'k';
-      }
-      return symCode + (v == v.truncateToDouble()
-          ? v.toInt().toString() : v.toStringAsFixed(0));
-    }
+    // Round maxVal up to a clean number for Y-axis
+    final yMax = _niceMax(maxVal);
+
+    // 4 Y-axis tick values: 0, 25%, 50%, 75%, 100% of yMax
+    final yTicks = [yMax, yMax * 0.75, yMax * 0.50, yMax * 0.25, 0.0];
 
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        // ── Title row: "Daily Spending   total" ──────────────────────────
-        // NOTE: this row is NOT rendered here — the title is in _expensesSection.
-        // We render the total + legend in one row below the title.
-
-        // ── Legend + total spent on same row ─────────────────────────────
+        // ── Legend row + total spent ──────────────────────────────────────
         pw.Row(children: [
           pw.Container(width: 9, height: 9,
-            decoration: pw.BoxDecoration(color: _trackGrey)),
+              decoration: pw.BoxDecoration(color: _trackGrey)),
           pw.SizedBox(width: 4),
           pw.Text('No spending',
-            style: pw.TextStyle(fontSize: 7, color: _grey)),
+              style: pw.TextStyle(fontSize: 7, color: _grey)),
           pw.SizedBox(width: 14),
           pw.Container(width: 9, height: 9,
-            decoration: pw.BoxDecoration(color: color)),
+              decoration: pw.BoxDecoration(color: color)),
           pw.SizedBox(width: 4),
           pw.Text('Spent that day',
-            style: pw.TextStyle(fontSize: 7, color: _grey)),
+              style: pw.TextStyle(fontSize: 7, color: _grey)),
           pw.Spacer(),
-          // Total spent — shown right-aligned next to legend
           pw.Text(
-            'Total: ' + _fmt(totalSpent, sym),
+            'Total spent: ' + _fmt(totalSpent, sym),
             style: pw.TextStyle(
               fontSize: 8,
               fontWeight: pw.FontWeight.bold,
@@ -811,110 +798,192 @@ class PdfHelper {
             ),
           ),
         ]),
-        pw.SizedBox(height: 4),
+        pw.SizedBox(height: 6),
 
-        // ── Y-axis max label ──────────────────────────────────────────────
-        pw.Text(_fmt(maxVal, sym),
-          style: pw.TextStyle(fontSize: 6, color: _grey)),
+        // ── Amount labels ABOVE each bar (plain compact number) ───────────
+        pw.Row(children: [
+          // Spacer matching Y-axis column width
+          pw.SizedBox(width: _yAxisW),
+          pw.SizedBox(
+            width: _barAreaW,
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+              children: entries.map((e) => pw.Expanded(
+                child: pw.Center(
+                  child: e.value > 0
+                      ? pw.Text(
+                    _compactNum(e.value),
+                    style: pw.TextStyle(
+                      fontSize: 4.5,
+                      color: color,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                    textAlign: pw.TextAlign.center,
+                  )
+                      : pw.SizedBox(),
+                ),
+              )).toList(),
+            ),
+          ),
+        ]),
         pw.SizedBox(height: 1),
 
-        // ── Amount labels ABOVE each bar ──────────────────────────────────
+        // ── Chart body: Y-axis labels (pw.Text) + bars (CustomPaint) ────────
         pw.SizedBox(
           width: _chartWidth,
+          height: chartH,
           child: pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
-            children: entries.map((e) => pw.Expanded(
-              child: pw.Center(
-                child: e.value > 0
-                    ? pw.Text(
-                        compact(e.value),
-                        style: pw.TextStyle(
-                          fontSize: 4.8,
-                          color: color,
-                          fontWeight: pw.FontWeight.bold,
+            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+            children: [
+              // Y-axis label column
+              pw.SizedBox(
+                width: _yAxisW,
+                child: pw.Stack(
+                  children: yTicks.map((tick) {
+                    // Position each label as fraction of chartH from top
+                    final topFraction = 1.0 - (tick / yMax);
+                    return pw.Positioned(
+                      top: topFraction * chartH - 5,
+                      left: 0,
+                      right: 2,
+                      child: pw.Align(
+                        alignment: pw.Alignment.centerRight,
+                        child: pw.Text(
+                          _compactNum(tick),
+                          style: pw.TextStyle(fontSize: 5.5, color: _grey),
+                          textAlign: pw.TextAlign.right,
                         ),
-                      )
-                    : pw.SizedBox(),
-              ),
-            )).toList(),
-          ),
-        ),
-        pw.SizedBox(height: 1),
-
-        // ── Bars — fills from BOTTOM to TOP ──────────────────────────────
-        pw.SizedBox(
-          width: _chartWidth,
-          height: 100,
-          child: pw.CustomPaint(
-            painter: (canvas, size) =>
-                _drawBars(canvas, size, entries, maxVal, color),
-          ),
-        ),
-
-        // ── Day number labels BELOW bars ──────────────────────────────────
-        pw.SizedBox(height: 2),
-        pw.SizedBox(
-          width: _chartWidth,
-          child: pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
-            children: entries.map((e) => pw.Expanded(
-              child: pw.Center(
-                child: pw.Text(
-                  e.key, // "1" … "31"
-                  style: pw.TextStyle(fontSize: 5.5, color: _grey),
+                      ),
+                    );
+                  }).toList(),
                 ),
               ),
-            )).toList(),
+              // Bar area
+              pw.SizedBox(
+                width: _barAreaW,
+                height: chartH,
+                child: pw.CustomPaint(
+                  painter: (canvas, size) =>
+                      _drawBarsWithYAxis(canvas, size, entries, yMax, color, yTicks),
+                ),
+              ),
+            ],
           ),
         ),
+
+        // ── Day number labels BELOW bars (offset by yAxisW to align) ─────
+        pw.SizedBox(height: 2),
+        pw.Row(children: [
+          pw.SizedBox(width: _yAxisW),
+          pw.SizedBox(
+            width: _barAreaW,
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+              children: entries.map((e) => pw.Expanded(
+                child: pw.Center(
+                  child: pw.Text(
+                    e.key,
+                    style: pw.TextStyle(fontSize: 5.0, color: _grey),
+                  ),
+                ),
+              )).toList(),
+            ),
+          ),
+        ]),
       ],
     );
   }
 
-  // Draws grey background track + colored fill growing from BOTTOM to TOP.
-  // In the pdf canvas coordinate system Y=0 is TOP, Y=h is BOTTOM.
-  // So "fill from bottom" means: draw fill at y = (h - barH), height = barH.
-  // The grey track always fills full height so every day is visible.
-  static void _drawBars(
-    PdfGraphics canvas, PdfPoint size,
-    List<MapEntry<String, double>> entries,
-    double maxVal, PdfColor color,
-  ) {
-    final n    = entries.length;
-    if (n == 0 || maxVal == 0) return;
-    final w    = size.x;
-    final h    = size.y;
+  // Round up to a clean "nice" ceiling — makes Y-axis labels tidy
+  static double _niceMax(double val) {
+    if (val <= 0) return 100;
+    final magnitude = math.pow(10, (math.log(val) / math.ln10).floor()).toDouble();
+    final normalized = val / magnitude;
+    double nice;
+    if (normalized <= 1)      nice = 1;
+    else if (normalized <= 2) nice = 2;
+    else if (normalized <= 5) nice = 5;
+    else                      nice = 10;
+    return nice * magnitude;
+  }
+
+  // Compact number without currency code — avoids word-wrap on narrow bars
+  static String _compactNum(double v) {
+    if (v <= 0) return '';
+    if (v >= 1000000) {
+      final m = v / 1000000;
+      return (m == m.truncateToDouble()
+          ? m.toInt().toString() : m.toStringAsFixed(1)) + 'M';
+    }
+    if (v >= 1000) {
+      final k = v / 1000;
+      return (k == k.truncateToDouble()
+          ? k.toInt().toString() : k.toStringAsFixed(1)) + 'k';
+    }
+    return v == v.truncateToDouble()
+        ? v.toInt().toString()
+        : v.toStringAsFixed(0);
+  }
+
+  // Draws horizontal grid lines + bars (bottom-to-top fill) in the bar area.
+  // Y-axis labels are rendered as pw.Text widgets outside this CustomPaint.
+  static void _drawBarsWithYAxis(
+      PdfGraphics canvas, PdfPoint size,
+      List<MapEntry<String, double>> entries,
+      double yMax, PdfColor color,
+      List<double> yTicks,
+      ) {
+    final w = size.x;
+    final h = size.y;
+    final n = entries.length;
+    if (n == 0 || yMax == 0) return;
+
     final slot = w / n;
     final barW = slot * 0.6;
     final gap  = (slot - barW) / 2;
 
+    // In the pdf package canvas: Y=0 is BOTTOM, Y=h is TOP.
+    // So "fill from bottom upward" means: start at y=0, height=barH.
+    // Grid lines at tick t: y = (t / yMax) * h  (0 = bottom, h = top)
+
+    // ── Horizontal grid lines ─────────────────────────────────────────────
+    for (final tick in yTicks) {
+      final y = (tick / yMax) * h; // y=0 bottom, y=h top
+      canvas
+        ..setStrokeColor(PdfColor.fromHex('#E0E0E0'))
+        ..setLineWidth(0.4)
+        ..moveTo(0, y)
+        ..lineTo(w, y)
+        ..strokePath();
+    }
+
+    // ── Draw bars ─────────────────────────────────────────────────────────
     for (int i = 0; i < n; i++) {
       final val  = entries[i].value;
-      // barH is how tall the colored fill is (proportion of total height)
-      final barH = (val / maxVal) * h;
+      final barH = (val / yMax) * h;
       final x    = i * slot + gap;
 
-      // 1. Full-height grey track (always — represents the "empty" column)
+      // Grey full-height track — from y=0 (bottom) to y=h (top)
       canvas
         ..setFillColor(_trackGrey)
         ..drawRect(x, 0, barW, h)
         ..fillPath();
 
-      // 2. Colored fill from BOTTOM — y starts at (h - barH), grows upward
+      // Colored fill — starts at y=0 (bottom) grows upward to barH
       if (barH > 0.5) {
         canvas
           ..setFillColor(color)
-          ..drawRect(x, h - barH, barW, barH)
+          ..drawRect(x, 0, barW, barH)
           ..fillPath();
       }
     }
 
-    // Baseline at the bottom
+    // Baseline at y=0 (bottom edge)
     canvas
       ..setStrokeColor(PdfColors.grey400)
       ..setLineWidth(0.5)
-      ..moveTo(0, h)
-      ..lineTo(w, h)
+      ..moveTo(0, 0)
+      ..lineTo(w, 0)
       ..strokePath();
   }
 
@@ -932,7 +1001,7 @@ class PdfHelper {
       pw.SizedBox(
         width: labelW,
         child: pw.Text(label,
-          style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+            style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
       ),
       pw.Stack(children: [
         // FIX: use _trackGrey for background instead of color.shade()
@@ -954,8 +1023,8 @@ class PdfHelper {
       ]),
       pw.SizedBox(width: 8),
       pw.Text(amtStr,
-        style: pw.TextStyle(
-          fontSize: 9, fontWeight: pw.FontWeight.bold, color: color)),
+          style: pw.TextStyle(
+              fontSize: 9, fontWeight: pw.FontWeight.bold, color: color)),
     ]);
   }
 
@@ -975,16 +1044,16 @@ class PdfHelper {
             pw.Container(
               height: 52, width: double.infinity,
               decoration: pw.BoxDecoration(
-                color: color, borderRadius: pw.BorderRadius.circular(8)),
+                  color: color, borderRadius: pw.BorderRadius.circular(8)),
               child: pw.Center(child: pw.Text(pctStr,
-                style: pw.TextStyle(
-                  color: _white, fontSize: 18, fontWeight: pw.FontWeight.bold))),
+                  style: pw.TextStyle(
+                      color: _white, fontSize: 18, fontWeight: pw.FontWeight.bold))),
             ),
             pw.SizedBox(height: 4),
             pw.Text(lbl,
-              style: pw.TextStyle(
-                fontSize: 8, fontWeight: pw.FontWeight.bold, color: color),
-              textAlign: pw.TextAlign.center),
+                style: pw.TextStyle(
+                    fontSize: 8, fontWeight: pw.FontWeight.bold, color: color),
+                textAlign: pw.TextAlign.center),
           ]),
         ),
       );
@@ -999,31 +1068,52 @@ class PdfHelper {
         : pct >= 0.5  ? _amber : _grey;
     final savedStr  = _fmt(g.savedAmount, sym);
     final targetStr = _fmt(g.targetAmount, sym);
-    final pctStr    = (pct * 100).toStringAsFixed(1) + '%  complete';
+    final pctStr    = (pct * 100).toStringAsFixed(1) + '% complete';
 
     return pw.Padding(
-      padding: const pw.EdgeInsets.only(bottom: 12),
+      padding: const pw.EdgeInsets.only(bottom: 14),
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
+          // Name + saved/target
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              pw.Expanded(
-                child: pw.Text(g.name,
+              pw.Text(g.name,
                   style: pw.TextStyle(
-                    fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                    fontSize: 10,
+                    fontWeight: pw.FontWeight.bold,
+                    color: _navy,
+                  )),
+              pw.Text(
+                savedStr + ' / ' + targetStr,
+                style: pw.TextStyle(fontSize: 8, color: _grey),
               ),
-              pw.Text(savedStr + ' / ' + targetStr,
-                style: pw.TextStyle(fontSize: 8, color: _grey)),
             ],
           ),
-          pw.SizedBox(height: 5),
-          // FIX 3: use _progressBar() helper instead of CustomPaint+drawRRect
-          _progressBar(pct, color, height: 11),
-          pw.SizedBox(height: 3),
-          pw.Text(pctStr,
-            style: pw.TextStyle(fontSize: 8, color: color)),
+          pw.SizedBox(height: 6),
+          _progressBar(pct, color, height: 9),
+          pw.SizedBox(height: 4),
+          // Percentage left-aligned, completion status right-aligned
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text(
+                pctStr,
+                style: pw.TextStyle(
+                  fontSize: 8,
+                  color: color,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              if (g.isCompleted)
+                pw.Text(
+                  'Completed',
+                  style: pw.TextStyle(fontSize: 8, color: _green,
+                      fontWeight: pw.FontWeight.bold),
+                ),
+            ],
+          ),
         ],
       ),
     );
@@ -1031,60 +1121,102 @@ class PdfHelper {
 
   // ── FIX 3: Goal card — replace drawRRect with drawRect ────────────────────
   static pw.Widget _goalCard(GoalModel g, String sym) {
-    final pct   = g.progress.clamp(0.0, 1.0);
-    final color = g.isCompleted ? _green
+    final pct         = g.progress.clamp(0.0, 1.0);
+    final isCompleted = g.isCompleted;
+    final color       = isCompleted ? _green
         : pct >= 0.75 ? _blue
-        : pct >= 0.5  ? _amber : _grey;
-    final status   = g.isCompleted ? 'IN PROGRESS' : 'IN PROGRESS';
-    final statusLabel = g.isCompleted ? 'COMPLETED' : 'IN PROGRESS';
-    final savedStr = _fmt(g.savedAmount, sym);
-    final targStr  = _fmt(g.targetAmount, sym);
-    final remStr   = _fmt(g.remaining, sym);
-    final pctStr   = (pct * 100).toStringAsFixed(1) + '% complete';
+        : pct >= 0.5  ? _amber
+        : _grey;
+    final statusLabel = isCompleted ? 'COMPLETED' : 'IN PROGRESS';
+    // Badge color: green for completed, amber for in-progress
+    final badgeColor  = isCompleted ? _green : _amber;
+    final savedStr    = _fmt(g.savedAmount, sym);
+    final targStr     = _fmt(g.targetAmount, sym);
+    final remStr      = _fmt(g.remaining, sym);
+    final pctStr      = (pct * 100).toStringAsFixed(1) + '% complete';
 
     return pw.Container(
       margin: const pw.EdgeInsets.only(bottom: 14),
-      padding: const pw.EdgeInsets.all(14),
       decoration: pw.BoxDecoration(
-        border: pw.Border.all(color: color.shade(0.70), width: 1),
-        borderRadius: pw.BorderRadius.circular(10),
-        color: color.shade(0.95),
+        // Clean white card with a left colored accent border
+        color: _white,
+        border: pw.Border(
+          left: pw.BorderSide(color: color, width: 4),
+          top:    pw.BorderSide(color: PdfColor.fromHex('#E0E0E0'), width: 0.5),
+          right:  pw.BorderSide(color: PdfColor.fromHex('#E0E0E0'), width: 0.5),
+          bottom: pw.BorderSide(color: PdfColor.fromHex('#E0E0E0'), width: 0.5),
+        ),
       ),
+      padding: const pw.EdgeInsets.all(14),
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
+          // ── Header: name + status badge ─────────────────────────────────
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              pw.Expanded(child: pw.Text(g.name,
-                style: pw.TextStyle(
-                  fontSize: 13, fontWeight: pw.FontWeight.bold))),
+              pw.Expanded(
+                child: pw.Text(g.name,
+                    style: pw.TextStyle(
+                      fontSize: 13,
+                      fontWeight: pw.FontWeight.bold,
+                      color: _navy,
+                    )),
+              ),
+              // Clean rectangular badge — no circular radius to avoid fish shape
               pw.Container(
                 padding: const pw.EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 3),
+                    horizontal: 10, vertical: 4),
                 decoration: pw.BoxDecoration(
-                  color: color, borderRadius: pw.BorderRadius.circular(20)),
-                child: pw.Text(statusLabel,
+                  color: badgeColor,
+                  borderRadius: pw.BorderRadius.circular(4),
+                ),
+                child: pw.Text(
+                  statusLabel,
                   style: pw.TextStyle(
-                    fontSize: 8, color: _white, fontWeight: pw.FontWeight.bold)),
+                    fontSize: 8,
+                    color: _white,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
               ),
             ],
           ),
-          pw.SizedBox(height: 10),
+
+          pw.SizedBox(height: 12),
+
+          // ── Stats row ────────────────────────────────────────────────────
           pw.Row(children: [
             pw.Expanded(child: _gStat('Saved',     savedStr, _green)),
             pw.Expanded(child: _gStat('Target',    targStr,  _navy)),
             pw.Expanded(child: _gStat('Remaining', remStr,   _red)),
             if (g.deadline != null)
-              pw.Expanded(child: _gStat('Deadline',
-                  _fmtDate(g.deadline!), _amber)),
+              pw.Expanded(child: _gStat('Deadline', _fmtDate(g.deadline!), _amber)),
           ]),
-          pw.SizedBox(height: 10),
-          // FIX 3: use _progressBar() helper
-          _progressBar(pct, color, height: 14),
-          pw.SizedBox(height: 4),
-          pw.Text(pctStr,
-            style: pw.TextStyle(fontSize: 9, color: color)),
+
+          pw.SizedBox(height: 12),
+
+          // ── Progress bar ─────────────────────────────────────────────────
+          _progressBar(pct, color, height: 10),
+          pw.SizedBox(height: 5),
+
+          // ── Percentage + remaining label ─────────────────────────────────
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text(pctStr,
+                  style: pw.TextStyle(
+                    fontSize: 8,
+                    color: color,
+                    fontWeight: pw.FontWeight.bold,
+                  )),
+              if (!isCompleted)
+                pw.Text(
+                  _fmt(g.remaining, sym) + ' to go',
+                  style: pw.TextStyle(fontSize: 8, color: _grey),
+                ),
+            ],
+          ),
         ],
       ),
     );
@@ -1150,14 +1282,14 @@ class PdfHelper {
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               pw.Text(w.name,
-                style: pw.TextStyle(
-                  fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                  style: pw.TextStyle(
+                      fontSize: 11, fontWeight: pw.FontWeight.bold)),
               pw.Text(w.type.toUpperCase(),
-                style: pw.TextStyle(fontSize: 8, color: color)),
+                  style: pw.TextStyle(fontSize: 8, color: color)),
               pw.SizedBox(height: 4),
               pw.Text(balStr,
-                style: pw.TextStyle(
-                  fontSize: 13, fontWeight: pw.FontWeight.bold, color: color)),
+                  style: pw.TextStyle(
+                      fontSize: 13, fontWeight: pw.FontWeight.bold, color: color)),
             ],
           ),
         );
@@ -1167,10 +1299,10 @@ class PdfHelper {
 
   // ── Tables ─────────────────────────────────────────────────────────────────
   static pw.Widget _catTable(
-    List<MapEntry<String, double>> entries,
-    Map<String, CategoryModel> categories,
-    double total, String sym,
-  ) {
+      List<MapEntry<String, double>> entries,
+      Map<String, CategoryModel> categories,
+      double total, String sym,
+      ) {
     return pw.Table(
       border: pw.TableBorder.all(color: _light, width: 0.5),
       columnWidths: {
@@ -1202,10 +1334,10 @@ class PdfHelper {
   }
 
   static pw.Widget _expTable(
-    List<ExpenseModel> expenses,
-    Map<String, CategoryModel> categories,
-    List<WalletModel> wallets, String sym,
-  ) {
+      List<ExpenseModel> expenses,
+      Map<String, CategoryModel> categories,
+      List<WalletModel> wallets, String sym,
+      ) {
     final walletMap = {for (final w in wallets) w.id: w};
     return pw.Table(
       border: pw.TableBorder.all(color: _light, width: 0.5),
@@ -1242,9 +1374,9 @@ class PdfHelper {
   }
 
   static pw.Widget _incTable(
-    List<IncomeModel> income,
-    List<WalletModel> wallets, String sym,
-  ) {
+      List<IncomeModel> income,
+      List<WalletModel> wallets, String sym,
+      ) {
     final walletMap = {for (final w in wallets) w.id: w};
     return pw.Table(
       border: pw.TableBorder.all(color: _light, width: 0.5),
@@ -1318,8 +1450,8 @@ class PdfHelper {
         children: cols.map((h) => pw.Padding(
           padding: const pw.EdgeInsets.all(6),
           child: pw.Text(h,
-            style: pw.TextStyle(
-              fontSize: 9, fontWeight: pw.FontWeight.bold, color: _white)),
+              style: pw.TextStyle(
+                  fontSize: 9, fontWeight: pw.FontWeight.bold, color: _white)),
         )).toList(),
       );
 
@@ -1328,10 +1460,10 @@ class PdfHelper {
       pw.Padding(
         padding: const pw.EdgeInsets.all(5),
         child: pw.Text(text,
-          style: const pw.TextStyle(fontSize: 8),
-          textAlign: right  ? pw.TextAlign.right
-              : center ? pw.TextAlign.center
-              : pw.TextAlign.left),
+            style: const pw.TextStyle(fontSize: 8),
+            textAlign: right  ? pw.TextAlign.right
+                : center ? pw.TextAlign.center
+                : pw.TextAlign.left),
       );
 
   // ── Shared UI helpers ──────────────────────────────────────────────────────
@@ -1385,28 +1517,28 @@ class PdfHelper {
       pw.Container(
         padding: const pw.EdgeInsets.only(top: 6),
         decoration: pw.BoxDecoration(
-          border: pw.Border(
-              top: pw.BorderSide(color: _light, width: 1))),
+            border: pw.Border(
+                top: pw.BorderSide(color: _light, width: 1))),
         child: pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
             pw.Text(
               // FIX 1: was using non-ASCII em-dash; now plain ASCII " | "
-              'Spendly Financial Report | ' + _fmtDate(now),
-              style: pw.TextStyle(fontSize: 8, color: _grey)),
+                'Spendly Financial Report | ' + _fmtDate(now),
+                style: pw.TextStyle(fontSize: 8, color: _grey)),
             pw.Text(
-              'Page ' + ctx.pageNumber.toString() +
-              ' of ' + ctx.pagesCount.toString(),
-              style: pw.TextStyle(fontSize: 8, color: _grey)),
+                'Page ' + ctx.pageNumber.toString() +
+                    ' of ' + ctx.pagesCount.toString(),
+                style: pw.TextStyle(fontSize: 8, color: _grey)),
           ],
         ),
       );
 
   // ── Slice helpers ──────────────────────────────────────────────────────────
   static List<_Slice> _toSlices(
-    List<MapEntry<String, double>> entries,
-    Map<String, CategoryModel> categories,
-  ) {
+      List<MapEntry<String, double>> entries,
+      Map<String, CategoryModel> categories,
+      ) {
     return entries.asMap().entries.map((e) => _Slice(
       label: categories[e.value.key]?.name ?? e.value.key,
       value: e.value.value,

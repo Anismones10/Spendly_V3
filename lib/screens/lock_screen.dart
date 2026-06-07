@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:hive/hive.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../utils/pin_helper.dart';
+import 'set_pin_screen.dart';
 import '../utils/biometric_service.dart';
 
 class LockScreen extends StatefulWidget {
@@ -62,7 +63,7 @@ class _LockScreenState extends State<LockScreen>
 
   Future<void> _initBiometric() async {
     final bioEnabled =
-        _box.get('lockBiometric', defaultValue: true) as bool;
+    _box.get('lockBiometric', defaultValue: true) as bool;
     if (!bioEnabled) return;
 
     final available = await BiometricService.isAvailable();
@@ -132,9 +133,9 @@ class _LockScreenState extends State<LockScreen>
   void _onError() {
     HapticFeedback.heavyImpact();
     Future.delayed(const Duration(milliseconds: 80),
-        () => HapticFeedback.heavyImpact());
+            () => HapticFeedback.heavyImpact());
     Future.delayed(const Duration(milliseconds: 160),
-        () => HapticFeedback.heavyImpact());
+            () => HapticFeedback.heavyImpact());
 
     setState(() => _pinState = _PinState.error);
     _resultCtrl.forward(from: 0);
@@ -156,92 +157,122 @@ class _LockScreenState extends State<LockScreen>
 
     return Scaffold(
       backgroundColor:
-          isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
+      isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
       body: SafeArea(
-        child: Column(
-          children: [
-            const Spacer(),
+        child: SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: MediaQuery.of(context).size.height -
+                  MediaQuery.of(context).padding.top -
+                  MediaQuery.of(context).padding.bottom,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(height: 32),
 
-            Container(
-              width: 80, height: 80,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: theme.colorScheme.primary.withOpacity(0.2),
-                  width: 1.5),
-              ),
-              child: Icon(Icons.account_balance_wallet_rounded,
-                  color: theme.colorScheme.primary, size: 38),
-            ).animate().scale(
-                begin: const Offset(0.8, 0.8),
-                duration: 400.ms, curve: Curves.elasticOut),
+                Container(
+                  width: 80, height: 80,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                        color: theme.colorScheme.primary.withOpacity(0.2),
+                        width: 1.5),
+                  ),
+                  child: Icon(Icons.account_balance_wallet_rounded,
+                      color: theme.colorScheme.primary, size: 38),
+                ).animate().scale(
+                    begin: const Offset(0.8, 0.8),
+                    duration: 400.ms, curve: Curves.elasticOut),
 
-            const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-            Text('Spendly',
-                style: TextStyle(
-                    fontSize: 28, fontWeight: FontWeight.w800,
-                    color: theme.colorScheme.onSurface,
-                    letterSpacing: -0.5))
-                .animate().fadeIn(delay: 100.ms),
+                Text('Spendly',
+                    style: TextStyle(
+                        fontSize: 28, fontWeight: FontWeight.w800,
+                        color: theme.colorScheme.onSurface,
+                        letterSpacing: -0.5))
+                    .animate().fadeIn(delay: 100.ms),
 
-            const SizedBox(height: 8),
+                const SizedBox(height: 8),
 
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              child: Text(
-                key: ValueKey(_pinState),
-                _pinState == _PinState.error
-                    ? 'Incorrect PIN. Try again.'
-                    : _pinState == _PinState.success
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: Text(
+                    key: ValueKey(_pinState),
+                    _pinState == _PinState.error
+                        ? 'Incorrect PIN. Try again.'
+                        : _pinState == _PinState.success
                         ? 'Unlocked!'
                         : 'Enter your PIN to continue',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: _pinState != _PinState.idle
-                      ? FontWeight.w600 : FontWeight.w400,
-                  color: _pinState == _PinState.error
-                      ? const Color(0xFFE57373)
-                      : _pinState == _PinState.success
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: _pinState != _PinState.idle
+                          ? FontWeight.w600 : FontWeight.w400,
+                      color: _pinState == _PinState.error
+                          ? const Color(0xFFE57373)
+                          : _pinState == _PinState.success
                           ? const Color(0xFF2ECC71)
                           : theme.colorScheme.onSurface.withOpacity(0.5),
-                ),
-              ),
-            ).animate().fadeIn(delay: 150.ms),
+                    ),
+                  ),
+                ).animate().fadeIn(delay: 150.ms),
 
-            const SizedBox(height: 48),
+                const SizedBox(height: 48),
 
-            _buildPinIndicator(theme),
+                _buildPinIndicator(theme),
 
-            const Spacer(),
+                const SizedBox(height: 32),
 
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 48),
-              child: Column(
-                children: [
-                  _keyRow(['1', '2', '3'], theme, isDark),
-                  const SizedBox(height: 14),
-                  _keyRow(['4', '5', '6'], theme, isDark),
-                  const SizedBox(height: 14),
-                  _keyRow(['7', '8', '9'], theme, isDark),
-                  const SizedBox(height: 14),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 48),
+                  child: Column(
                     children: [
-                      _biometricAvailable
-                          ? _bioKey(theme)
-                          : const SizedBox(width: 72, height: 72),
-                      _numKey('0', theme, isDark),
-                      _backKey(theme),
+                      _keyRow(['1', '2', '3'], theme, isDark),
+                      const SizedBox(height: 14),
+                      _keyRow(['4', '5', '6'], theme, isDark),
+                      const SizedBox(height: 14),
+                      _keyRow(['7', '8', '9'], theme, isDark),
+                      const SizedBox(height: 14),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _biometricAvailable
+                              ? _bioKey(theme)
+                              : const SizedBox(width: 72, height: 72),
+                          _numKey('0', theme, isDark),
+                          _backKey(theme),
+                        ],
+                      ),
                     ],
                   ),
-                ],
-              ),
-            ),
+                ),
 
-            const SizedBox(height: 40),
-          ],
+                const SizedBox(height: 16),
+
+                // ── Forgot PIN? ────────────────────────────────────────────
+                GestureDetector(
+                  onTap: () => _showForgotPin(context),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      'Forgot PIN?',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: theme.colorScheme.onSurface.withOpacity(0.4),
+                        decoration: TextDecoration.underline,
+                        decorationColor:
+                        theme.colorScheme.onSurface.withOpacity(0.4),
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -251,7 +282,7 @@ class _LockScreenState extends State<LockScreen>
     if (_pinState == _PinState.success || _pinState == _PinState.error) {
       final isSuccess = _pinState == _PinState.success;
       final color =
-          isSuccess ? const Color(0xFF2ECC71) : const Color(0xFFE57373);
+      isSuccess ? const Color(0xFF2ECC71) : const Color(0xFFE57373);
       return ScaleTransition(
         scale: _resultScale,
         child: Container(
@@ -262,8 +293,8 @@ class _LockScreenState extends State<LockScreen>
             border: Border.all(color: color, width: 2.5),
           ),
           child: Icon(
-            isSuccess ? Icons.check_rounded : Icons.close_rounded,
-            color: color, size: 38),
+              isSuccess ? Icons.check_rounded : Icons.close_rounded,
+              color: color, size: 38),
         ),
       );
     }
@@ -271,7 +302,7 @@ class _LockScreenState extends State<LockScreen>
     return AnimatedBuilder(
       animation: _shakeAnim,
       builder: (_, child) => Transform.translate(
-        offset: Offset(_shakeAnim.value, 0), child: child),
+          offset: Offset(_shakeAnim.value, 0), child: child),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: List.generate(_pinLength, (i) {
@@ -287,8 +318,8 @@ class _LockScreenState extends State<LockScreen>
                   : theme.colorScheme.onSurface.withOpacity(0.15),
               boxShadow: filled
                   ? [BoxShadow(
-                      color: theme.colorScheme.primary.withOpacity(0.45),
-                      blurRadius: 10)]
+                  color: theme.colorScheme.primary.withOpacity(0.45),
+                  blurRadius: 10)]
                   : null,
             ),
           );
@@ -316,13 +347,13 @@ class _LockScreenState extends State<LockScreen>
           shape: BoxShape.circle,
           color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           boxShadow: [BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 10, offset: const Offset(0, 3))],
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 10, offset: const Offset(0, 3))],
         ),
         child: Center(child: Text(digit,
-          style: TextStyle(
-            fontSize: 24, fontWeight: FontWeight.w600,
-            color: theme.colorScheme.onSurface))),
+            style: TextStyle(
+                fontSize: 24, fontWeight: FontWeight.w600,
+                color: theme.colorScheme.onSurface))),
       ),
     );
   }
@@ -335,9 +366,9 @@ class _LockScreenState extends State<LockScreen>
         _onKey('⌫');
       },
       child: SizedBox(width: 72, height: 72,
-        child: Center(child: Icon(Icons.backspace_outlined,
-          color: theme.colorScheme.onSurface.withOpacity(0.6),
-          size: 24))),
+          child: Center(child: Icon(Icons.backspace_outlined,
+              color: theme.colorScheme.onSurface.withOpacity(0.6),
+              size: 24))),
     );
   }
 
@@ -345,11 +376,265 @@ class _LockScreenState extends State<LockScreen>
     return GestureDetector(
       onTap: _tryBiometric,
       child: SizedBox(width: 72, height: 72,
-        child: Center(child: Icon(
-          _bioIcon == BioIcon.face
-              ? Icons.face_rounded
-              : Icons.fingerprint_rounded,
-          color: theme.colorScheme.primary, size: 36))),
+          child: Center(child: Icon(
+              _bioIcon == BioIcon.face
+                  ? Icons.face_rounded
+                  : Icons.fingerprint_rounded,
+              color: theme.colorScheme.primary, size: 36))),
+    );
+  }
+
+  // ── Forgot PIN flow ───────────────────────────────────────────────────────
+  void _showForgotPin(BuildContext context) {
+    final theme  = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius:
+          const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: EdgeInsets.fromLTRB(
+            24, 16, 24, MediaQuery.of(ctx).padding.bottom + 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2)),
+            ),
+            const SizedBox(height: 20),
+            const Text('Forgot PIN?',
+                style: TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 6),
+            Text('Choose a recovery option',
+                style: TextStyle(
+                    fontSize: 13,
+                    color: theme.colorScheme.onSurface.withOpacity(0.5))),
+            const SizedBox(height: 24),
+
+            // Secret word recovery
+            _RecoveryOption(
+              icon: Icons.key_rounded,
+              color: const Color(0xFFFF9800),
+              title: 'Use Secret Word',
+              subtitle: 'Enter the secret word you set when creating your PIN',
+              onTap: () {
+                Navigator.pop(ctx);
+                _showSecretWordInput(context);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Recovery Code input ────────────────────────────────────────────────────
+  void _showSecretWordInput(BuildContext context) {
+    final theme  = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final ctrl   = TextEditingController();
+    String? errorMsg;
+    bool obscureWord = true;
+    final hint   = _box.get('secretWordHint', defaultValue: '') as String;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => Dialog(
+          backgroundColor:
+          isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20)),
+          insetPadding: const EdgeInsets.symmetric(
+              horizontal: 24, vertical: 40),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Enter Secret Word',
+                    style: TextStyle(
+                        fontSize: 17, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 16),
+
+                // Hint
+                if (hint.isNotEmpty)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    margin: const EdgeInsets.only(bottom: 14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF9800).withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                          color: const Color(0xFFFF9800).withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.lightbulb_outline_rounded,
+                            color: Color(0xFFFF9800), size: 16),
+                        const SizedBox(width: 8),
+                        Text('Hint: $hint',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFFFF9800),
+                            )),
+                      ],
+                    ),
+                  ),
+
+                TextField(
+                  controller: ctrl,
+                  obscureText: obscureWord,
+                  decoration: InputDecoration(
+                    labelText: 'Secret word',
+                    errorText: errorMsg,
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        obscureWord
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                        size: 20,
+                      ),
+                      // setLocal rebuilds the whole dialog → obscureWord persists
+                      onPressed: () =>
+                          setLocal(() => obscureWord = !obscureWord),
+                    ),
+                  ),
+                  onChanged: (_) =>
+                      setLocal(() => errorMsg = null),
+                ),
+                const SizedBox(height: 20),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          final stored = _box.get('secretWordHash',
+                              defaultValue: '') as String;
+                          if (verifySecretWord(ctrl.text, stored)) {
+                            Navigator.pop(ctx);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const SetPinScreen()),
+                            );
+                          } else {
+                            setLocal(() => errorMsg =
+                            'Incorrect word. Try again.');
+                          }
+                        },
+                        child: const Text('Verify'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Reset PIN with secret word ───────────────────────────────────────────────
+  void _showResetConfirm(BuildContext context) {
+    // This option is now handled by _showSecretWordInput
+    _showSecretWordInput(context);
+  }
+
+} // end _LockScreenState
+
+// ── Recovery option tile ───────────────────────────────────────────────────────
+class _RecoveryOption extends StatelessWidget {
+  final IconData icon;
+  final Color    color;
+  final String   title;
+  final String   subtitle;
+  final VoidCallback onTap;
+
+  const _RecoveryOption({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme  = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark
+              ? const Color(0xFF2A2A2A)
+              : Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+              color: color.withOpacity(0.2), width: 1.5),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42, height: 42,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 3),
+                  Text(subtitle,
+                      style: TextStyle(
+                          fontSize: 12,
+                          height: 1.4,
+                          color: theme.colorScheme.onSurface
+                              .withOpacity(0.5))),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded,
+                color: theme.colorScheme.onSurface.withOpacity(0.3),
+                size: 20),
+          ],
+        ),
+      ),
     );
   }
 }

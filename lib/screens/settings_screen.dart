@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:hive/hive.dart';
 import 'package:local_auth/local_auth.dart';
@@ -22,13 +23,16 @@ import 'notification_settings_screen.dart';
 import '../utils/category_icons.dart';
 import '../models/category_model.dart';
 import '../utils/app_utils.dart';
+import '../utils/app_theme.dart';
+import '../utils/pin_helper.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final settings = context.watch<SettingsProvider>();
+    // Use read so toggling switches does NOT rebuild the whole screen
+    final settings = context.read<SettingsProvider>();
     final theme    = Theme.of(context);
     final isDark   = theme.brightness == Brightness.dark;
 
@@ -41,163 +45,166 @@ class SettingsScreen extends StatelessWidget {
         title: const Text('Settings'),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
+
+          // ── General ───────────────────────────────────────────────────
+          _ExpandableSection(
+            icon: Icons.tune_rounded,
+            title: 'General',
+            color: const Color(0xFF5C6BC0),
+            initiallyExpanded: false,
+            children: [
+              _SettingTile(
+                icon: Icons.dark_mode_rounded,
+                title: 'Dark Mode',
+                trailing: _SmoothSwitch(hiveKey: 'darkMode', defaultValue: false, onToggle: () => settings.toggleDarkMode()),
+              ),
+              _SettingTile(
+                icon: Icons.volume_up_rounded,
+                title: 'Sound Effects',
+                trailing: _SmoothSwitch(hiveKey: 'soundEnabled', defaultValue: true, onToggle: () => settings.toggleSound()),
+              ),
+              _SettingTile(
+                icon: Icons.vibration_rounded,
+                title: 'Haptic Feedback',
+                trailing: _SmoothSwitch(hiveKey: 'hapticEnabled', defaultValue: true, onToggle: () => settings.toggleHaptic()),
+              ),
+              Consumer<SettingsProvider>(
+                builder: (ctx, s, _) => _SettingTile(
+                  icon: Icons.currency_exchange_rounded,
+                  title: 'Currency',
+                  subtitle: s.currency,
+                  onTap: () => _pickCurrency(ctx, s),
+                ),
+              ),
+              // ── Color theme picker ─────────────────────────────────────
+              Consumer<SettingsProvider>(
+                builder: (_, s, __) => _ColorThemeTile(settings: s),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
           // ── Notifications ─────────────────────────────────────────────
-          _SectionHeader('Notifications'),
-          _SettingTile(
+          _ExpandableSection(
             icon: Icons.notifications_rounded,
             title: 'Notifications',
-            subtitle: 'Reminders, alerts and summaries',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => const NotificationSettingsScreen()),
-            ),
+            color: const Color(0xFFEF6C00),
+            children: [
+              _SettingTile(
+                icon: Icons.notifications_active_rounded,
+                title: 'Notification Settings',
+                subtitle: 'Reminders, budget alerts & weekly summary',
+                onTap: () => Navigator.push(context,
+                  MaterialPageRoute(
+                    builder: (_) => const NotificationSettingsScreen())),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
 
           // ── Security ──────────────────────────────────────────────────
-          _SectionHeader('Security'),
-          const _SecuritySection(),
-          const SizedBox(height: 16),
-
-          // ── Appearance ────────────────────────────────────────────────
-          _SectionHeader('Appearance'),
-          _SettingTile(
-            icon: Icons.dark_mode_rounded,
-            title: 'Dark Mode',
-            trailing: Switch.adaptive(
-              value: settings.isDarkMode,
-              onChanged: (_) => settings.toggleDarkMode(),
-            ),
+          _ExpandableSection(
+            icon: Icons.security_rounded,
+            title: 'Security',
+            color: const Color(0xFF26A69A),
+            children: const [_SecuritySection()],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
 
-          // ── Sound ─────────────────────────────────────────────────────
-          _SectionHeader('Sound'),
-          _SettingTile(
-            icon: Icons.volume_up_rounded,
-            title: 'Sound Effects',
-            trailing: Switch.adaptive(
-              value: settings.soundEnabled,
-              onChanged: (_) => settings.toggleSound(),
-            ),
-          ),
-          _SettingTile(
-            icon: Icons.vibration_rounded,
-            title: 'Haptic Feedback',
-            trailing: Switch.adaptive(
-              value: settings.hapticEnabled,
-              onChanged: (_) => settings.toggleHaptic(),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // ── Currency ──────────────────────────────────────────────────
-          _SectionHeader('Currency'),
-          _SettingTile(
-            icon: Icons.currency_exchange_rounded,
-            title: 'Currency',
-            subtitle: settings.currency,
-            onTap: () => _pickCurrency(context, settings),
-          ),
-          const SizedBox(height: 16),
-
-          // ── Wallets ───────────────────────────────────────────────────
-          _SectionHeader('Wallets'),
-          _SettingTile(
+          // ── Wallets & Budget ──────────────────────────────────────────
+          _ExpandableSection(
             icon: Icons.account_balance_wallet_rounded,
-            title: 'Manage Wallets',
-            subtitle: 'Cash, Card, Bank accounts',
-            onTap: () => _manageWallets(context),
+            title: 'Wallets & Budget',
+            color: const Color(0xFF42A5F5),
+            children: [
+              _SettingTile(
+                icon: Icons.account_balance_wallet_rounded,
+                title: 'Manage Wallets',
+                subtitle: 'Cash, Card, Bank accounts',
+                onTap: () => _manageWallets(context),
+              ),
+              _SettingTile(
+                icon: Icons.swap_horiz_rounded,
+                title: 'Transfer Between Wallets',
+                subtitle: 'Move money from one wallet to another',
+                onTap: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const TransferScreen())),
+              ),
+              _SettingTile(
+                icon: Icons.pie_chart_rounded,
+                title: 'Category Budgets',
+                subtitle: 'Set spending limits per category',
+                onTap: () => _manageCategoryBudgets(context),
+              ),
+              _SettingTile(
+                icon: Icons.category_rounded,
+                title: 'Manage Categories',
+                onTap: () => _manageCategories(context),
+              ),
+            ],
           ),
-          _SettingTile(
-            icon: Icons.swap_horiz_rounded,
-            title: 'Transfer Between Wallets',
-            subtitle: 'Move money from one wallet to another',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const TransferScreen()),
-            ),
-          ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
 
-          // ── Budget ────────────────────────────────────────────────────
-          _SectionHeader('Budget'),
-          _SettingTile(
-            icon: Icons.pie_chart_rounded,
-            title: 'Category Budgets',
-            subtitle: 'Set spending limits per category',
-            onTap: () => _manageCategoryBudgets(context),
-          ),
-          const SizedBox(height: 16),
-
-          // ── Categories ────────────────────────────────────────────────
-          _SectionHeader('Categories'),
-          _SettingTile(
-            icon: Icons.category_rounded,
-            title: 'Manage Categories',
-            onTap: () => _manageCategories(context),
-          ),
-          const SizedBox(height: 16),
-
-          // ── Data ──────────────────────────────────────────────────────
-          _SectionHeader('Data'),
-          _SettingTile(
-            icon: Icons.picture_as_pdf_rounded,
-            title: 'Export PDF Report',
-            subtitle: 'Full report with charts, pies & tables',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ExportScreen()),
-            ),
-          ),
-          _SettingTile(
-            icon: Icons.download_rounded,
-            title: 'Export Expenses (CSV)',
-            subtitle: 'Save expenses as CSV',
-            onTap: () async {
-              final expenses   = context.read<ExpenseProvider>();
-              final categories = context.read<CategoryProvider>();
-              final catMap = {
-                for (final c in categories.categories) c.id: c
-              };
-              await CsvHelper.exportExpenses(
-                  expenses.allExpenses, catMap, settings.currencySymbol);
-            },
-          ),
-          _SettingTile(
-            icon: Icons.download_rounded,
-            title: 'Export Income (CSV)',
-            subtitle: 'Save income as CSV',
-            onTap: () async {
-              final income = context.read<IncomeProvider>();
-              await CsvHelper.exportIncome(
-                  income.allIncome, settings.currencySymbol);
-            },
-          ),
-          _SettingTile(
-            icon: Icons.download_rounded,
-            title: 'Export Loans (CSV)',
-            subtitle: 'Save lending & borrowing as CSV',
-            onTap: () async {
-              final loans = context.read<LoanProvider>();
-              await CsvHelper.exportLoans(
-                  loans.allLoans, settings.currencySymbol);
-            },
-          ),
-          _SettingTile(
-            icon: Icons.download_for_offline_rounded,
-            title: 'Export All Data (CSV)',
-            subtitle: 'Expenses + Income + Loans in one file',
-            onTap: () async {
-              final expenses   = context.read<ExpenseProvider>();
-              final categories = context.read<CategoryProvider>();
-              final income     = context.read<IncomeProvider>();
-              final loans      = context.read<LoanProvider>();
-              final catMap = {
-                for (final c in categories.categories) c.id: c
+          // ── Export ────────────────────────────────────────────────────
+          _ExpandableSection(
+            icon: Icons.ios_share_rounded,
+            title: 'Export',
+            color: const Color(0xFF66BB6A),
+            children: [
+              _SettingTile(
+                icon: Icons.picture_as_pdf_rounded,
+                title: 'Export PDF Report',
+                subtitle: 'Full report with charts, pies & tables',
+                onTap: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const ExportScreen())),
+              ),
+              _SettingTile(
+                icon: Icons.receipt_long_rounded,
+                title: 'Export Expenses (CSV)',
+                subtitle: 'Save expenses as spreadsheet',
+                onTap: () async {
+                  final expenses   = context.read<ExpenseProvider>();
+                  final categories = context.read<CategoryProvider>();
+                  final catMap = {
+                    for (final c in categories.categories) c.id: c
+                  };
+                  await CsvHelper.exportExpenses(
+                      expenses.allExpenses, catMap, settings.currencySymbol);
+                },
+              ),
+              _SettingTile(
+                icon: Icons.trending_up_rounded,
+                title: 'Export Income (CSV)',
+                subtitle: 'Save income as spreadsheet',
+                onTap: () async {
+                  final income = context.read<IncomeProvider>();
+                  await CsvHelper.exportIncome(
+                      income.allIncome, settings.currencySymbol);
+                },
+              ),
+              _SettingTile(
+                icon: Icons.handshake_rounded,
+                title: 'Export Loans (CSV)',
+                subtitle: 'Save lending & borrowing as spreadsheet',
+                onTap: () async {
+                  final loans = context.read<LoanProvider>();
+                  await CsvHelper.exportLoans(
+                      loans.allLoans, settings.currencySymbol);
+                },
+              ),
+              _SettingTile(
+                icon: Icons.download_for_offline_rounded,
+                title: 'Export All Data (CSV)',
+                subtitle: 'Expenses + Income + Loans in one file',
+                onTap: () async {
+                  final expenses   = context.read<ExpenseProvider>();
+                  final categories = context.read<CategoryProvider>();
+                  final income     = context.read<IncomeProvider>();
+                  final loans      = context.read<LoanProvider>();
+                  final catMap = {
+                    for (final c in categories.categories) c.id: c
               };
               await CsvHelper.exportAll(
                 expenses.allExpenses,
@@ -208,24 +215,41 @@ class SettingsScreen extends StatelessWidget {
               );
             },
           ),
-          _SettingTile(
-            icon: Icons.delete_forever_rounded,
-            title: 'Clear All Data',
-            titleColor: Colors.red,
-            onTap: () => _confirmClear(context),
+            ],
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 10),
+
+          // ── Data ──────────────────────────────────────────────────────
+          _ExpandableSection(
+            icon: Icons.storage_rounded,
+            title: 'Data',
+            color: const Color(0xFFEF5350),
+            children: [
+              _SettingTile(
+                icon: Icons.delete_forever_rounded,
+                title: 'Clear All Data',
+                subtitle: 'Permanently delete everything',
+                titleColor: Colors.red,
+                onTap: () => _confirmClear(context),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
 
           // ── About ─────────────────────────────────────────────────────
-          _SectionHeader('About'),
-          _SettingTile(
+          _ExpandableSection(
             icon: Icons.info_outline_rounded,
-            title: 'About Spendly',
-            subtitle: 'Version 1.1.0 · Made by Mones',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AboutScreen()),
-            ),
+            title: 'About',
+            color: const Color(0xFF78909C),
+            children: [
+              _SettingTile(
+                icon: Icons.info_outline_rounded,
+                title: 'About Spendly',
+                subtitle: 'Version 1.1.0 · Made by Mones',
+                onTap: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const AboutScreen())),
+              ),
+            ],
           ),
           const SizedBox(height: 32),
 
@@ -320,24 +344,155 @@ class _SecuritySectionState extends State<_SecuritySection> {
 
   Future<void> _toggleLock(bool value) async {
     if (value) {
+      // Enabling lock → go set a PIN
       final result = await Navigator.push<bool>(
         context,
         MaterialPageRoute(builder: (_) => const SetPinScreen()),
       );
       if (result == true) setState(() {});
     } else {
-      // Must verify PIN before disabling
-      final result = await Navigator.push<bool>(
-        context,
-        MaterialPageRoute(
-            builder: (_) => const SetPinScreen(isChanging: true)),
-      );
-      if (result == true) {
+      // Disabling lock → just verify current PIN with a simple dialog
+      final verified = await _verifyPinDialog();
+      if (verified) {
         _box.put('lockEnabled', false);
         _box.put('lockPin', '');
         setState(() {});
       }
     }
+  }
+
+  /// Simple 4-dot PIN entry dialog — only verifies, no extra steps
+  Future<bool> _verifyPinDialog() async {
+    final theme  = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    String entered = '';
+    String? errorMsg;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          void onKey(String key) {
+            if (key == '⌫') {
+              if (entered.isNotEmpty) {
+                setLocal(() => entered =
+                    entered.substring(0, entered.length - 1));
+              }
+              return;
+            }
+            if (entered.length >= 4) return;
+            setLocal(() { entered += key; errorMsg = null; });
+
+            if (entered.length == 4) {
+              final saved = _box.get('lockPin', defaultValue: '') as String;
+              if (hashPin(entered) == saved) {
+                Navigator.pop(ctx, true);
+              } else {
+                setLocal(() { errorMsg = 'Incorrect PIN'; entered = ''; });
+              }
+            }
+          }
+
+          return Dialog(
+            backgroundColor:
+                isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20)),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Enter your PIN',
+                      style: TextStyle(
+                          fontSize: 17, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 6),
+                  Text('Confirm to disable app lock',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: theme.colorScheme.onSurface.withOpacity(0.5),
+                      )),
+                  const SizedBox(height: 24),
+
+                  // 4 dots
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(4, (i) {
+                      final filled = i < entered.length;
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        margin: const EdgeInsets.symmetric(horizontal: 10),
+                        width: 16, height: 16,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: errorMsg != null
+                              ? Colors.red
+                              : filled
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.onSurface
+                                      .withOpacity(0.15),
+                        ),
+                      );
+                    }),
+                  ),
+
+                  if (errorMsg != null) ...[
+                    const SizedBox(height: 8),
+                    Text(errorMsg!,
+                        style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600)),
+                  ],
+
+                  const SizedBox(height: 20),
+
+                  // Mini keypad
+                  ...[ ['1','2','3'], ['4','5','6'], ['7','8','9'] ]
+                      .map((row) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: row.map((d) => _MiniKey(
+                            digit: d,
+                            onTap: () => onKey(d),
+                          )).toList(),
+                        ),
+                      )),
+
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(width: 64),
+                      const SizedBox(width: 12),
+                      _MiniKey(digit: '0', onTap: () => onKey('0')),
+                      const SizedBox(width: 12),
+                      SizedBox(
+                        width: 64, height: 48,
+                        child: IconButton(
+                          onPressed: () => onKey('⌫'),
+                          icon: Icon(Icons.backspace_outlined,
+                              color: theme.colorScheme.onSurface
+                                  .withOpacity(0.6),
+                              size: 20),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Cancel'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+    return result ?? false;
   }
 
   Future<void> _changePin() async {
@@ -1023,6 +1178,7 @@ class _WalletSheetState extends State<_WalletSheet> {
   final _nameCtrl = TextEditingController();
   String _selectedType = 'cash';
   late Color _selectedColor;
+  bool _allowOverdraft = false; // default off; auto-set when type changes
 
   static const List<Color> _palette = [
     Color(0xFF4CAF50), Color(0xFF1E3A5F), Color(0xFF2196F3),
@@ -1042,11 +1198,13 @@ class _WalletSheetState extends State<_WalletSheet> {
   void initState() {
     super.initState();
     if (widget.existing != null) {
-      _nameCtrl.text  = widget.existing!.name;
-      _selectedType   = widget.existing!.type;
-      _selectedColor  = Color(widget.existing!.colorValue);
+      _nameCtrl.text    = widget.existing!.name;
+      _selectedType     = widget.existing!.type;
+      _selectedColor    = Color(widget.existing!.colorValue);
+      _allowOverdraft   = widget.existing!.allowOverdraft;
     } else {
-      _selectedColor = Color(WalletProvider.colorForType(_selectedType));
+      _selectedColor    = Color(WalletProvider.colorForType(_selectedType));
+      _allowOverdraft   = _selectedType == 'card'; // card defaults to true
     }
   }
 
@@ -1062,6 +1220,7 @@ class _WalletSheetState extends State<_WalletSheet> {
       id: widget.existing?.id ?? AppUtils.generateId(),
       name: name, type: _selectedType, balance: balance,
       colorValue: _selectedColor.value, icon: _selectedType,
+      allowOverdraft: _allowOverdraft,
     );
     if (widget.existing != null) {
       provider.updateWallet(wallet);
@@ -1122,6 +1281,10 @@ class _WalletSheetState extends State<_WalletSheet> {
                         _selectedType  = t['type'] as String;
                         _selectedColor = Color(
                             WalletProvider.colorForType(_selectedType));
+                        // Auto-set overdraft when creating new wallet
+                        if (widget.existing == null) {
+                          _allowOverdraft = _selectedType == 'card';
+                        }
                       }),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
@@ -1198,6 +1361,73 @@ class _WalletSheetState extends State<_WalletSheet> {
                   );
                 }).toList(),
               ),
+              const SizedBox(height: 20),
+
+              // ── Allow Overdraft toggle ─────────────────────────────
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? const Color(0xFF2A2A2A)
+                      : Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: _allowOverdraft
+                        ? const Color(0xFFFF9800).withOpacity(0.4)
+                        : Colors.transparent,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36, height: 36,
+                      decoration: BoxDecoration(
+                        color: _allowOverdraft
+                            ? const Color(0xFFFF9800).withOpacity(0.12)
+                            : Colors.grey.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        Icons.credit_score_rounded,
+                        color: _allowOverdraft
+                            ? const Color(0xFFFF9800)
+                            : Colors.grey,
+                        size: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Allow Overdraft',
+                              style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600)),
+                          Text(
+                            _allowOverdraft
+                                ? 'Balance can go negative (credit card mode)'
+                                : 'Expense blocked if balance is insufficient',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withOpacity(0.5),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch.adaptive(
+                      value: _allowOverdraft,
+                      onChanged: (v) =>
+                          setState(() => _allowOverdraft = v),
+                    ),
+                  ],
+                ),
+              ),
+
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
@@ -1433,6 +1663,117 @@ class _CategoriesPage extends StatelessWidget {
 }
 
 // ── Shared Widgets ────────────────────────────────────────────────────────────
+
+// ── Expandable Section ───────────────────────────────────────────────────────
+
+class _ExpandableSection extends StatefulWidget {
+  final IconData    icon;
+  final String      title;
+  final Color       color;
+  final List<Widget> children;
+  final bool        initiallyExpanded;
+
+  const _ExpandableSection({
+    required this.icon,
+    required this.title,
+    required this.color,
+    required this.children,
+    this.initiallyExpanded = false,
+  });
+
+  @override
+  State<_ExpandableSection> createState() => _ExpandableSectionState();
+}
+
+class _ExpandableSectionState extends State<_ExpandableSection> {
+  late bool _expanded;
+
+  @override
+  void initState() {
+    super.initState();
+    _expanded = widget.initiallyExpanded;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme  = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10, offset: const Offset(0, 3)),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Column(
+          children: [
+            // ── Header ──────────────────────────────────────────────
+            InkWell(
+              onTap: () => setState(() => _expanded = !_expanded),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 14),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36, height: 36,
+                      decoration: BoxDecoration(
+                        color: widget.color.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(widget.icon,
+                          color: widget.color, size: 18),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(widget.title,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700)),
+                    ),
+                    AnimatedRotation(
+                      turns: _expanded ? 0.5 : 0,
+                      duration: const Duration(milliseconds: 250),
+                      child: Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        color: theme.colorScheme.onSurface.withOpacity(0.4),
+                        size: 22,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // ── Expandable content ────────────────────────────────────
+            ClipRect(
+              child: AnimatedSize(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeInOut,
+                child: _expanded
+                    ? Column(
+                        children: [
+                          Divider(
+                            height: 1,
+                            color: theme.colorScheme.onSurface
+                                .withOpacity(0.07)),
+                          ...widget.children,
+                        ],
+                      )
+                    : const SizedBox(width: double.infinity, height: 0),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _SectionHeader extends StatelessWidget {
   final String text;
@@ -1682,6 +2023,126 @@ class _CurrencyPickerSheetState extends State<_CurrencyPickerSheet> {
   }
 }
 
+// ── Isolated Switch — same pattern as _SecuritySection ───────────────────────
+// Reads Hive directly into local state. Only THIS widget rebuilds on toggle.
+
+class _SmoothSwitch extends StatefulWidget {
+  final String hiveKey;       // Hive key to read/write
+  final bool defaultValue;
+  final VoidCallback onToggle; // Provider call (for notifyListeners)
+
+  const _SmoothSwitch({
+    required this.hiveKey,
+    required this.defaultValue,
+    required this.onToggle,
+  });
+
+  @override
+  State<_SmoothSwitch> createState() => _SmoothSwitchState();
+}
+
+class _SmoothSwitchState extends State<_SmoothSwitch> {
+  final Box _box = Hive.box('settings');
+  late bool _value;
+
+  @override
+  void initState() {
+    super.initState();
+    // Read directly from Hive — same as SecuritySection does
+    _value = _box.get(widget.hiveKey, defaultValue: widget.defaultValue) as bool;
+  }
+
+  void _toggle(bool v) {
+    setState(() => _value = v);       // Only this widget rebuilds
+    HapticFeedback.lightImpact();
+    widget.onToggle();                // Tell provider (for theme/sound changes)
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Switch.adaptive(
+      value: _value,
+      onChanged: _toggle,
+    );
+  }
+}
+
+// ── Color Theme Tile ─────────────────────────────────────────────────────────
+
+class _ColorThemeTile extends StatelessWidget {
+  final SettingsProvider settings;
+  const _ColorThemeTile({required this.settings});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme   = Theme.of(context);
+    final current = settings.themeColor;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36, height: 36,
+                decoration: BoxDecoration(
+                  color: current.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.palette_rounded,
+                    color: current, size: 18),
+              ),
+              const SizedBox(width: 12),
+              const Text('App Color',
+                  style: TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w600)),
+            ],
+          ),
+          const SizedBox(height: 14),
+          // ── Color circles ────────────────────────────────────────────
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: List.generate(AppColors.presets.length, (i) {
+              final color     = AppColors.presets[i];
+              final isSelected =
+                  current.value == color.value;
+              return GestureDetector(
+                onTap: () => settings.setThemeColor(color),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width:  isSelected ? 36 : 30,
+                  height: isSelected ? 36 : 30,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                    border: isSelected
+                        ? Border.all(
+                            color: theme.colorScheme.onSurface,
+                            width: 2.5)
+                        : null,
+                    boxShadow: isSelected
+                        ? [BoxShadow(
+                            color: color.withOpacity(0.5),
+                            blurRadius: 8)]
+                        : null,
+                  ),
+                  child: isSelected
+                      ? const Icon(Icons.check_rounded,
+                          color: Colors.white, size: 16)
+                      : null,
+                ),
+              );
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _CurrencyTile extends StatelessWidget {
   final String code;
   final String label;
@@ -1747,6 +2208,35 @@ class _CurrencyTile extends StatelessWidget {
               Icon(Icons.check_circle_rounded,
                   color: theme.colorScheme.primary, size: 20),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Mini key for PIN verify dialog ────────────────────────────────────────────
+class _MiniKey extends StatelessWidget {
+  final String digit;
+  final VoidCallback onTap;
+  const _MiniKey({required this.digit, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 64, height: 48,
+        margin: const EdgeInsets.symmetric(horizontal: 6),
+        decoration: BoxDecoration(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? const Color(0xFF2A2A2A)
+              : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Center(
+          child: Text(digit,
+            style: const TextStyle(
+                fontSize: 20, fontWeight: FontWeight.w600)),
         ),
       ),
     );

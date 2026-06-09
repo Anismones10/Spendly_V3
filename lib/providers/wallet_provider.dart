@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import '../models/wallet_model.dart';
 import '../utils/app_utils.dart';
+import '../utils/widget_helper.dart';
 
 class WalletProvider extends ChangeNotifier {
   final Box<WalletModel> _box = Hive.box<WalletModel>('wallets');
@@ -72,11 +73,13 @@ class WalletProvider extends ChangeNotifier {
   void addWallet(WalletModel wallet) {
     _box.put(wallet.id, wallet);
     notifyListeners();
+    WidgetHelper.updateWidget();
   }
 
   void updateWallet(WalletModel wallet) {
     _box.put(wallet.id, wallet);
     notifyListeners();
+    WidgetHelper.updateWidget();
   }
 
   void updateBalance(String id, double newBalance) {
@@ -85,14 +88,15 @@ class WalletProvider extends ChangeNotifier {
       wallet.balance = newBalance;
       wallet.save();
       notifyListeners();
+      WidgetHelper.updateWidget();
     }
   }
 
   void deleteWallet(String id) {
     if (_box.length <= 1) return;
-
     _box.delete(id);
     notifyListeners();
+    WidgetHelper.updateWidget();
   }
 
   void clearAll() {

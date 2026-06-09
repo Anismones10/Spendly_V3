@@ -35,15 +35,16 @@ class _SplashScreenState extends State<SplashScreen> {
     final hasPin      = (box.get('lockPin', defaultValue: '') as String).isNotEmpty;
 
     if (lockEnabled && hasPin) {
-      // Show lock screen first
-      Navigator.pushReplacement(
-        context,
+      // Push lock screen on TOP (not replace) so splash stays mounted
+      await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => LockScreen(
-            onUnlocked: () => _goToApp(),
+            onUnlocked: () => Navigator.of(context).pop(),
           ),
         ),
       );
+      // Lock screen was dismissed (unlocked) — now navigate
+      if (mounted) _goToApp();
       return;
     }
 
@@ -74,7 +75,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
     return Scaffold(
       backgroundColor:
-          isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
+      isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

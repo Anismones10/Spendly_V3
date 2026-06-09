@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
+import '../utils/widget_helper.dart';
 import '../models/expense_model.dart';
 
 class ExpenseProvider extends ChangeNotifier {
@@ -48,7 +49,7 @@ class ExpenseProvider extends ChangeNotifier {
       while (!next.isAfter(today)) {
         // Check if an instance for this exact date already exists
         final alreadyExists = _box.values.any((e) =>
-            e.recurringParentId == parent.id &&
+        e.recurringParentId == parent.id &&
             e.date.year == next.year &&
             e.date.month == next.month &&
             e.date.day == next.day);
@@ -117,7 +118,7 @@ class ExpenseProvider extends ChangeNotifier {
     if (_searchQuery.isNotEmpty) {
       list = list
           .where((e) =>
-              e.name.toLowerCase().contains(_searchQuery.toLowerCase()))
+          e.name.toLowerCase().contains(_searchQuery.toLowerCase()))
           .toList();
     }
     if (_filterCategory != null) {
@@ -127,10 +128,10 @@ class ExpenseProvider extends ChangeNotifier {
     if (_dateRange != null) {
       list = list
           .where((e) =>
-              e.date.isAfter(_dateRange!.start
-                  .subtract(const Duration(days: 1))) &&
-              e.date.isBefore(
-                  _dateRange!.end.add(const Duration(days: 1))))
+      e.date.isAfter(_dateRange!.start
+          .subtract(const Duration(days: 1))) &&
+          e.date.isBefore(
+              _dateRange!.end.add(const Duration(days: 1))))
           .toList();
     }
 
@@ -142,7 +143,7 @@ class ExpenseProvider extends ChangeNotifier {
         list.sort((a, b) => b.amount.compareTo(a.amount));
         break;
       case 'dateAsc':
-        // Sort by full dateTime (date + time)
+      // Sort by full dateTime (date + time)
         list.sort((a, b) => a.dateTime.compareTo(b.dateTime));
         break;
       case 'dateDesc':
@@ -170,9 +171,9 @@ class ExpenseProvider extends ChangeNotifier {
       String walletId, int year, int month) {
     return _box.values
         .where((e) =>
-            e.walletId == walletId &&
-            e.date.year == year &&
-            e.date.month == month)
+    e.walletId == walletId &&
+        e.date.year == year &&
+        e.date.month == month)
         .fold(0, (sum, e) => sum + e.amount);
   }
 
@@ -187,9 +188,9 @@ class ExpenseProvider extends ChangeNotifier {
   List<ExpenseModel> getExpensesForDay(DateTime day) {
     return _box.values
         .where((e) =>
-            e.date.year == day.year &&
-            e.date.month == day.month &&
-            e.date.day == day.day)
+    e.date.year == day.year &&
+        e.date.month == day.month &&
+        e.date.day == day.day)
         .toList()
       ..sort((a, b) => b.dateTime.compareTo(a.dateTime));
   }
@@ -262,6 +263,7 @@ class ExpenseProvider extends ChangeNotifier {
     }
 
     notifyListeners();
+    WidgetHelper.updateWidget();
   }
 
   /// Deletes an expense. If it's a recurring parent, deletes all its instances too.
@@ -339,7 +341,7 @@ class ExpenseProvider extends ChangeNotifier {
 
     if (lastMonth > 0) {
       final diff =
-          ((thisMonth - lastMonth) / lastMonth * 100).round();
+      ((thisMonth - lastMonth) / lastMonth * 100).round();
       if (diff > 0) {
         insights.add(
             'You spent $diff% more this month compared to last month.');

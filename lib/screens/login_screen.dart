@@ -26,20 +26,16 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    // Check if this is first login — migrate local data
-    final box            = Hive.box('settings');
+    final box             = Hive.box('settings');
     final alreadyMigrated = box.get('dataMigrated', defaultValue: false) as bool;
 
     if (!alreadyMigrated) {
-      // Check if cloud has data (returning user on new device)
       try {
         await SyncService.restoreFromCloud();
       } catch (_) {
-        // No cloud data yet — migrate local data up
         await SyncService.migrateLocalData();
       }
     } else {
-      // Regular login — sync if needed
       await SyncService.syncIfNeeded();
     }
 
@@ -49,6 +45,13 @@ class _LoginScreenState extends State<LoginScreen> {
         MaterialPageRoute(builder: (_) => const MainShell()),
       );
     }
+  }
+
+  void _skipForNow() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const MainShell()),
+    );
   }
 
   @override
@@ -67,7 +70,7 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               const Spacer(),
 
-              // ── Logo ────────────────────────────────────────────────
+              // ── Logo ──────────────────────────────────────────────────
               Container(
                 width: 100, height: 100,
                 decoration: BoxDecoration(
@@ -86,11 +89,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 24),
 
-              // ── Title ────────────────────────────────────────────────
               Text('Spendly',
                   style: TextStyle(
-                    fontSize: 36,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 36, fontWeight: FontWeight.w800,
                     color: theme.colorScheme.onSurface,
                     letterSpacing: -1,
                   )).animate().fadeIn(delay: 200.ms),
@@ -101,15 +102,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 'Track your spending.\nReach your goals.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 16,
-                  height: 1.5,
+                  fontSize: 16, height: 1.5,
                   color: theme.colorScheme.onSurface.withOpacity(0.5),
                 ),
               ).animate().fadeIn(delay: 300.ms),
 
               const Spacer(),
 
-              // ── Features list ─────────────────────────────────────────
+              // ── Feature list ───────────────────────────────────────────
               ...[
                 ('📊', 'Track every expense and income'),
                 ('💳', 'Manage multiple wallets'),
@@ -123,8 +123,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         Text(f.$2,
                             style: TextStyle(
                               fontSize: 14,
-                              color: theme.colorScheme.onSurface
-                                  .withOpacity(0.7),
+                              color: theme.colorScheme.onSurface.withOpacity(0.7),
                             )),
                       ],
                     ),
@@ -132,7 +131,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 32),
 
-              // ── Error ────────────────────────────────────────────────
+              // ── Error ──────────────────────────────────────────────────
               if (_error != null) ...[
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -148,7 +147,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 12),
               ],
 
-              // ── Google Sign In button ─────────────────────────────────
+              // ── Google Sign In button ──────────────────────────────────
               SizedBox(
                 width: double.infinity,
                 height: 56,
@@ -173,41 +172,41 @@ class _LoginScreenState extends State<LoginScreen> {
                       : Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            // Google logo
-                            Container(
-                              width: 24, height: 24,
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                              ),
-                              child: Image.network(
-                                'https://www.google.com/favicon.ico',
-                                width: 20, height: 20,
-                                errorBuilder: (_, __, ___) =>
-                                    const Icon(Icons.g_mobiledata_rounded,
-                                        size: 24),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            const Text(
-                              'Continue with Google',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                            Icon(Icons.g_mobiledata_rounded,
+                                size: 28,
+                                color: theme.colorScheme.primary),
+                            const SizedBox(width: 10),
+                            const Text('Continue with Google',
+                                style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600)),
                           ],
                         ),
                 ),
               ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.3),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
+
+              // ── Skip button ────────────────────────────────────────────
+              TextButton(
+                onPressed: _skipForNow,
+                child: Text(
+                  'Skip for now  →',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: theme.colorScheme.onSurface.withOpacity(0.45),
+                  ),
+                ),
+              ).animate().fadeIn(delay: 500.ms),
+
+              const SizedBox(height: 8),
 
               Text(
-                'Your data is encrypted and private.\nWe never share or sell your information.',
+                'You can sign in later from Settings\nto enable cloud backup.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 11,
-                  color: theme.colorScheme.onSurface.withOpacity(0.35),
+                  color: theme.colorScheme.onSurface.withOpacity(0.3),
                   height: 1.5,
                 ),
               ),

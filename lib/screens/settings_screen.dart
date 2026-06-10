@@ -25,6 +25,9 @@ import '../models/category_model.dart';
 import '../utils/app_utils.dart';
 import '../utils/app_theme.dart';
 import '../utils/pin_helper.dart';
+import '../services/auth_service.dart';
+import '../services/sync_service.dart';
+import 'login_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -225,6 +228,7 @@ class SettingsScreen extends StatelessWidget {
             title: 'Data',
             color: const Color(0xFFEF5350),
             children: [
+              const _SyncTile(),
               _SettingTile(
                 icon: Icons.delete_forever_rounded,
                 title: 'Clear All Data',
@@ -1178,7 +1182,6 @@ class _WalletSheetState extends State<_WalletSheet> {
   final _nameCtrl = TextEditingController();
   String _selectedType = 'cash';
   late Color _selectedColor;
-  bool _allowOverdraft = false; // default off; auto-set when type changes
 
   static const List<Color> _palette = [
     Color(0xFF4CAF50), Color(0xFF1E3A5F), Color(0xFF2196F3),
@@ -1198,13 +1201,11 @@ class _WalletSheetState extends State<_WalletSheet> {
   void initState() {
     super.initState();
     if (widget.existing != null) {
-      _nameCtrl.text    = widget.existing!.name;
-      _selectedType     = widget.existing!.type;
-      _selectedColor    = Color(widget.existing!.colorValue);
-      _allowOverdraft   = widget.existing!.allowOverdraft;
+      _nameCtrl.text  = widget.existing!.name;
+      _selectedType   = widget.existing!.type;
+      _selectedColor  = Color(widget.existing!.colorValue);
     } else {
-      _selectedColor    = Color(WalletProvider.colorForType(_selectedType));
-      _allowOverdraft   = _selectedType == 'card'; // card defaults to true
+      _selectedColor = Color(WalletProvider.colorForType(_selectedType));
     }
   }
 
@@ -1220,7 +1221,6 @@ class _WalletSheetState extends State<_WalletSheet> {
       id: widget.existing?.id ?? AppUtils.generateId(),
       name: name, type: _selectedType, balance: balance,
       colorValue: _selectedColor.value, icon: _selectedType,
-      allowOverdraft: _allowOverdraft,
     );
     if (widget.existing != null) {
       provider.updateWallet(wallet);
@@ -1281,10 +1281,6 @@ class _WalletSheetState extends State<_WalletSheet> {
                         _selectedType  = t['type'] as String;
                         _selectedColor = Color(
                             WalletProvider.colorForType(_selectedType));
-                        // Auto-set overdraft when creating new wallet
-                        if (widget.existing == null) {
-                          _allowOverdraft = _selectedType == 'card';
-                        }
                       }),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
@@ -1361,73 +1357,6 @@ class _WalletSheetState extends State<_WalletSheet> {
                   );
                 }).toList(),
               ),
-              const SizedBox(height: 20),
-
-              // ── Allow Overdraft toggle ─────────────────────────────
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF2A2A2A)
-                      : Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: _allowOverdraft
-                        ? const Color(0xFFFF9800).withOpacity(0.4)
-                        : Colors.transparent,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 36, height: 36,
-                      decoration: BoxDecoration(
-                        color: _allowOverdraft
-                            ? const Color(0xFFFF9800).withOpacity(0.12)
-                            : Colors.grey.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(
-                        Icons.credit_score_rounded,
-                        color: _allowOverdraft
-                            ? const Color(0xFFFF9800)
-                            : Colors.grey,
-                        size: 18,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Allow Overdraft',
-                              style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600)),
-                          Text(
-                            _allowOverdraft
-                                ? 'Balance can go negative (credit card mode)'
-                                : 'Expense blocked if balance is insufficient',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurface
-                                  .withOpacity(0.5),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Switch.adaptive(
-                      value: _allowOverdraft,
-                      onChanged: (v) =>
-                          setState(() => _allowOverdraft = v),
-                    ),
-                  ],
-                ),
-              ),
-
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
@@ -2239,6 +2168,85 @@ class _MiniKey extends StatelessWidget {
                 fontSize: 20, fontWeight: FontWeight.w600)),
         ),
       ),
+    );
+  }
+}
+
+// ── Sync Tile ─────────────────────────────────────────────────────────────────
+class _SyncTile extends StatefulWidget {
+  const _SyncTile();
+
+  @override
+  State<_SyncTile> createState() => _SyncTileState();
+}
+
+class _SyncTileState extends State<_SyncTile> {
+  bool _syncing = false;
+
+  String _lastSyncText() {
+    final box  = Hive.box('settings');
+    final last = box.get('lastSyncTime', defaultValue: 0) as int;
+    if (last == 0) return 'Never synced';
+    final dt   = DateTime.fromMillisecondsSinceEpoch(last);
+    final now  = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.inMinutes < 1)  return 'Just now';
+    if (diff.inHours < 1)    return '${diff.inMinutes}m ago';
+    if (diff.inDays < 1)     return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
+  }
+
+  Future<void> _sync() async {
+    if (!AuthService.isLoggedIn) {
+      // Not logged in — go to login screen
+      Navigator.push(context,
+          MaterialPageRoute(builder: (_) => const LoginScreen()));
+      return;
+    }
+    setState(() => _syncing = true);
+    await SyncService.syncAll();
+    if (mounted) setState(() => _syncing = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme     = Theme.of(context);
+    final isLoggedIn = AuthService.isLoggedIn;
+
+    return ListTile(
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      leading: Container(
+        width: 36, height: 36,
+        decoration: BoxDecoration(
+          color: const Color(0xFF42A5F5).withOpacity(0.12),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: _syncing
+            ? Padding(
+                padding: const EdgeInsets.all(8),
+                child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: theme.colorScheme.primary),
+              )
+            : const Icon(Icons.cloud_sync_rounded,
+                color: Color(0xFF42A5F5), size: 18),
+      ),
+      title: const Text('Sync to Cloud',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+      subtitle: Text(
+        isLoggedIn
+            ? 'Last sync: ${_lastSyncText()}'
+            : 'Sign in to enable cloud backup',
+        style: TextStyle(
+            fontSize: 11,
+            color: theme.colorScheme.onSurface.withOpacity(0.5)),
+      ),
+      trailing: Icon(
+        isLoggedIn ? Icons.sync_rounded : Icons.login_rounded,
+        color: theme.colorScheme.primary, size: 20,
+      ),
+      onTap: _syncing ? null : _sync,
     );
   }
 }

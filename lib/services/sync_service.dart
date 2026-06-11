@@ -29,6 +29,31 @@ class SyncService {
     return hours >= 24; // sync every 24 hours
   }
 
+  // ── Check if cloud has any data ──────────────────────────────────────────
+  static Future<bool> hasCloudData() async {
+    if (!AuthService.isLoggedIn) return false;
+    try {
+      final uid  = AuthService.userId!;
+      final snap = await _db
+          .collection('users')
+          .doc(uid)
+          .collection('expenses')
+          .limit(1)
+          .get();
+      return snap.docs.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ── Check if local Hive has any data ──────────────────────────────────────
+  static bool hasLocalData() {
+    final expenses  = Hive.box<ExpenseModel>('expenses');
+    final wallets   = Hive.box<WalletModel>('wallets');
+    // Wallets always have 2 defaults — only count if user added expenses
+    return expenses.isNotEmpty || wallets.length > 2;
+  }
+
   // ── Full sync — call on app open if needsSync ─────────────────────────────
   static Future<void> syncIfNeeded() async {
     if (!AuthService.isLoggedIn) return;

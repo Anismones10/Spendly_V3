@@ -30,9 +30,38 @@ class _LoginScreenState extends State<LoginScreen> {
     final alreadyMigrated = box.get('dataMigrated', defaultValue: false) as bool;
 
     if (!alreadyMigrated) {
-      try {
+      // First time signing in — check both local and cloud
+      final hasCloud = await SyncService.hasCloudData();
+      final hasLocal = SyncService.hasLocalData();
+
+      if (hasCloud && hasLocal) {
+        // ── Both have data — first confirm account ownership ─────────
+        if (!mounted) return;
+        final confirmed = await _showAccountConfirmDialog(user);
+        if (confirmed != true) {
+          // User not sure — sign out, keep local data safe
+          await AuthService.signOut();
+          setState(() => _loading = false);
+          return;
+        }
+        // Confirmed it's their account — ask which data to keep
+        if (!mounted) return;
+        final keepLocal = await _showConflictDialog();
+        if (keepLocal == null) {
+          await AuthService.signOut();
+          setState(() => _loading = false);
+          return;
+        }
+        if (keepLocal) {
+          await SyncService.migrateLocalData();
+        } else {
+          await SyncService.restoreFromCloud();
+        }
+      } else if (hasCloud) {
+        // Only cloud has data (new device, existing account)
         await SyncService.restoreFromCloud();
-      } catch (_) {
+      } else {
+        // Only local has data (or both empty) — push local to cloud
         await SyncService.migrateLocalData();
       }
     } else {
@@ -45,6 +74,185 @@ class _LoginScreenState extends State<LoginScreen> {
         MaterialPageRoute(builder: (_) => const MainShell()),
       );
     }
+  }
+
+  Future<bool?> _showAccountConfirmDialog(dynamic user) async {
+    final theme  = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final email  = user?.email ?? 'Unknown account';
+    final name   = user?.displayName ?? '';
+    final photo  = user?.photoURL;
+
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor:
+            isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20)),
+        title: const Text('Confirm your account',
+            style: TextStyle(
+                fontSize: 17, fontWeight: FontWeight.w700)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'This Google account already has cloud data. Make sure this is YOUR account before continuing.',
+              style: TextStyle(fontSize: 13, height: 1.5),
+            ),
+            const SizedBox(height: 16),
+
+            // Account card
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withOpacity(0.07),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                    color: theme.colorScheme.primary.withOpacity(0.2)),
+              ),
+              child: Row(
+                children: [
+                  // Profile photo or icon
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundColor:
+                        theme.colorScheme.primary.withOpacity(0.15),
+                    backgroundImage: photo != null
+                        ? NetworkImage(photo)
+                        : null,
+                    child: photo == null
+                        ? Icon(Icons.person_rounded,
+                            color: theme.colorScheme.primary)
+                        : null,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (name.isNotEmpty)
+                          Text(name,
+                              style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700)),
+                        Text(email,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: theme.colorScheme.onSurface
+                                  .withOpacity(0.6),
+                            )),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Row(children: [
+                Icon(Icons.warning_amber_rounded,
+                    color: Colors.orange, size: 16),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'If this is not your account, tap Cancel to protect your local data.',
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.orange,
+                        height: 1.4),
+                  ),
+                ),
+              ]),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel',
+                style: TextStyle(color: Colors.red)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Yes, this is my account'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool?> _showConflictDialog() async {
+    final theme  = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor:
+            isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20)),
+        title: Row(children: [
+          Container(
+            width: 36, height: 36,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF9800).withOpacity(0.15),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.merge_type_rounded,
+                color: Color(0xFFFF9800), size: 20),
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text('Data Conflict',
+                style: TextStyle(
+                    fontSize: 17, fontWeight: FontWeight.w700)),
+          ),
+        ]),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'You have data on this device AND data in the cloud. Which one do you want to keep?',
+              style: TextStyle(fontSize: 13, height: 1.5),
+            ),
+            const SizedBox(height: 16),
+            // Keep local option
+            _ConflictOption(
+              icon: Icons.phone_android_rounded,
+              color: const Color(0xFF42A5F5),
+              title: 'Keep this device',
+              subtitle: 'Your local data will be uploaded to cloud',
+              onTap: () => Navigator.pop(ctx, true),
+            ),
+            const SizedBox(height: 10),
+            // Keep cloud option
+            _ConflictOption(
+              icon: Icons.cloud_rounded,
+              color: const Color(0xFF2ECC71),
+              title: 'Keep cloud data',
+              subtitle: 'Cloud data will be downloaded to this device',
+              onTap: () => Navigator.pop(ctx, false),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, null),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _skipForNow() {
@@ -214,6 +422,75 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 32),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Conflict option tile ───────────────────────────────────────────────────────
+class _ConflictOption extends StatelessWidget {
+  final IconData icon;
+  final Color    color;
+  final String   title;
+  final String   subtitle;
+  final VoidCallback onTap;
+
+  const _ConflictOption({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme  = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isDark
+              ? const Color(0xFF2A2A2A)
+              : Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withOpacity(0.25)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38, height: 38,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 2),
+                  Text(subtitle,
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: theme.colorScheme.onSurface
+                              .withOpacity(0.5))),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded,
+                color: theme.colorScheme.onSurface.withOpacity(0.3),
+                size: 18),
+          ],
         ),
       ),
     );

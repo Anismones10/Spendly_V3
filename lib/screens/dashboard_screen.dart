@@ -97,7 +97,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     final allExpenses = expenses.allExpenses;
     final netLoan = loans.totalBorrowing - loans.totalLending;
-    final totalAllSpent = expenses.getTotalForMonth(now.year, now.month);
+    final totalAllSpent = wallets.getTotalSpent(allExpenses);
 
     double spentForWallet(String walletId) {
       final filtered = allExpenses.where((e) => e.walletId == walletId);
@@ -116,21 +116,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
         isAllWallets: true,
       ),
       ...wallets.wallets.map((w) => _CardData(
-            title: w.name,
-            totalBalance: w.balance,
-            spent: spentForWallet(w.id),
-            borrowed: 0,
-            lentOut: 0,
-            netLoan: 0,
-            isAllWallets: false,
-            walletType: w.type,
-            colorValue: w.colorValue,
-          )),
+        title: w.name,
+        totalBalance: w.balance,
+        spent: spentForWallet(w.id),
+        borrowed: 0,
+        lentOut: 0,
+        netLoan: 0,
+        isAllWallets: false,
+        walletType: w.type,
+        colorValue: w.colorValue,
+      )),
     ];
 
     return Scaffold(
       backgroundColor:
-          isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
+      isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
@@ -139,7 +139,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             pinned: true,
             elevation: 0,
             backgroundColor:
-                isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
+            isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
             flexibleSpace: FlexibleSpaceBar(
               titlePadding: const EdgeInsets.only(left: 20, bottom: 12),
               title: ShaderMask(
@@ -170,7 +170,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Container(
                 margin: const EdgeInsets.only(right: 4),
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.primary.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(20),
@@ -240,7 +240,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       final card = allCards[i];
                       return Padding(
                         padding:
-                            const EdgeInsets.symmetric(horizontal: 16),
+                        const EdgeInsets.symmetric(horizontal: 16),
                         child: _WalletCard(
                           card: card,
                           symbol: symbol,
@@ -265,7 +265,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               if (_currentCard > 0) {
                                 _cardController.previousPage(
                                     duration:
-                                        const Duration(milliseconds: 300),
+                                    const Duration(milliseconds: 300),
                                     curve: Curves.easeInOut);
                               }
                             },
@@ -273,9 +273,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 size: 22,
                                 color: _currentCard > 0
                                     ? theme.colorScheme.onSurface
-                                        .withOpacity(0.5)
+                                    .withOpacity(0.5)
                                     : theme.colorScheme.onSurface
-                                        .withOpacity(0.15)),
+                                    .withOpacity(0.15)),
                           ),
                           const SizedBox(width: 8),
                           ...List.generate(allCards.length, (i) {
@@ -283,14 +283,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             return AnimatedContainer(
                               duration: const Duration(milliseconds: 250),
                               margin:
-                                  const EdgeInsets.symmetric(horizontal: 3),
+                              const EdgeInsets.symmetric(horizontal: 3),
                               width: isSelected ? 20 : 8,
                               height: 8,
                               decoration: BoxDecoration(
                                 color: isSelected
                                     ? theme.colorScheme.primary
                                     : theme.colorScheme.onSurface
-                                        .withOpacity(0.2),
+                                    .withOpacity(0.2),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                             );
@@ -301,7 +301,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               if (_currentCard < allCards.length - 1) {
                                 _cardController.nextPage(
                                     duration:
-                                        const Duration(milliseconds: 300),
+                                    const Duration(milliseconds: 300),
                                     curve: Curves.easeInOut);
                               }
                             },
@@ -309,9 +309,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 size: 22,
                                 color: _currentCard < allCards.length - 1
                                     ? theme.colorScheme.onSurface
-                                        .withOpacity(0.5)
+                                    .withOpacity(0.5)
                                     : theme.colorScheme.onSurface
-                                        .withOpacity(0.15)),
+                                    .withOpacity(0.15)),
                           ),
                         ],
                       ),
@@ -321,7 +321,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         style: TextStyle(
                           fontSize: 11,
                           color:
-                              theme.colorScheme.onSurface.withOpacity(0.35),
+                          theme.colorScheme.onSurface.withOpacity(0.35),
                         ),
                       ),
                     ],
@@ -364,7 +364,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         child: _QuickStatCard(
                           label: 'Income',
                           value:
-                              AppUtils.formatAmount(monthlyIncome, symbol),
+                          AppUtils.formatAmount(monthlyIncome, symbol),
                           icon: Icons.account_balance_wallet_rounded,
                           color: const Color(0xFF2ECC71),
                           onTap: () => Navigator.push(
@@ -561,12 +561,12 @@ class _BlobPainter extends CustomPainter {
   }
 
   void _drawBlob(
-    Canvas canvas, {
-    required Offset center,
-    required double radius,
-    required Color color,
-    required double blur,
-  }) {
+      Canvas canvas, {
+        required Offset center,
+        required double radius,
+        required Color color,
+        required double blur,
+      }) {
     canvas.drawCircle(
       center,
       radius,
@@ -616,7 +616,7 @@ class _AnimatedBlobsState extends State<_AnimatedBlobs>
       animation: _ctrl,
       builder: (_, __) => CustomPaint(
         painter:
-            _BlobPainter(t: _ctrl.value, baseColor: widget.baseColor),
+        _BlobPainter(t: _ctrl.value, baseColor: widget.baseColor),
         child: const SizedBox.expand(),
       ),
     );
@@ -656,13 +656,13 @@ class _WalletCard extends StatelessWidget {
     final Color cardColorDark = card.isAllWallets
         ? const Color(0xFF0F2440)
         : HSLColor.fromColor(Color(card.colorValue ?? 0xFF1E3A5F))
-            .withLightness(
-              (HSLColor.fromColor(Color(card.colorValue ?? 0xFF1E3A5F))
-                          .lightness -
-                      0.15)
-                  .clamp(0.0, 1.0),
-            )
-            .toColor();
+        .withLightness(
+      (HSLColor.fromColor(Color(card.colorValue ?? 0xFF1E3A5F))
+          .lightness -
+          0.15)
+          .clamp(0.0, 1.0),
+    )
+        .toColor();
 
     IconData walletIcon = Icons.account_balance_wallet_rounded;
     if (card.walletType != null) {
@@ -1045,9 +1045,9 @@ class _LoanRow extends StatelessWidget {
             fontWeight: FontWeight.w700,
             shadows: active
                 ? [
-                    Shadow(color: color.withOpacity(0.80), blurRadius: 12),
-                    Shadow(color: color.withOpacity(0.40), blurRadius: 24),
-                  ]
+              Shadow(color: color.withOpacity(0.80), blurRadius: 12),
+              Shadow(color: color.withOpacity(0.40), blurRadius: 24),
+            ]
                 : null,
           ),
         ),
@@ -1081,7 +1081,7 @@ class _BudgetHealthCard extends StatelessWidget {
     final budgets = context.watch<CategoryBudgetProvider>();
     final catTotals = expenses.getCategoryTotals(now.year, now.month);
     final allBudgetedCats =
-        cats.categories.where((c) => budgets.hasBudget(c.id)).toList();
+    cats.categories.where((c) => budgets.hasBudget(c.id)).toList();
 
     if (allBudgetedCats.isEmpty) return const SizedBox.shrink();
 
@@ -1189,7 +1189,7 @@ class _BudgetHealthCard extends StatelessWidget {
                                 color: isOver
                                     ? const Color(0xFFE57373)
                                     : theme.colorScheme.onSurface
-                                        .withOpacity(0.5),
+                                    .withOpacity(0.5),
                               ),
                             ),
                           ],
@@ -1202,7 +1202,7 @@ class _BudgetHealthCard extends StatelessWidget {
                             minHeight: 6,
                             backgroundColor: barColor.withOpacity(0.12),
                             valueColor:
-                                AlwaysStoppedAnimation<Color>(barColor),
+                            AlwaysStoppedAnimation<Color>(barColor),
                           ),
                         ),
                         const SizedBox(height: 4),

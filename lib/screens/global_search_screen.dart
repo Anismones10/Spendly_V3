@@ -59,7 +59,10 @@ const _filterColors = {
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 class GlobalSearchScreen extends StatefulWidget {
-  const GlobalSearchScreen({super.key});
+  /// Set to true only when opened explicitly via search icon.
+  /// When used as a bottom nav tab, keep false to avoid keyboard popping up.
+  final bool autoFocus;
+  const GlobalSearchScreen({super.key, this.autoFocus = false});
 
   @override
   State<GlobalSearchScreen> createState() => _GlobalSearchScreenState();
@@ -82,8 +85,10 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance
-        .addPostFrameCallback((_) => _focusNode.requestFocus());
+    if (widget.autoFocus) {
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _focusNode.requestFocus());
+    }
     _controller.addListener(() {
       setState(() => _query = _controller.text.trim().toLowerCase());
     });

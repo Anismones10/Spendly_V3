@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Spendly</string>
-    <string name="widget_description">Spendly — balance, today\'s spending &amp; quick add</string>
+    <string name="widget_description">Balance, today\'s spending and quick add expense</string>
 </resources>

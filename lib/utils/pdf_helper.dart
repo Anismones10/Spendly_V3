@@ -363,16 +363,23 @@ class PdfHelper {
         pw.SizedBox(height: 18),
 
         pw.Row(children: [
-          pw.Expanded(child: _card('Total Income',   _fmt(totalInc, sym), _green)),
-          pw.SizedBox(width: 8),
+          // Only show income card if there is actual income data
+          if (totalInc > 0) ...[
+            pw.Expanded(child: _card('Total Income', _fmt(totalInc, sym), _green)),
+            pw.SizedBox(width: 8),
+          ],
           pw.Expanded(child: _card('Total Expenses', _fmt(totalExp, sym), _red)),
           pw.SizedBox(width: 8),
-          pw.Expanded(child: _card('Net Balance',    _fmt(net, sym),
-              net >= 0 ? _green : _red)),
-          pw.SizedBox(width: 8),
-          pw.Expanded(child: _card('Savings Rate',
-              savRate.toStringAsFixed(1) + '%',
-              savRate >= 20 ? _green : savRate >= 10 ? _amber : _red)),
+          // Only show net balance and savings rate if income exists
+          if (totalInc > 0) ...[
+            pw.SizedBox(width: 8),
+            pw.Expanded(child: _card('Net Balance', _fmt(net, sym),
+                net >= 0 ? _green : _red)),
+            pw.SizedBox(width: 8),
+            pw.Expanded(child: _card('Savings Rate',
+                savRate.toStringAsFixed(1) + '%',
+                savRate >= 20 ? _green : savRate >= 10 ? _amber : _red)),
+          ],
         ]),
         pw.SizedBox(height: 20),
 

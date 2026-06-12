@@ -702,7 +702,7 @@ class _CategoryBudgetsPage extends StatelessWidget {
         children: [
           Container(
             padding: const EdgeInsets.all(14),
-            margin: const EdgeInsets.only(bottom: 20),
+            margin: const EdgeInsets.only(bottom: 12),
             decoration: BoxDecoration(
               color: theme.colorScheme.primary.withOpacity(0.08),
               borderRadius: BorderRadius.circular(14),
@@ -720,6 +720,34 @@ class _CategoryBudgetsPage extends StatelessWidget {
                     style: TextStyle(
                         fontSize: 12,
                         color: theme.colorScheme.primary,
+                        height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // ── Monthly reset indicator ──────────────────────────────
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            margin: const EdgeInsets.only(bottom: 20),
+            decoration: BoxDecoration(
+              color: const Color(0xFF2ECC71).withOpacity(0.08),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                  color: const Color(0xFF2ECC71).withOpacity(0.25)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.refresh_rounded,
+                    color: Color(0xFF2ECC71), size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Tracking ${AppUtils.formatMonthYear(now)} · Resets automatically on the 1st of each month',
+                    style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF2ECC71),
+                        fontWeight: FontWeight.w600,
                         height: 1.4),
                   ),
                 ),

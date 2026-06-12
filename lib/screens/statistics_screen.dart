@@ -1672,8 +1672,22 @@ class _IncomeBySourceTab extends StatelessWidget {
                       children: entries.asMap().entries.map((e) {
                         final color = colors[e.key % colors.length];
                         final pct = total > 0 ? (e.value.value / total * 100) : 0.0;
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
+                        final isTouched = e.key == touchedIndex;
+                        return AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: EdgeInsets.symmetric(
+                              horizontal: isTouched ? 8 : 0,
+                              vertical: isTouched ? 6 : 0),
+                          decoration: BoxDecoration(
+                            color: isTouched
+                                ? color.withOpacity(0.12)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
+                            border: isTouched
+                                ? Border.all(color: color.withOpacity(0.4))
+                                : null,
+                          ),
                           child: Row(
                             children: [
                               Container(
@@ -1689,15 +1703,21 @@ class _IncomeBySourceTab extends StatelessWidget {
                                     Text(e.value.key,
                                         style: TextStyle(
                                           fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: theme.colorScheme.onSurface,
+                                          fontWeight: isTouched
+                                              ? FontWeight.w800
+                                              : FontWeight.w600,
+                                          color: isTouched
+                                              ? color
+                                              : theme.colorScheme.onSurface,
                                         ),
                                         maxLines: 1, overflow: TextOverflow.ellipsis),
                                     Text(
                                         '${pct.toStringAsFixed(1)}% · ${AppUtils.formatAmount(e.value.value, symbol)}',
                                         style: TextStyle(
                                           fontSize: 10,
-                                          color: theme.colorScheme.onSurface.withOpacity(0.5),
+                                          color: isTouched
+                                              ? color.withOpacity(0.8)
+                                              : theme.colorScheme.onSurface.withOpacity(0.5),
                                         )),
                                   ],
                                 ),

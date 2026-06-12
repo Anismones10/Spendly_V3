@@ -26,8 +26,7 @@
             android:text="Spendly"
             android:textColor="#B3FFFFFF"
             android:textSize="11sp"
-            android:textStyle="bold"
-            android:letterSpacing="0.08"/>
+            android:textStyle="bold"/>
 
         <TextView
             android:id="@+id/widget_last_updated"
@@ -48,8 +47,7 @@
         android:text="$0.00"
         android:textColor="#FFFFFF"
         android:textSize="26sp"
-        android:textStyle="bold"
-        android:letterSpacing="-0.02"/>
+        android:textStyle="bold"/>
 
     <TextView
         android:layout_width="match_parent"
@@ -133,7 +131,8 @@
             android:layout_width="1dp"
             android:layout_height="match_parent"
             android:background="#33FFFFFF"
-            android:layout_marginHorizontal="10dp"/>
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="10dp"/>
 
         <!-- Remaining budget block -->
         <LinearLayout
@@ -178,7 +177,8 @@
             android:layout_width="1dp"
             android:layout_height="match_parent"
             android:background="#33FFFFFF"
-            android:layout_marginHorizontal="10dp"/>
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="10dp"/>
 
         <!-- Quick Add button -->
         <LinearLayout

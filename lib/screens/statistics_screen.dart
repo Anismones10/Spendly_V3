@@ -821,19 +821,35 @@ class _CategoriesTab extends StatelessWidget {
 
                   const SizedBox(width: 16),
 
-                  // Right-side legend — plain, no glow
+                  // Right-side legend
                   Expanded(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: entries.take(6).map((e) {
+                      children: entries.take(6).toList().asMap().entries.map((indexed) {
+                        final i = indexed.key;
+                        final e = indexed.value;
                         final cat = categories.getById(e.key);
                         final color = cat != null
                             ? Color(cat.colorValue)
                             : theme.colorScheme.primary;
                         final pct = (e.value / total * 100);
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
+                        final isTouched = i == touchedIndex;
+                        return AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: EdgeInsets.symmetric(
+                              horizontal: isTouched ? 8 : 0,
+                              vertical: isTouched ? 6 : 0),
+                          decoration: BoxDecoration(
+                            color: isTouched
+                                ? color.withOpacity(0.12)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
+                            border: isTouched
+                                ? Border.all(color: color.withOpacity(0.4))
+                                : null,
+                          ),
                           child: Row(
                             children: [
                               Container(
@@ -849,15 +865,21 @@ class _CategoriesTab extends StatelessWidget {
                                     Text(cat?.name ?? e.key,
                                         style: TextStyle(
                                           fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: theme.colorScheme.onSurface,
+                                          fontWeight: isTouched
+                                              ? FontWeight.w800
+                                              : FontWeight.w600,
+                                          color: isTouched
+                                              ? color
+                                              : theme.colorScheme.onSurface,
                                         ),
                                         maxLines: 1, overflow: TextOverflow.ellipsis),
                                     Text(
                                         '${pct.toStringAsFixed(1)}% · ${AppUtils.formatAmount(e.value, symbol)}',
                                         style: TextStyle(
                                           fontSize: 10,
-                                          color: theme.colorScheme.onSurface.withOpacity(0.5),
+                                          color: isTouched
+                                              ? color.withOpacity(0.8)
+                                              : theme.colorScheme.onSurface.withOpacity(0.5),
                                         )),
                                   ],
                                 ),
@@ -885,13 +907,26 @@ class _CategoriesTab extends StatelessWidget {
           final pct = (e.value.value / total * 100);
           final isHeld = e.key == touchedIndex;
 
-          return Container(
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
             margin: const EdgeInsets.only(bottom: 10),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              color: isHeld
+                  ? color.withOpacity(isDark ? 0.15 : 0.10)
+                  : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
               borderRadius: BorderRadius.circular(16),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)],
+              border: isHeld
+                  ? Border.all(color: color.withOpacity(0.5), width: 1.5)
+                  : null,
+              boxShadow: [
+                BoxShadow(
+                  color: isHeld
+                      ? color.withOpacity(0.25)
+                      : Colors.black.withOpacity(0.04),
+                  blurRadius: isHeld ? 14 : 8,
+                ),
+              ],
             ),
             child: Row(
               children: [
@@ -1740,13 +1775,27 @@ class _IncomeBySourceTab extends StatelessWidget {
         ...entries.asMap().entries.map((e) {
           final color = colors[e.key % colors.length];
           final pct = total > 0 ? (e.value.value / total * 100) : 0.0;
-          return Container(
+          final isTouched = e.key == touchedIndex;
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
             margin: const EdgeInsets.only(bottom: 10),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              color: isTouched
+                  ? color.withOpacity(isDark ? 0.15 : 0.10)
+                  : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
               borderRadius: BorderRadius.circular(16),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)],
+              border: isTouched
+                  ? Border.all(color: color.withOpacity(0.5), width: 1.5)
+                  : null,
+              boxShadow: [
+                BoxShadow(
+                  color: isTouched
+                      ? color.withOpacity(0.25)
+                      : Colors.black.withOpacity(0.04),
+                  blurRadius: isTouched ? 14 : 8,
+                ),
+              ],
             ),
             child: Row(
               children: [

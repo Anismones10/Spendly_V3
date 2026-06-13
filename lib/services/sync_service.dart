@@ -235,6 +235,14 @@ class SyncService {
       'isDarkMode':   _settings.get('darkMode',     defaultValue: false),
       'monthlyBudget': _settings.get('monthlyBudget', defaultValue: 0.0),
       'themeColor':   _settings.get('themeColor',   defaultValue: 0xFF2196F3),
+      'notifEnabled': _settings.get('notifEnabled', defaultValue: false),
+      'notifDaily':   _settings.get('notifDaily',   defaultValue: true),
+      'notifWeekly':  _settings.get('notifWeekly',  defaultValue: true),
+      'notifBudget':  _settings.get('notifBudget',  defaultValue: true),
+      'notifLoan':    _settings.get('notifLoan',    defaultValue: true),
+      'notifGoal':    _settings.get('notifGoal',    defaultValue: true),
+      'notifHour':    _settings.get('notifHour',    defaultValue: 21),
+      'notifMinute':  _settings.get('notifMinute',  defaultValue: 0),
       'lastSyncTime': DateTime.now().toIso8601String(),
     }, SetOptions(merge: true));
   }
@@ -251,6 +259,7 @@ class SyncService {
       _restoreCategories(),
       _restoreGoals(),
       _restoreLoans(),
+      _restoreSettings(),
     ]);
 
     _settings.put('lastSyncTime',
@@ -381,6 +390,49 @@ class SyncService {
           walletId: d['walletId'],
         ));
       }
+    }
+  }
+  static Future<void> _restoreSettings() async {
+    final uid = AuthService.userId!;
+    final doc = await _db.collection('users').doc(uid).get();
+    final d = doc.data();
+    if (d == null) return;
+
+    if (d['currency'] != null) {
+      _settings.put('currency', d['currency']);
+    }
+    if (d['isDarkMode'] != null) {
+      _settings.put('darkMode', d['isDarkMode']);
+    }
+    if (d['monthlyBudget'] != null) {
+      _settings.put('monthlyBudget', (d['monthlyBudget'] as num).toDouble());
+    }
+    if (d['themeColor'] != null) {
+      _settings.put('themeColor', d['themeColor']);
+    }
+    if (d['notifEnabled'] != null) {
+      _settings.put('notifEnabled', d['notifEnabled']);
+    }
+    if (d['notifDaily'] != null) {
+      _settings.put('notifDaily', d['notifDaily']);
+    }
+    if (d['notifWeekly'] != null) {
+      _settings.put('notifWeekly', d['notifWeekly']);
+    }
+    if (d['notifBudget'] != null) {
+      _settings.put('notifBudget', d['notifBudget']);
+    }
+    if (d['notifLoan'] != null) {
+      _settings.put('notifLoan', d['notifLoan']);
+    }
+    if (d['notifGoal'] != null) {
+      _settings.put('notifGoal', d['notifGoal']);
+    }
+    if (d['notifHour'] != null) {
+      _settings.put('notifHour', d['notifHour']);
+    }
+    if (d['notifMinute'] != null) {
+      _settings.put('notifMinute', d['notifMinute']);
     }
   }
 }

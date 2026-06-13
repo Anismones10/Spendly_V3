@@ -9,6 +9,7 @@ import android.widget.RemoteViews
 import android.graphics.Color
 import android.app.PendingIntent
 import es.antonborri.home_widget.HomeWidgetPlugin
+import es.antonborri.home_widget.HomeWidgetBackgroundIntent
 
 class SpendlyWidgetProvider : AppWidgetProvider() {
 
@@ -86,6 +87,13 @@ class SpendlyWidgetProvider : AppWidgetProvider() {
                         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
                 views.setOnClickPendingIntent(R.id.widget_add_btn, addPending)
+
+                // Refresh button — triggers Flutter background callback to recompute data
+                val refreshPending = HomeWidgetBackgroundIntent.getBroadcast(
+                        context,
+                        Uri.parse("spendly://refresh")
+                )
+                views.setOnClickPendingIntent(R.id.widget_refresh_btn, refreshPending)
 
                 // Tap widget body → open app
                 val openIntent = context.packageManager

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
+import '../utils/widget_helper.dart';
 
 class SettingsProvider extends ChangeNotifier {
   final Box _box = Hive.box('settings');
@@ -66,11 +67,13 @@ class SettingsProvider extends ChangeNotifier {
   void setCurrency(String code) {
     _box.put('currency', code);
     notifyListeners();
+    WidgetHelper.updateWidget();
   }
 
   void setMonthlyBudget(double budget) {
     _box.put('monthlyBudget', budget);
     notifyListeners();
+    WidgetHelper.updateWidget();
   }
 
   void updateStreak(bool underBudget) {

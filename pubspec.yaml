@@ -30,7 +30,7 @@ dependencies:
   flutter_local_notifications: ^17.2.3
   timezone: ^0.9.4
   local_auth: ^2.3.0
-  home_widget: ^0.7.0
+  home_widget: ^0.9.0
   firebase_core: ^4.1.0
   firebase_auth: ^6.0.2
   cloud_firestore: ^6.0.1

@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
 import 'models/expense_model.dart';
 import 'models/category_model.dart';
 import 'models/goal_model.dart';
@@ -29,21 +28,50 @@ import 'screens/add_expense_screen.dart';
 import 'utils/app_theme.dart';
 import 'utils/notification_helper.dart';
 import 'utils/widget_helper.dart';
-import 'services/auth_service.dart';
-import 'services/sync_service.dart';
+import 'firebase_options.dart';
 
 // Global navigator key — needed for deep link navigation from widget
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
+// ── Background callback for widget refresh button ─────────────────────────
+// Runs in a separate isolate when the widget's refresh (↻) button is tapped.
+@pragma('vm:entry-point')
+Future<void> widgetBackgroundCallback(Uri? uri) async {
+  debugPrint('🟢 widgetBackgroundCallback fired with uri: $uri');
+  if (uri?.host != 'refresh') return;
+
+  WidgetsFlutterBinding.ensureInitialized();
+  await Hive.initFlutter();
+
+  // Register adapters (idempotent — safe even if already registered in main isolate)
+  if (!Hive.isAdapterRegistered(ExpenseModelAdapter().typeId)) {
+    Hive.registerAdapter(ExpenseModelAdapter());
+  }
+  if (!Hive.isAdapterRegistered(WalletModelAdapter().typeId)) {
+    Hive.registerAdapter(WalletModelAdapter());
+  }
+
+  if (!Hive.isBoxOpen('expenses')) {
+    await Hive.openBox<ExpenseModel>('expenses');
+  }
+  if (!Hive.isBoxOpen('wallets')) {
+    await Hive.openBox<WalletModel>('wallets');
+  }
+  if (!Hive.isBoxOpen('settings')) {
+    await Hive.openBox('settings');
+  }
+
+  await WidgetHelper.updateWidget();
+  debugPrint('🟢 widgetBackgroundCallback finished updateWidget()');
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ── Firebase init (must be first) ─────────────────────────────────────────
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // ── Hive init ──────────────────────────────────────────────────────────────
   await Hive.initFlutter();
 
   Hive.registerAdapter(ExpenseModelAdapter());
@@ -67,15 +95,12 @@ void main() async {
   await Hive.openBox<TransferModel>('transfers');
   await Hive.openBox('settings');
 
-  // ── Notifications ──────────────────────────────────────────────────────────
   await NotificationHelper.init();
 
-  // ── Home widget init ───────────────────────────────────────────────────────
+  // ── Home widget init ───────────────────────────────────────────────────
   await HomeWidget.setAppGroupId('group.com.example.expense_tracker');
-  await WidgetHelper.updateWidget();
-
-  // ── Nightly sync (non-blocking) ────────────────────────────────────────────
-  SyncService.syncIfNeeded();
+  HomeWidget.registerBackgroundCallback(widgetBackgroundCallback);
+  await WidgetHelper.updateWidget(); // push initial data to widget
 
   final settingsBox  = Hive.box('settings');
   final notifEnabled =
@@ -139,19 +164,32 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
-    // Listen for widget button tap (deep link: spendly://add_expense)
-    HomeWidget.widgetClicked.listen((uri) {
-      if (uri == null) return;
-      if (uri.host == 'add_expense') {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          navigatorKey.currentState?.push(
-            MaterialPageRoute(
-              builder: (_) => const AddExpenseScreen(),
-            ),
-          );
-        });
-      }
-    });
+    // Handle cold start: app launched fresh by tapping the widget
+    HomeWidget.initiallyLaunchedFromHomeWidget().then(_handleWidgetUri);
+
+    // Handle warm start: app already running, widget tapped again
+    HomeWidget.widgetClicked.listen(_handleWidgetUri);
+  }
+
+  void _handleWidgetUri(Uri? uri) {
+    debugPrint('🔵 _handleWidgetUri called with: $uri');
+    if (uri == null) return;
+    if (uri.host == 'add_expense') {
+      debugPrint('🔵 Pushing AddExpenseScreen');
+      _pushAddExpenseWhenReady();
+    }
+  }
+
+  void _pushAddExpenseWhenReady() {
+    final state = navigatorKey.currentState;
+    if (state != null) {
+      state.push(
+        MaterialPageRoute(builder: (_) => const AddExpenseScreen()),
+      );
+    } else {
+      // Navigator not mounted yet (e.g. splash screen still loading) — retry shortly
+      Future.delayed(const Duration(milliseconds: 200), _pushAddExpenseWhenReady);
+    }
   }
 
   @override
@@ -160,12 +198,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  // Refresh widget + sync when app comes to foreground
+  // Refresh widget data every time app comes back to foreground
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       WidgetHelper.updateWidget();
-      SyncService.syncIfNeeded(); // sync if 24h passed
     }
   }
 
@@ -175,7 +212,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     return MaterialApp(
       title: 'Spendly',
       debugShowCheckedModeBanner: false,
-      navigatorKey: navigatorKey,
+      navigatorKey: navigatorKey, // needed for deep link navigation
       theme:     AppTheme.light(settings.themeColor),
       darkTheme: AppTheme.dark(settings.themeColor),
       themeMode: settings.isDarkMode ? ThemeMode.dark : ThemeMode.light,

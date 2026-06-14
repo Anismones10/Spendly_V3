@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:hive/hive.dart';
+import 'package:provider/provider.dart';
+import '../providers/settings_provider.dart';
 import '../services/auth_service.dart';
 import '../services/sync_service.dart';
 import 'main_shell.dart';
@@ -56,10 +58,16 @@ class _LoginScreenState extends State<LoginScreen> {
           await SyncService.migrateLocalData();
         } else {
           await SyncService.restoreFromCloud();
+          if (mounted) {
+            context.read<SettingsProvider>().refresh();
+          }
         }
       } else if (hasCloud) {
         // Only cloud has data (new device, existing account)
         await SyncService.restoreFromCloud();
+        if (mounted) {
+          context.read<SettingsProvider>().refresh();
+        }
       } else {
         // Only local has data (or both empty) — push local to cloud
         await SyncService.migrateLocalData();

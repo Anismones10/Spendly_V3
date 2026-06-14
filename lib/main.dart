@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:home_widget/home_widget.dart';
@@ -159,37 +160,42 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
+
+  static const _widgetChannel = MethodChannel('com.example.expense_tracker/widget');
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
-    // Handle cold start: app launched fresh by tapping the widget
-    HomeWidget.initiallyLaunchedFromHomeWidget().then(_handleWidgetUri);
-
-    // Handle warm start: app already running, widget tapped again
-    HomeWidget.widgetClicked.listen(_handleWidgetUri);
+    // Listen for widget button taps sent directly from MainActivity via MethodChannel
+    _widgetChannel.setMethodCallHandler((call) async {
+      if (call.method == 'onWidgetAction') {
+        final action = call.arguments as String?;
+        debugPrint('🔵 onWidgetAction: $action');
+        if (action == 'add_expense') {
+          _pushAddExpenseWhenReady();
+        } else if (action == 'refresh') {
+          WidgetHelper.updateWidget();
+        }
+      }
+    });
   }
 
-  void _handleWidgetUri(Uri? uri) {
-    debugPrint('🔵 _handleWidgetUri called with: $uri');
-    if (uri == null) return;
-    if (uri.host == 'add_expense') {
-      debugPrint('🔵 Pushing AddExpenseScreen');
-      _pushAddExpenseWhenReady();
-    }
-  }
-
-  void _pushAddExpenseWhenReady() {
+  void _pushAddExpenseWhenReady([int attempts = 0]) {
+    if (attempts > 30) return; // give up after 6 seconds
     final state = navigatorKey.currentState;
-    if (state != null) {
-      state.push(
-        MaterialPageRoute(builder: (_) => const AddExpenseScreen()),
-      );
-    } else {
-      // Navigator not mounted yet (e.g. splash screen still loading) — retry shortly
-      Future.delayed(const Duration(milliseconds: 200), _pushAddExpenseWhenReady);
+    // Also check the navigator has a valid route (splash may have replaced it)
+    if (state != null && state.canPop() || state?.widget != null) {
+      try {
+        state!.push(MaterialPageRoute(builder: (_) => const AddExpenseScreen()));
+        return;
+      } catch (_) {}
     }
+    Future.delayed(
+      const Duration(milliseconds: 200),
+      () => _pushAddExpenseWhenReady(attempts + 1),
+    );
   }
 
   @override

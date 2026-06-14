@@ -41,22 +41,16 @@ class WidgetHelper {
         if (d == yesterday) yesterdaySpent += e.amount;
       }
 
-      // ── Monthly spending vs budget ───────────────────────────────────────
-      final monthlyBudget = (settingsBox.get(
-          'monthlyBudget', defaultValue: 0.0) as num).toDouble();
-
-      double monthSpent = 0;
+      // ── Remaining = totalBalance - totalSpent (matches Home screen) ─────
+      double totalSpent = 0;
       for (final e in expenseBox.values) {
-        if (e.date.year == now.year && e.date.month == now.month) {
-          monthSpent += e.amount;
-        }
+        totalSpent += e.amount;
       }
 
-      final remaining       = monthlyBudget > 0
-          ? monthlyBudget - monthSpent : totalBalance;
-      final hasBudget       = monthlyBudget > 0;
-      final budgetPct       = hasBudget
-          ? (monthSpent / monthlyBudget).clamp(0.0, 1.0) : 0.0;
+      final remaining = totalBalance - totalSpent;
+      final pct = totalBalance > 0
+          ? (totalSpent / totalBalance).clamp(0.0, 1.0)
+          : 0.0;
 
       // ── Comparison arrow ─────────────────────────────────────────────────
       // +1 = spent more today, -1 = spent less, 0 = same
@@ -71,8 +65,8 @@ class WidgetHelper {
         HomeWidget.saveWidgetData<String>('yesterday_spent', _fmt(yesterdaySpent, symbol)),
         HomeWidget.saveWidgetData<int>   ('trend',           trend),
         HomeWidget.saveWidgetData<String>('remaining',       _fmt(remaining,     symbol)),
-        HomeWidget.saveWidgetData<bool>  ('has_budget',      hasBudget),
-        HomeWidget.saveWidgetData<int>   ('budget_pct',      (budgetPct * 100).round()),
+        HomeWidget.saveWidgetData<bool>  ('has_budget',      true),
+        HomeWidget.saveWidgetData<int>   ('budget_pct',      (pct * 100).round()),
         HomeWidget.saveWidgetData<String>('last_updated',    _timeLabel(now)),
       ]);
 
@@ -89,13 +83,24 @@ class WidgetHelper {
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   static String _fmt(double amount, String sym) {
-    if (amount >= 1000000) {
-      return '$sym${(amount / 1000000).toStringAsFixed(1)}M';
+    final isNegative = amount < 0;
+    final absAmount = amount.abs();
+
+    // Format with thousands separators, 2 decimal places
+    final wholePart = absAmount.truncate();
+    final decimalPart = ((absAmount - wholePart) * 100).round();
+
+    final wholeStr = wholePart.toString();
+    final buffer = StringBuffer();
+    for (int i = 0; i < wholeStr.length; i++) {
+      if (i > 0 && (wholeStr.length - i) % 3 == 0) {
+        buffer.write(',');
+      }
+      buffer.write(wholeStr[i]);
     }
-    if (amount >= 1000) {
-      return '$sym${(amount / 1000).toStringAsFixed(1)}k';
-    }
-    return '$sym${amount.toStringAsFixed(2)}';
+
+    final formatted = '$buffer.${decimalPart.toString().padLeft(2, '0')}';
+    return '${isNegative ? '-' : ''}$sym$formatted';
   }
 
   static String _timeLabel(DateTime now) {

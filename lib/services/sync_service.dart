@@ -4,6 +4,7 @@ import '../models/expense_model.dart';
 import '../models/income_model.dart';
 import '../models/wallet_model.dart';
 import '../models/category_model.dart';
+import '../models/category_budget_model.dart';
 import '../models/goal_model.dart';
 import '../models/loan_model.dart';
 import 'auth_service.dart';
@@ -33,7 +34,17 @@ class SyncService {
   static Future<bool> hasCloudData() async {
     if (!AuthService.isLoggedIn) return false;
     try {
-      final uid  = AuthService.userId!;
+      final uid = AuthService.userId!;
+
+      // Check the user's settings doc first (covers users with settings
+      // but few/no expenses)
+      final userDoc = await _db.collection('users').doc(uid).get();
+      if (userDoc.exists && userDoc.data() != null &&
+          userDoc.data()!.containsKey('currency')) {
+        return true;
+      }
+
+      // Fallback: check expenses collection
       final snap = await _db
           .collection('users')
           .doc(uid)
@@ -71,6 +82,7 @@ class SyncService {
       _syncIncome(),
       _syncWallets(),
       _syncCategories(),
+      _syncCategoryBudgets(),
       _syncGoals(),
       _syncLoans(),
       _syncSettings(),
@@ -90,6 +102,7 @@ class SyncService {
       _syncIncome(),
       _syncWallets(),
       _syncCategories(),
+      _syncCategoryBudgets(),
       _syncGoals(),
       _syncLoans(),
       _syncSettings(),
@@ -184,6 +197,21 @@ class SyncService {
     await batch.commit();
   }
 
+  // ── Category Budgets ──────────────────────────────────────────────────────
+  static Future<void> _syncCategoryBudgets() async {
+    final box = Hive.box<CategoryBudgetModel>('category_budgets');
+    final batch = _db.batch();
+    final col = _userCol('categoryBudgets');
+
+    for (final b in box.values) {
+      batch.set(col.doc(b.categoryId), {
+        'categoryId':  b.categoryId,
+        'limitAmount': b.limitAmount,
+      });
+    }
+    await batch.commit();
+  }
+
   // ── Goals ─────────────────────────────────────────────────────────────────
   static Future<void> _syncGoals() async {
     final box = Hive.box<GoalModel>('goals');
@@ -228,6 +256,11 @@ class SyncService {
   }
 
   // ── Settings ──────────────────────────────────────────────────────────────
+  static Future<void> syncSettingsNow() async {
+    if (!AuthService.isLoggedIn) return;
+    await _syncSettings();
+  }
+
   static Future<void> _syncSettings() async {
     final uid = AuthService.userId!;
     await _db.collection('users').doc(uid).set({
@@ -257,6 +290,7 @@ class SyncService {
       _restoreIncome(),
       _restoreWallets(),
       _restoreCategories(),
+      _restoreCategoryBudgets(),
       _restoreGoals(),
       _restoreLoans(),
       _restoreSettings(),
@@ -348,6 +382,18 @@ class SyncService {
     }
   }
 
+  static Future<void> _restoreCategoryBudgets() async {
+    final box  = Hive.box<CategoryBudgetModel>('category_budgets');
+    final docs = await _userCol('categoryBudgets').get();
+    for (final doc in docs.docs) {
+      final d = doc.data() as Map<String, dynamic>;
+      box.put(d['categoryId'], CategoryBudgetModel(
+        categoryId:  d['categoryId'],
+        limitAmount: (d['limitAmount'] as num).toDouble(),
+      ));
+    }
+  }
+
   static Future<void> _restoreGoals() async {
     final box  = Hive.box<GoalModel>('goals');
     final docs = await _userCol('goals').get();
@@ -392,6 +438,7 @@ class SyncService {
       }
     }
   }
+
   static Future<void> _restoreSettings() async {
     final uid = AuthService.userId!;
     final doc = await _db.collection('users').doc(uid).get();

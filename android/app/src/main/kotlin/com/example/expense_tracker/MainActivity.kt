@@ -12,7 +12,6 @@ class MainActivity : FlutterFragmentActivity() {
     private val CHANNEL = "com.example.expense_tracker/biometric"
     private val WIDGET_CHANNEL = "com.example.expense_tracker/widget"
 
-    // Store action from cold-start intent until Flutter engine is ready
     private var pendingWidgetAction: String? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -33,9 +32,9 @@ class MainActivity : FlutterFragmentActivity() {
             }
         }
 
-        // Flutter engine is now ready — send any pending widget action
+        // Send any pending widget action now that Flutter engine is ready
         pendingWidgetAction?.let { action ->
-            Log.d("SpendlyWidget", "Sending pending action to Flutter: $action")
+            Log.d("SpendlyWidget", "Sending pending action: $action")
             MethodChannel(flutterEngine.dartExecutor.binaryMessenger, WIDGET_CHANNEL)
                 .invokeMethod("onWidgetAction", action)
             pendingWidgetAction = null
@@ -44,36 +43,27 @@ class MainActivity : FlutterFragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        extractWidgetAction(intent)
+        handleWidgetIntent(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        // Engine is already running on warm start — send immediately
-        val action = getSpendlyAction(intent) ?: return
-        Log.d("SpendlyWidget", "onNewIntent action: $action")
-        flutterEngine?.dartExecutor?.binaryMessenger?.let { messenger ->
-            MethodChannel(messenger, WIDGET_CHANNEL).invokeMethod("onWidgetAction", action)
-        }
+        handleWidgetIntent(intent)
     }
 
-    private fun extractWidgetAction(intent: Intent?) {
-        val action = getSpendlyAction(intent) ?: return
-        Log.d("SpendlyWidget", "onCreate action: $action (engine ready: ${flutterEngine != null})")
+    private fun handleWidgetIntent(intent: Intent?) {
+        val action = intent?.getStringExtra("widget_action") ?: return
+        if (action == "open") return // plain open — do nothing extra
+        Log.d("SpendlyWidget", "handleWidgetIntent action: $action")
+
         val engine = flutterEngine
         if (engine != null) {
             MethodChannel(engine.dartExecutor.binaryMessenger, WIDGET_CHANNEL)
                 .invokeMethod("onWidgetAction", action)
         } else {
-            // Engine not ready yet — store and send in configureFlutterEngine
+            // Engine not ready (cold start) — store and send in configureFlutterEngine
             pendingWidgetAction = action
         }
-    }
-
-    private fun getSpendlyAction(intent: Intent?): String? {
-        val uri = intent?.data ?: return null
-        if (uri.scheme != "spendly") return null
-        return uri.host
     }
 }

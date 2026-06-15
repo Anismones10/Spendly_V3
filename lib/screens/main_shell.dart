@@ -78,7 +78,7 @@ final List<_TabDef> _allTabs = [
     label: 'Search',
     icon: Icons.search_outlined,
     activeIcon: Icons.search_rounded,
-    screen: const GlobalSearchScreen(),
+    screen: const GlobalSearchScreen(autoFocus: true), // ← fix
   ),
   _TabDef(
     id: 'settings',
@@ -360,7 +360,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     } else if (currentId == 'income') {
       currentScreen = IncomeScreen(onMoreTap: _showMoreMenu);
     } else if (currentId == 'search') {
-      currentScreen = const GlobalSearchScreen();
+      currentScreen = const GlobalSearchScreen(autoFocus: true); // ← fix
     } else if (_currentIndex < tabs.length) {
       currentScreen = tabs[_currentIndex].screen;
     } else {
@@ -372,8 +372,20 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     final needsMoreOverlay =
         !hasOwnMoreButton && currentId != 'search';
 
-    return Scaffold(
-      body: Stack(
+    return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          if (_currentIndex != 0) {
+            // First back press — go to home
+            _goTo(0);
+          } else {
+            // Already on home — exit app
+            SystemNavigator.pop();
+          }
+        },
+        child: Scaffold(
+          body: Stack(
         children: [
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 260),
@@ -450,8 +462,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                   label: tab.label,
                   isSelected: isSelected,
                   onTap: () => _goTo(i),
-                );
-              }),
+                  );
+                }),
+              ),
             ),
           ),
         ),

@@ -4,7 +4,6 @@ import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.widget.RemoteViews
 import android.graphics.Color
 import android.app.PendingIntent
@@ -23,6 +22,23 @@ class SpendlyWidgetProvider : AppWidgetProvider() {
     }
 
     companion object {
+
+        private fun buildPending(context: Context, action: String, requestCode: Int): PendingIntent {
+            // Use the same launch intent (resumes app instantly, no splash)
+            // but attach our action as an extra
+            val intent = context.packageManager
+                .getLaunchIntentForPackage(context.packageName)!!
+                .apply {
+                    putExtra("widget_action", action)
+                    // SINGLE_TOP so onNewIntent fires on the running instance
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                }
+            return PendingIntent.getActivity(
+                context, requestCode, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        }
+
         fun updateWidget(
                 context: Context,
                 appWidgetManager: AppWidgetManager,
@@ -41,71 +57,41 @@ class SpendlyWidgetProvider : AppWidgetProvider() {
 
                 val views = RemoteViews(context.packageName, R.layout.spendly_widget)
 
-                // ── Remaining (hero) ──────────────────────────────────────
+                // ── Remaining (hero) ──────────────────────────────────
                 views.setTextViewText(R.id.widget_remaining, remaining)
-                views.setTextColor(R.id.widget_remaining, Color.parseColor("#FFFFFF"))
+                views.setTextColor(R.id.widget_remaining, Color.WHITE)
 
-                // ── Total balance + spending progress (bottom stat) ───────
+                // ── Total balance + progress ──────────────────────────
                 views.setTextViewText(R.id.widget_balance, balance)
                 views.setTextViewText(R.id.widget_last_updated, lastUpdated)
                 views.setProgressBar(R.id.widget_budget_bar, 100, budgetPct, false)
 
-                // ── Today spent ────────────────────────────────────────────
+                // ── Today spent ───────────────────────────────────────
                 views.setTextViewText(R.id.widget_today_spent, todaySpent)
                 views.setTextViewText(R.id.widget_yesterday, "vs $yesterday yesterday")
 
-                // ── Trend arrow ─────────────────────────────────────────────
+                // ── Trend arrow ───────────────────────────────────────
                 when (trend) {
-                    1 -> {
-                        views.setTextViewText(R.id.widget_trend, "▲")
-                        views.setTextColor(R.id.widget_trend, Color.parseColor("#E57373"))
-                    }
-                    -1 -> {
-                        views.setTextViewText(R.id.widget_trend, "▼")
-                        views.setTextColor(R.id.widget_trend, Color.parseColor("#2ECC71"))
-                    }
+                    1  -> { views.setTextViewText(R.id.widget_trend, "▲")
+                            views.setTextColor(R.id.widget_trend, Color.parseColor("#E57373")) }
+                    -1 -> { views.setTextViewText(R.id.widget_trend, "▼")
+                            views.setTextColor(R.id.widget_trend, Color.parseColor("#2ECC71")) }
                     else -> views.setTextViewText(R.id.widget_trend, "")
                 }
 
-                // ── Add Expense button — deep link, reuses running activity ─
-                val addPending = PendingIntent.getActivity(
-                        context, 0,
-                        Intent(Intent.ACTION_VIEW, Uri.parse("spendly://add_expense")).apply {
-                            setPackage(context.packageName)
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
-                                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                                    Intent.FLAG_ACTIVITY_CLEAR_TOP
-                        },
-                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                views.setOnClickPendingIntent(R.id.widget_add_btn, addPending)
+                // ── Buttons ───────────────────────────────────────────
+                // All use getLaunchIntent so app resumes instantly (no splash)
+                views.setOnClickPendingIntent(R.id.widget_add_btn,
+                    buildPending(context, "add_expense", 0))
 
-                // ── Refresh button — deep link recomputes widget data from Hive ─
-                val refreshPending = PendingIntent.getActivity(
-                        context, 2,
-                        Intent(Intent.ACTION_VIEW, Uri.parse("spendly://refresh")).apply {
-                            setPackage(context.packageName)
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
-                                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                                    Intent.FLAG_ACTIVITY_CLEAR_TOP
-                        },
-                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                views.setOnClickPendingIntent(R.id.widget_refresh_btn, refreshPending)
+                views.setOnClickPendingIntent(R.id.widget_refresh_btn,
+                    buildPending(context, "refresh", 2))
 
-                // ── Tap widget body → open app ──────────────────────────────
-                val openIntent = context.packageManager
-                        .getLaunchIntentForPackage(context.packageName)
-                        ?.apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
-                if (openIntent != null) {
-                    val openPending = PendingIntent.getActivity(
-                            context, 1, openIntent,
-                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                    )
-                    views.setOnClickPendingIntent(R.id.widget_balance, openPending)
-                    views.setOnClickPendingIntent(R.id.widget_today_spent, openPending)
-                    views.setOnClickPendingIntent(R.id.widget_remaining, openPending)
-                }
+                // Tap body → open app normally (no action extra)
+                val openPending = buildPending(context, "open", 1)
+                views.setOnClickPendingIntent(R.id.widget_balance, openPending)
+                views.setOnClickPendingIntent(R.id.widget_today_spent, openPending)
+                views.setOnClickPendingIntent(R.id.widget_remaining, openPending)
 
                 appWidgetManager.updateAppWidget(widgetId, views)
 

@@ -84,8 +84,8 @@ class SpendlyWidgetProvider : AppWidgetProvider() {
                 views.setOnClickPendingIntent(R.id.widget_add_btn,
                     buildPending(context, "add_expense", 0))
 
-                views.setOnClickPendingIntent(R.id.widget_refresh_btn,
-                    buildPending(context, "refresh", 2))
+                views.setOnClickPendingIntent(R.id.widget_income_btn,
+                    buildPending(context, "income", 2))
 
                 // Tap body → open app normally (no action extra)
                 val openPending = buildPending(context, "open", 1)

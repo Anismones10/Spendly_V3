@@ -26,6 +26,7 @@ import 'providers/transfer_provider.dart';
 import 'screens/main_shell.dart';
 import 'screens/splash_screen.dart';
 import 'screens/add_expense_screen.dart';
+import 'screens/income_screen.dart';
 import 'utils/app_theme.dart';
 import 'utils/notification_helper.dart';
 import 'utils/widget_helper.dart';
@@ -174,27 +175,34 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         final action = call.arguments as String?;
         debugPrint('🔵 onWidgetAction: $action');
         if (action == 'add_expense') {
-          _pushAddExpenseWhenReady();
-        } else if (action == 'refresh') {
-          WidgetHelper.updateWidget();
+          _pushScreenWhenReady(() => const AddExpenseScreen());
+        } else if (action == 'income') {
+          _pushScreenWhenReady(() => const IncomeScreen());
         }
       }
     });
   }
 
-  void _pushAddExpenseWhenReady([int attempts = 0]) {
+  bool _widgetPushInFlight = false;
+
+  void _pushScreenWhenReady(Widget Function() builder, [int attempts = 0]) {
+    if (_widgetPushInFlight) return; // already pushed/pushing — ignore duplicates
     if (attempts > 30) return; // give up after 6 seconds
+
     final state = navigatorKey.currentState;
-    // Also check the navigator has a valid route (splash may have replaced it)
-    if (state != null && state.canPop() || state?.widget != null) {
-      try {
-        state!.push(MaterialPageRoute(builder: (_) => const AddExpenseScreen()));
-        return;
-      } catch (_) {}
+    if (state != null) {
+      _widgetPushInFlight = true;
+      state.push(
+        MaterialPageRoute(builder: (_) => builder()),
+      ).then((_) {
+        _widgetPushInFlight = false; // reset once user navigates back
+      });
+      return;
     }
+
     Future.delayed(
       const Duration(milliseconds: 200),
-      () => _pushAddExpenseWhenReady(attempts + 1),
+          () => _pushScreenWhenReady(builder, attempts + 1),
     );
   }
 

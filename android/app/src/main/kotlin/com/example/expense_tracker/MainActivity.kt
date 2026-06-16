@@ -12,7 +12,16 @@ class MainActivity : FlutterFragmentActivity() {
     private val CHANNEL = "com.example.expense_tracker/biometric"
     private val WIDGET_CHANNEL = "com.example.expense_tracker/widget"
 
+    // Holds the action extracted from the launching/new intent until
+    // the Flutter engine is ready to receive it via MethodChannel.
     private var pendingWidgetAction: String? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        // IMPORTANT: do NOT touch flutterEngine here — it does not exist yet.
+        // Just capture the action; it will be sent once configureFlutterEngine runs.
+        pendingWidgetAction = extractAction(intent)
+        super.onCreate(savedInstanceState)
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -32,38 +41,33 @@ class MainActivity : FlutterFragmentActivity() {
             }
         }
 
-        // Send any pending widget action now that Flutter engine is ready
+        // Engine is ready now — flush any pending widget action
         pendingWidgetAction?.let { action ->
-            Log.d("SpendlyWidget", "Sending pending action: $action")
+            Log.d("SpendlyWidget", "Sending pending action (cold start): $action")
             MethodChannel(flutterEngine.dartExecutor.binaryMessenger, WIDGET_CHANNEL)
                 .invokeMethod("onWidgetAction", action)
             pendingWidgetAction = null
         }
     }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        handleWidgetIntent(intent)
-    }
-
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        handleWidgetIntent(intent)
+
+        // Activity (and its Flutter engine) already exists on warm start — safe to send now
+        val action = extractAction(intent) ?: return
+        Log.d("SpendlyWidget", "onNewIntent action (warm start): $action")
+        try {
+            MethodChannel(flutterEngine!!.dartExecutor.binaryMessenger, WIDGET_CHANNEL)
+                .invokeMethod("onWidgetAction", action)
+        } catch (e: Exception) {
+            Log.e("SpendlyWidget", "Failed to send widget action", e)
+        }
     }
 
-    private fun handleWidgetIntent(intent: Intent?) {
-        val action = intent?.getStringExtra("widget_action") ?: return
-        if (action == "open") return // plain open — do nothing extra
-        Log.d("SpendlyWidget", "handleWidgetIntent action: $action")
-
-        val engine = flutterEngine
-        if (engine != null) {
-            MethodChannel(engine.dartExecutor.binaryMessenger, WIDGET_CHANNEL)
-                .invokeMethod("onWidgetAction", action)
-        } else {
-            // Engine not ready (cold start) — store and send in configureFlutterEngine
-            pendingWidgetAction = action
-        }
+    private fun extractAction(intent: Intent?): String? {
+        val action = intent?.getStringExtra("widget_action") ?: return null
+        if (action == "open") return null
+        return action
     }
 }

@@ -339,10 +339,15 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
             child: Row(
               children: [
-                // Back button
-                GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: Container(
+                // Back button — only show when pushed as a screen, not as a tab
+                if (widget.autoFocus && Navigator.of(context).canPop())
+                  GestureDetector(
+                    onTap: () {
+                      if (Navigator.of(context).canPop()) {
+                        Navigator.pop(context);
+                      }
+                    },
+                    child: Container(
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
@@ -359,8 +364,8 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
                     child: Icon(Icons.arrow_back_rounded,
                         size: 20,
                         color: theme.colorScheme.onSurface),
-                  ),
-                ),
+                    ),
+                  ),  // closes GestureDetector
                 const SizedBox(width: 10),
                 // Search field
                 Expanded(

@@ -36,19 +36,28 @@
             android:textColor="#66FFFFFF"
             android:textSize="9sp"/>
 
-        <TextView
-            android:id="@+id/widget_refresh_btn"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+        <LinearLayout
+            android:id="@+id/widget_income_btn"
+            android:layout_width="wrap_content"
+            android:layout_height="28dp"
             android:layout_marginStart="6dp"
+            android:orientation="horizontal"
             android:gravity="center"
-            android:text="↻"
-            android:textColor="#FFFFFF"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            android:includeFontPadding="false"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
             android:background="@drawable/widget_refresh_button"
-            android:clickable="true"/>
+            android:clickable="true">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="+ Income"
+                android:textColor="#FFFFFF"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:includeFontPadding="false"/>
+
+        </LinearLayout>
 
     </LinearLayout>
 

@@ -187,6 +187,36 @@ class ExpenseTile extends StatelessWidget {
                             ),
                           ),
                         ],
+                        // Manage button for recurring parent
+                        if (expense.isRecurring && expense.recurringParentId == null) ...[
+                          const SizedBox(width: 4),
+                          GestureDetector(
+                            onTap: () => _showRecurringMenu(context, isDark, theme),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primary.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: theme.colorScheme.primary.withOpacity(0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.tune_rounded, size: 11, color: theme.colorScheme.primary),
+                                  const SizedBox(width: 3),
+                                  Text('Manage', style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: theme.colorScheme.primary,
+                                  )),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                         if (hasNote) ...[
                           const SizedBox(width: 4),
                           GestureDetector(
@@ -341,6 +371,200 @@ class ExpenseTile extends StatelessWidget {
     );
   }
 
+  void _showRecurringMenu(
+      BuildContext context, bool isDark, ThemeData theme) {
+    final provider = context.read<ExpenseProvider>();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        margin: const EdgeInsets.all(16),
+        padding: EdgeInsets.fromLTRB(
+            20, 20, 20, MediaQuery.of(ctx).padding.bottom + 20),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.repeat_rounded,
+                      color: theme.colorScheme.primary, size: 18),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(expense.name,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w700, fontSize: 15),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                      Text(
+                        '${expense.recurringType ?? 'recurring'} · recurring',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // ── Edit ──────────────────────────────────────────────────
+            _RecurringOption(
+              icon: Icons.edit_rounded,
+              color: theme.colorScheme.primary,
+              title: 'Edit this expense',
+              subtitle: 'Change details for this entry only',
+              isDark: isDark,
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => AddExpenseScreen(existing: expense)),
+                );
+              },
+            ),
+            const SizedBox(height: 10),
+
+            // ── Stop recurring ────────────────────────────────────────
+            _RecurringOption(
+              icon: Icons.stop_circle_rounded,
+              color: const Color(0xFFFF9800),
+              title: 'Stop recurring',
+              subtitle: 'Keep this expense but stop future auto-generation',
+              isDark: isDark,
+              onTap: () async {
+                Navigator.pop(ctx);
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (c) => AlertDialog(
+                    title: const Text('Stop Recurring?'),
+                    content: Text(
+                        '"${expense.name}" will no longer auto-generate new entries. Existing entries are kept.'),
+                    actions: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(c, false),
+                          child: const Text('Cancel')),
+                      ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFFF9800)),
+                          onPressed: () => Navigator.pop(c, true),
+                          child: const Text('Stop')),
+                    ],
+                  ),
+                );
+                if (confirm == true) {
+                  final updated = ExpenseModel(
+                    id: expense.id,
+                    name: expense.name,
+                    amount: expense.amount,
+                    categoryId: expense.categoryId,
+                    date: expense.date,
+                    note: expense.note,
+                    isRecurring: false,
+                    recurringType: null,
+                    walletId: expense.walletId,
+                    timeHour: expense.timeHour,
+                    timeMinute: expense.timeMinute,
+                    recurringParentId: null,
+                    recurringLastGenerated: expense.recurringLastGenerated,
+                  );
+                  provider.updateExpense(updated);
+                }
+              },
+            ),
+            const SizedBox(height: 10),
+
+            // ── Delete this only ──────────────────────────────────────
+            _RecurringOption(
+              icon: Icons.delete_outline_rounded,
+              color: const Color(0xFFE57373),
+              title: 'Delete this entry only',
+              subtitle: 'Remove just this expense, keep recurring active',
+              isDark: isDark,
+              onTap: () async {
+                Navigator.pop(ctx);
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (c) => AlertDialog(
+                    title: const Text('Delete This Entry?'),
+                    content: Text(
+                        'Delete "${expense.name}"? The recurring schedule stays active.'),
+                    actions: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(c, false),
+                          child: const Text('Cancel')),
+                      ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red),
+                          onPressed: () => Navigator.pop(c, true),
+                          child: const Text('Delete')),
+                    ],
+                  ),
+                );
+                if (confirm == true) {
+                  provider.deleteExpense(expense.id);
+                }
+              },
+            ),
+            const SizedBox(height: 10),
+
+            // ── Delete all ────────────────────────────────────────────
+            _RecurringOption(
+              icon: Icons.delete_forever_rounded,
+              color: const Color(0xFFB71C1C),
+              title: 'Delete all recurring entries',
+              subtitle: 'Remove this and all auto-generated entries',
+              isDark: isDark,
+              onTap: () async {
+                Navigator.pop(ctx);
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (c) => AlertDialog(
+                    title: const Text('Delete All?'),
+                    content: Text(
+                        'This will delete "${expense.name}" and all its auto-generated entries. This cannot be undone.'),
+                    actions: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(c, false),
+                          child: const Text('Cancel')),
+                      ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red),
+                          onPressed: () => Navigator.pop(c, true),
+                          child: const Text('Delete All')),
+                    ],
+                  ),
+                );
+                if (confirm == true) {
+                  provider.deleteExpense(expense.id);
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showNote(
       BuildContext context, bool isDark, ThemeData theme) {
     showModalBottomSheet(
@@ -418,6 +642,78 @@ class ExpenseTile extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+// ── Recurring option tile ─────────────────────────────────────────────────────
+
+class _RecurringOption extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String subtitle;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _RecurringOption({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.subtitle,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withOpacity(0.2)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: color)),
+                  const SizedBox(height: 2),
+                  Text(subtitle,
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withOpacity(0.5))),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded,
+                color: color.withOpacity(0.4), size: 18),
           ],
         ),
       ),

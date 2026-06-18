@@ -187,36 +187,6 @@ class ExpenseTile extends StatelessWidget {
                             ),
                           ),
                         ],
-                        // Manage button for recurring parent
-                        if (expense.isRecurring && expense.recurringParentId == null) ...[
-                          const SizedBox(width: 4),
-                          GestureDetector(
-                            onTap: () => _showRecurringMenu(context, isDark, theme),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.primary.withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                  color: theme.colorScheme.primary.withOpacity(0.3),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.tune_rounded, size: 11, color: theme.colorScheme.primary),
-                                  const SizedBox(width: 3),
-                                  Text('Manage', style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    color: theme.colorScheme.primary,
-                                  )),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
                         if (hasNote) ...[
                           const SizedBox(width: 4),
                           GestureDetector(
@@ -374,6 +344,9 @@ class ExpenseTile extends StatelessWidget {
   void _showRecurringMenu(
       BuildContext context, bool isDark, ThemeData theme) {
     final provider = context.read<ExpenseProvider>();
+    final childCount = provider.allExpenses
+        .where((e) => e.recurringParentId == expense.id)
+        .length;
 
     showModalBottomSheet(
       context: context,
@@ -413,7 +386,7 @@ class ExpenseTile extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis),
                       Text(
-                        '${expense.recurringType ?? 'recurring'} · recurring',
+                        '${expense.recurringType ?? 'recurring'} · $childCount instance${childCount == 1 ? '' : 's'} generated',
                         style: TextStyle(
                             fontSize: 12,
                             color: theme.colorScheme.primary,

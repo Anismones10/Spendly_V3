@@ -138,6 +138,320 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     );
   }
 
+  void _showRecurringManager(BuildContext context, ExpenseProvider expenses) {
+    final symbol = context.read<SettingsProvider>().currencySymbol;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final parents = expenses.recurringTemplates;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: parents.isEmpty ? 0.35 : 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        builder: (_, scroll) => Container(
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: EdgeInsets.fromLTRB(
+              20, 16, 20, MediaQuery.of(ctx).padding.bottom + 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Handle
+              Center(
+                child: Container(
+                  width: 40, height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Header
+              Row(children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.repeat_rounded,
+                      color: theme.colorScheme.primary, size: 18),
+                ),
+                const SizedBox(width: 12),
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('Recurring Expenses',
+                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                  Text('${parents.length} active template${parents.length == 1 ? '' : 's'}',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurface.withOpacity(0.5))),
+                ]),
+              ]),
+              const SizedBox(height: 16),
+
+              if (parents.isEmpty)
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(children: [
+                      Icon(Icons.repeat_rounded,
+                          size: 48,
+                          color: theme.colorScheme.onSurface.withOpacity(0.2)),
+                      const SizedBox(height: 12),
+                      Text('No recurring expenses yet',
+                          style: TextStyle(
+                              fontSize: 15,
+                              color: theme.colorScheme.onSurface.withOpacity(0.4))),
+                    ]),
+                  ),
+                )
+              else
+                Expanded(
+                  child: ListView.builder(
+                    controller: scroll,
+                    itemCount: parents.length,
+                    itemBuilder: (_, i) {
+                      final parent = parents[i];
+                      final childCount = expenses.allExpenses
+                          .where((e) => e.recurringParentId == parent.id)
+                          .length;
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? const Color(0xFF2A2A2A)
+                              : Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                              color: theme.colorScheme.primary.withOpacity(0.15)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Name + type badge
+                            Row(children: [
+                              Expanded(
+                                child: Text(parent.name,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w700, fontSize: 15),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.primary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  parent.recurringType ?? 'recurring',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: theme.colorScheme.primary,
+                                  ),
+                                ),
+                              ),
+                            ]),
+                            const SizedBox(height: 6),
+                            // Amount + children count
+                            Row(children: [
+                              Text(
+                                AppUtils.formatAmount(parent.amount, symbol),
+                                style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: theme.colorScheme.primary),
+                              ),
+                              const SizedBox(width: 10),
+                              Icon(Icons.copy_rounded,
+                                  size: 12,
+                                  color: theme.colorScheme.onSurface.withOpacity(0.4)),
+                              const SizedBox(width: 4),
+                              Text(
+                                '$childCount instance${childCount == 1 ? '' : 's'} generated',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    color: theme.colorScheme.onSurface.withOpacity(0.5)),
+                              ),
+                            ]),
+                            const SizedBox(height: 10),
+                            // Action buttons
+                            Row(children: [
+                              // Edit
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () {
+                                    Navigator.pop(ctx);
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (_) => AddExpenseScreen(
+                                              existing: parent)),
+                                    );
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: theme.colorScheme.primary.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.edit_rounded,
+                                            size: 14,
+                                            color: theme.colorScheme.primary),
+                                        const SizedBox(width: 5),
+                                        Text('Edit',
+                                            style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                                color: theme.colorScheme.primary)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              // Stop
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () async {
+                                    Navigator.pop(ctx);
+                                    final confirm = await showDialog<bool>(
+                                      context: context,
+                                      builder: (c) => AlertDialog(
+                                        title: const Text('Stop Recurring?'),
+                                        content: Text(
+                                            '"${parent.name}" will stop auto-generating new entries. Existing entries are kept.'),
+                                        actions: [
+                                          TextButton(
+                                              onPressed: () => Navigator.pop(c, false),
+                                              child: const Text('Cancel')),
+                                          ElevatedButton(
+                                              style: ElevatedButton.styleFrom(
+                                                  backgroundColor: const Color(0xFFFF9800)),
+                                              onPressed: () => Navigator.pop(c, true),
+                                              child: const Text('Stop')),
+                                        ],
+                                      ),
+                                    );
+                                    if (confirm == true) {
+                                      final updated = ExpenseModel(
+                                        id: parent.id,
+                                        name: parent.name,
+                                        amount: parent.amount,
+                                        categoryId: parent.categoryId,
+                                        date: parent.date,
+                                        note: parent.note,
+                                        isRecurring: false,
+                                        recurringType: null,
+                                        walletId: parent.walletId,
+                                        timeHour: parent.timeHour,
+                                        timeMinute: parent.timeMinute,
+                                        recurringParentId: null,
+                                        recurringLastGenerated:
+                                            parent.recurringLastGenerated,
+                                      );
+                                      expenses.updateExpense(updated);
+                                    }
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFF9800).withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.stop_circle_rounded,
+                                            size: 14, color: Color(0xFFFF9800)),
+                                        SizedBox(width: 5),
+                                        Text('Stop',
+                                            style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                                color: Color(0xFFFF9800))),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              // Delete all
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () async {
+                                    Navigator.pop(ctx);
+                                    final confirm = await showDialog<bool>(
+                                      context: context,
+                                      builder: (c) => AlertDialog(
+                                        title: const Text('Delete All?'),
+                                        content: Text(
+                                            'This will delete "${parent.name}" and all $childCount generated entries.'),
+                                        actions: [
+                                          TextButton(
+                                              onPressed: () => Navigator.pop(c, false),
+                                              child: const Text('Cancel')),
+                                          ElevatedButton(
+                                              style: ElevatedButton.styleFrom(
+                                                  backgroundColor: Colors.red),
+                                              onPressed: () => Navigator.pop(c, true),
+                                              child: const Text('Delete All')),
+                                        ],
+                                      ),
+                                    );
+                                    if (confirm == true) {
+                                      expenses.deleteExpense(parent.id);
+                                    }
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.delete_forever_rounded,
+                                            size: 14, color: Colors.red),
+                                        SizedBox(width: 5),
+                                        Text('Delete',
+                                            style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.red)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ]),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final expenses = context.watch<ExpenseProvider>();
@@ -203,6 +517,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                     ),
                   ),
                 ),
+              // Recurring button
+              IconButton(
+                icon: const Icon(Icons.repeat_rounded),
+                onPressed: () => _showRecurringManager(context, expenses),
+                tooltip: 'Manage Recurring',
+              ),
             ],
           ),
         ],

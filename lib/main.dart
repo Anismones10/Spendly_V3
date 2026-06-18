@@ -35,37 +35,10 @@ import 'firebase_options.dart';
 // Global navigator key — needed for deep link navigation from widget
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-// ── Background callback for widget refresh button ─────────────────────────
-// Runs in a separate isolate when the widget's refresh (↻) button is tapped.
-@pragma('vm:entry-point')
-Future<void> widgetBackgroundCallback(Uri? uri) async {
-  debugPrint('🟢 widgetBackgroundCallback fired with uri: $uri');
-  if (uri?.host != 'refresh') return;
-
-  WidgetsFlutterBinding.ensureInitialized();
-  await Hive.initFlutter();
-
-  // Register adapters (idempotent — safe even if already registered in main isolate)
-  if (!Hive.isAdapterRegistered(ExpenseModelAdapter().typeId)) {
-    Hive.registerAdapter(ExpenseModelAdapter());
-  }
-  if (!Hive.isAdapterRegistered(WalletModelAdapter().typeId)) {
-    Hive.registerAdapter(WalletModelAdapter());
-  }
-
-  if (!Hive.isBoxOpen('expenses')) {
-    await Hive.openBox<ExpenseModel>('expenses');
-  }
-  if (!Hive.isBoxOpen('wallets')) {
-    await Hive.openBox<WalletModel>('wallets');
-  }
-  if (!Hive.isBoxOpen('settings')) {
-    await Hive.openBox('settings');
-  }
-
-  await WidgetHelper.updateWidget();
-  debugPrint('🟢 widgetBackgroundCallback finished updateWidget()');
-}
+// Set to true by SplashScreen right before it replaces itself with the
+// real app (MainShell/LoginScreen). Widget-triggered navigation waits for
+// this so it doesn't get stomped by splash's own pushReplacement.
+bool splashNavigationDone = false;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -101,7 +74,6 @@ void main() async {
 
   // ── Home widget init ───────────────────────────────────────────────────
   await HomeWidget.setAppGroupId('group.com.example.expense_tracker');
-  HomeWidget.registerBackgroundCallback(widgetBackgroundCallback);
   await WidgetHelper.updateWidget(); // push initial data to widget
 
   final settingsBox  = Hive.box('settings');
@@ -187,10 +159,15 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   void _pushScreenWhenReady(Widget Function() builder, [int attempts = 0]) {
     if (_widgetPushInFlight) return; // already pushed/pushing — ignore duplicates
-    if (attempts > 30) return; // give up after 6 seconds
+    if (attempts > 50) return; // give up after ~10 seconds
 
     final state = navigatorKey.currentState;
-    if (state != null) {
+
+    // SplashScreen does its own pushReplacement ~1.5s after creation. If we
+    // push our screen before that happens, the splash's pushReplacement will
+    // replace OUR route instead of itself, kicking the user back to home.
+    // So wait until splash has signaled it's done navigating.
+    if (state != null && splashNavigationDone) {
       _widgetPushInFlight = true;
       state.push(
         MaterialPageRoute(builder: (_) => builder()),

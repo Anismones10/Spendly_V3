@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:hive/hive.dart';
 import '../services/auth_service.dart';
 import '../services/sync_service.dart';
+import '../main.dart';
 import 'main_shell.dart';
 import 'login_screen.dart';
 import 'lock_screen.dart';
@@ -66,6 +67,13 @@ class _SplashScreenState extends State<SplashScreen> {
         MaterialPageRoute(builder: (_) => const LoginScreen()),
       );
     }
+
+    // pushReplacement swaps the route stack synchronously (the transition
+    // animation is purely visual), so by the next frame the splash route
+    // is already gone. Signal it's now safe for widget-triggered pushes.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      splashNavigationDone = true;
+    });
   }
 
   @override

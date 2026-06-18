@@ -1464,7 +1464,9 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               const SizedBox(height: 20),
 
               // ── Recurring ─────────────────────────────────────────────
-              Container(
+              Builder(builder: (context) {
+                final isChild = widget.existing?.recurringParentId != null;
+                return Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: isDark
@@ -1480,7 +1482,9 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                 child: Column(children: [
                   Row(children: [
                     Icon(Icons.repeat_rounded,
-                        color: _isRecurring
+                        color: isChild
+                            ? theme.colorScheme.onSurface.withOpacity(0.3)
+                            : _isRecurring
                             ? theme.colorScheme.primary
                             : theme.colorScheme.onSurface
                                 .withOpacity(0.5)),
@@ -1489,10 +1493,21 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Recurring Expense',
+                          Text('Recurring Expense',
                               style: TextStyle(
-                                  fontWeight: FontWeight.w600)),
-                          if (_isRecurring)
+                                  fontWeight: FontWeight.w600,
+                                  color: isChild
+                                      ? theme.colorScheme.onSurface.withOpacity(0.4)
+                                      : null)),
+                          if (isChild)
+                            Text(
+                              'Auto-generated expenses cannot be set as recurring',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: const Color(0xFFFF9800).withOpacity(0.8),
+                              ),
+                            )
+                          else if (_isRecurring)
                             Text(
                               'Automatically logged every $_recurringType',
                               style: TextStyle(
@@ -1504,8 +1519,8 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                       ),
                     ),
                     Switch.adaptive(
-                      value: _isRecurring,
-                      onChanged: (v) =>
+                      value: isChild ? false : _isRecurring,
+                      onChanged: isChild ? null : (v) =>
                           setState(() => _isRecurring = v),
                     ),
                   ]),
@@ -1582,7 +1597,8 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                     ),
                   ],
                 ]),
-              ).animate().fadeIn(delay: 250.ms),
+              ).animate().fadeIn(delay: 250.ms);
+              }), // end Builder
 
               const SizedBox(height: 32),
 

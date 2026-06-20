@@ -481,22 +481,13 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
         title: const Text('Expenses'),
         actions: [
-          // ••• More button
-          if (widget.onMoreTap != null)
-            GestureDetector(
-              onTap: widget.onMoreTap,
-              child: Container(
-                margin: const EdgeInsets.only(right: 4),
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Icon(Icons.more_horiz_rounded,
-                    color: theme.colorScheme.primary, size: 20),
-              ),
-            ),
-          // Filter button
+          // ── Recurring button ───────────────────────────────────────
+          IconButton(
+            icon: const Icon(Icons.repeat_rounded),
+            onPressed: () => _showRecurringManager(context, expenses),
+            tooltip: 'Manage Recurring',
+          ),
+          // ── Filter button ──────────────────────────────────────────
           Stack(
             children: [
               IconButton(
@@ -517,14 +508,23 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                     ),
                   ),
                 ),
-              // Recurring button
-              IconButton(
-                icon: const Icon(Icons.repeat_rounded),
-                onPressed: () => _showRecurringManager(context, expenses),
-                tooltip: 'Manage Recurring',
-              ),
             ],
           ),
+          // ── More button ────────────────────────────────────────────
+          if (widget.onMoreTap != null)
+            GestureDetector(
+              onTap: widget.onMoreTap,
+              child: Container(
+                margin: const EdgeInsets.only(right: 4),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Icon(Icons.more_horiz_rounded,
+                    color: theme.colorScheme.primary, size: 20),
+              ),
+            ),
         ],
       ),
       body: Column(

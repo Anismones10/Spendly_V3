@@ -1,5 +1,4 @@
-package com.example.expense_tracker
-
+package com.blazefang.spendly
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK
 import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL

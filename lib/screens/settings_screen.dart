@@ -252,11 +252,6 @@ class SettingsScreen extends StatelessWidget {
                 title: 'Switch Account',
                 subtitle: 'Sign out and log in with a different account',
               ),
-              const _AccountTile(
-                icon: Icons.person_add_alt_1_rounded,
-                title: 'Add Another Account',
-                subtitle: 'Save current data and sign in to a new account',
-              ),
             ],
           ),
           const SizedBox(height: 10),
@@ -326,7 +321,7 @@ class SettingsScreen extends StatelessWidget {
               child: const Text('Cancel')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () {
+            onPressed: () async {
               ctx.read<ExpenseProvider>().clearAll();
               ctx.read<CategoryProvider>().clearAll();
               ctx.read<SavingsProvider>().clearAll();
@@ -337,6 +332,8 @@ class SettingsScreen extends StatelessWidget {
               ctx.read<CategoryBudgetProvider>().clearAll();
               ctx.read<TransferProvider>().clearAll();
               ctx.read<SettingsProvider>().clearAllData();
+              // Also clear Firestore so it doesn't restore on next login
+              SyncService.clearCloudData();
               Navigator.pop(ctx);
             },
             child: const Text('Clear All'),
@@ -2366,8 +2363,16 @@ class _AccountTileState extends State<_AccountTile> {
       }
     }
 
-    // Sign out and go to login screen
+    // Sign out + disconnect Google so the account picker appears on next sign-in
     await AuthService.signOut();
+    try {
+      await AuthService.disconnectGoogle();
+    } catch (_) {}
+
+    // Clear all local data so the new account starts fresh
+    // (new account will either restore its own cloud data or start empty)
+    await SyncService.clearAllLocalData();
+
     if (!mounted) return;
     setState(() => _loading = false);
 

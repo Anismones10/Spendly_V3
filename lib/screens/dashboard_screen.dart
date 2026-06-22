@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import 'package:provider/provider.dart';
+import '../services/auth_service.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../providers/expense_provider.dart';
 import '../providers/settings_provider.dart';
@@ -150,9 +151,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ],
                 ).createShader(bounds),
                 child: Text(
-                  'Spendly',
+                  _greeting(),
                   style: TextStyle(
-                    fontSize: 26,
+                    fontSize: 22,
                     fontWeight: FontWeight.w800,
                     color: Colors.white,
                     letterSpacing: -0.5,
@@ -452,6 +453,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
         elevation: 8,
       ).animate().scale(delay: 600.ms),
     );
+  }
+
+  String _greeting() {
+    final user = AuthService.currentUser;
+    String name = '';
+
+    if (user != null) {
+      // Prefer display name, fall back to email prefix
+      if (user.displayName != null && user.displayName!.trim().isNotEmpty) {
+        // Use only the first name
+        name = user.displayName!.trim().split(' ').first;
+      } else if (user.email != null) {
+        // e.g. "john.doe@gmail.com" → "john"
+        name = user.email!.split('@').first.split('.').first;
+      }
+    }
+
+    final hour = DateTime.now().hour;
+    final greeting = hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening';
+
+    return name.isNotEmpty ? 'Hi, $name ' : 'Good $greeting ';
   }
 
   String _todayDate() {

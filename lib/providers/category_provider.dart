@@ -40,6 +40,10 @@ class CategoryProvider extends ChangeNotifier {
 
   /// Returns categories in the user-defined order
   List<CategoryModel> get categories {
+    // Always ensure defaults exist — handles case where clearAll() fired
+    // before this screen was mounted (notifyListeners was missed)
+    _seedDefaults();
+
     final all = _box.values.toList();
     final order = _savedOrder;
 

@@ -280,6 +280,46 @@ class SyncService {
     }, SetOptions(merge: true));
   }
 
+  // ── Clear all cloud Firestore data for current user ──────────────────────
+  /// Deletes all collections + the user document from Firestore.
+  /// Called when user taps "Clear All Data" so cloud stays in sync.
+  static Future<void> clearCloudData() async {
+    if (!AuthService.isLoggedIn) return;
+    final uid = AuthService.userId!;
+
+    final collections = [
+      'expenses', 'income', 'wallets', 'categories',
+      'categoryBudgets', 'goals', 'loans',
+    ];
+
+    await Future.wait(collections.map((col) async {
+      final snap = await _db.collection('users').doc(uid).collection(col).get();
+      final batch = _db.batch();
+      for (final doc in snap.docs) {
+        batch.delete(doc.reference);
+      }
+      if (snap.docs.isNotEmpty) await batch.commit();
+    }));
+
+    // Delete the user settings document too
+    await _db.collection('users').doc(uid).delete();
+  }
+
+  // ── Clear all local Hive data ─────────────────────────────────────────────
+  /// Called when switching accounts so the new account starts clean.
+  static Future<void> clearAllLocalData() async {
+    await Hive.box<ExpenseModel>('expenses').clear();
+    await Hive.box<IncomeModel>('income').clear();
+    await Hive.box<WalletModel>('wallets').clear();
+    await Hive.box<CategoryModel>('categories').clear();
+    await Hive.box<CategoryBudgetModel>('category_budgets').clear();
+    await Hive.box<GoalModel>('goals').clear();
+    await Hive.box<LoanModel>('loans').clear();
+    // Reset account-specific flags (keep other settings like theme/currency)
+    _settings.put('dataMigrated', false);
+    _settings.put('lastSyncTime', 0);
+  }
+
   // ── Restore from Firestore to Hive ────────────────────────────────────────
   /// Used when user logs in on a new device — pulls cloud data into Hive.
   static Future<void> restoreFromCloud() async {

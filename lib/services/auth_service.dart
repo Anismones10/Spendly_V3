@@ -22,7 +22,7 @@ class AuthService {
 
       // Get auth details
       final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
+      await googleUser.authentication;
 
       // Create Firebase credential
       final credential = GoogleAuthProvider.credential(
@@ -32,7 +32,7 @@ class AuthService {
 
       // Sign in to Firebase
       final UserCredential result =
-          await _auth.signInWithCredential(credential);
+      await _auth.signInWithCredential(credential);
       return result.user;
     } catch (e) {
       return null;
@@ -43,5 +43,12 @@ class AuthService {
   static Future<void> signOut() async {
     await _googleSignIn.signOut();
     await _auth.signOut();
+  }
+
+  // ── Disconnect Google ─────────────────────────────────────────────────────
+  // Clears the cached Google token so the NEXT signInWithGoogle() call
+  // always shows the account picker (used before switching accounts).
+  static Future<void> disconnectGoogle() async {
+    await _googleSignIn.disconnect();
   }
 }

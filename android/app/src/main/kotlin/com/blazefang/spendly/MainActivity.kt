@@ -1,5 +1,4 @@
-package com.example.expense_tracker
-
+package com.blazefang.spendly
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log

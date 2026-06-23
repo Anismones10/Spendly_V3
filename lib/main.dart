@@ -26,19 +26,15 @@ import 'providers/transfer_provider.dart';
 import 'screens/main_shell.dart';
 import 'screens/splash_screen.dart';
 import 'screens/add_expense_screen.dart';
-import 'screens/income_screen.dart';
-import 'utils/app_theme.dart';
+import 'screens/income_screen.dart';import 'utils/app_theme.dart';
 import 'utils/notification_helper.dart';
 import 'utils/widget_helper.dart';
 import 'firebase_options.dart';
+import 'app_state.dart';
 
 // Global navigator key — needed for deep link navigation from widget
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-// Set to true by SplashScreen right before it replaces itself with the
-// real app (MainShell/LoginScreen). Widget-triggered navigation waits for
-// this so it doesn't get stomped by splash's own pushReplacement.
-bool splashNavigationDone = false;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -134,7 +130,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
-  static const _widgetChannel = MethodChannel('com.example.expense_tracker/widget');
+  static const _widgetChannel = MethodChannel('com.blazefang.spendly/widget');
 
   @override
   void initState() {

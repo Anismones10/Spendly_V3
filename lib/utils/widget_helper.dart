@@ -57,8 +57,12 @@ class WidgetHelper {
       final trend = todaySpent > yesterdaySpent
           ? 1 : todaySpent < yesterdaySpent ? -1 : 0;
 
+      // ── User name ────────────────────────────────────────────────────────
+      final userName = settingsBox.get('user_display_name', defaultValue: '') as String;
+
       // ── Save to widget storage ───────────────────────────────────────────
       await Future.wait([
+        HomeWidget.saveWidgetData<String>('user_name',        userName),
         HomeWidget.saveWidgetData<String>('symbol',          symbol),
         HomeWidget.saveWidgetData<String>('total_balance',   _fmt(totalBalance,  symbol)),
         HomeWidget.saveWidgetData<String>('today_spent',     _fmt(todaySpent,    symbol)),

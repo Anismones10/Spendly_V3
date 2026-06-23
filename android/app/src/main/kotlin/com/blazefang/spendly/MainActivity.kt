@@ -1,4 +1,5 @@
 package com.blazefang.spendly
+
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -8,8 +9,8 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterFragmentActivity() {
 
-    private val CHANNEL = "com.example.expense_tracker/biometric"
-    private val WIDGET_CHANNEL = "com.example.expense_tracker/widget"
+    private val CHANNEL = "com.blazefang.spendly/biometric"
+    private val WIDGET_CHANNEL = "com.blazefang.spendly/widget"
 
     // Holds the action extracted from the launching/new intent until
     // the Flutter engine is ready to receive it via MethodChannel.

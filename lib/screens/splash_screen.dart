@@ -3,10 +3,10 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:hive/hive.dart';
 import '../services/auth_service.dart';
 import '../services/sync_service.dart';
-import '../main.dart';
 import 'main_shell.dart';
 import 'login_screen.dart';
 import 'lock_screen.dart';
+import '../app_state.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -64,7 +64,7 @@ class _SplashScreenState extends State<SplashScreen> {
     } else {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        MaterialPageRoute(builder: (_) => LoginScreen()),
       );
     }
 

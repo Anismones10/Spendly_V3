@@ -28,7 +28,13 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    final box             = Hive.box('settings');
+    // Save display name/email to Hive so widget can show it without Firebase
+    final box = Hive.box('settings');
+    final displayName = user.displayName ?? '';
+    final firstName = displayName.trim().isNotEmpty
+        ? displayName.trim().split(' ').first
+        : (user.email ?? '').split('@').first.split('.').first;
+    box.put('user_display_name', firstName);
     final alreadyMigrated = box.get('dataMigrated', defaultValue: false) as bool;
 
     if (!alreadyMigrated) {
@@ -96,7 +102,7 @@ class _LoginScreenState extends State<LoginScreen> {
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         backgroundColor:
-            isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        isDark ? const Color(0xFF1E1E1E) : Colors.white,
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20)),
         title: const Text('Confirm your account',
@@ -126,13 +132,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   CircleAvatar(
                     radius: 22,
                     backgroundColor:
-                        theme.colorScheme.primary.withOpacity(0.15),
+                    theme.colorScheme.primary.withOpacity(0.15),
                     backgroundImage: photo != null
                         ? NetworkImage(photo)
                         : null,
                     child: photo == null
                         ? Icon(Icons.person_rounded,
-                            color: theme.colorScheme.primary)
+                        color: theme.colorScheme.primary)
                         : null,
                   ),
                   const SizedBox(width: 12),
@@ -206,7 +212,7 @@ class _LoginScreenState extends State<LoginScreen> {
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         backgroundColor:
-            isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        isDark ? const Color(0xFF1E1E1E) : Colors.white,
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20)),
         title: Row(children: [
@@ -277,7 +283,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return Scaffold(
       backgroundColor:
-          isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
+      isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -331,19 +337,19 @@ class _LoginScreenState extends State<LoginScreen> {
                 ('💳', 'Manage multiple wallets'),
                 ('☁️', 'Backed up automatically to cloud'),
               ].map((f) => Padding(
-                    padding: const EdgeInsets.only(bottom: 14),
-                    child: Row(
-                      children: [
-                        Text(f.$1, style: const TextStyle(fontSize: 22)),
-                        const SizedBox(width: 14),
-                        Text(f.$2,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: theme.colorScheme.onSurface.withOpacity(0.7),
-                            )),
-                      ],
-                    ),
-                  )),
+                padding: const EdgeInsets.only(bottom: 14),
+                child: Row(
+                  children: [
+                    Text(f.$1, style: const TextStyle(fontSize: 22)),
+                    const SizedBox(width: 14),
+                    Text(f.$2,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: theme.colorScheme.onSurface.withOpacity(0.7),
+                        )),
+                  ],
+                ),
+              )),
 
               const SizedBox(height: 32),
 
@@ -371,7 +377,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   onPressed: _loading ? null : _signInWithGoogle,
                   style: ElevatedButton.styleFrom(
                     backgroundColor:
-                        isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                    isDark ? const Color(0xFF1E1E1E) : Colors.white,
                     foregroundColor: theme.colorScheme.onSurface,
                     elevation: 2,
                     shape: RoundedRectangleBorder(
@@ -379,25 +385,25 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   child: _loading
                       ? SizedBox(
-                          width: 24, height: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.5,
-                            color: theme.colorScheme.primary,
-                          ),
-                        )
+                    width: 24, height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: theme.colorScheme.primary,
+                    ),
+                  )
                       : Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.g_mobiledata_rounded,
-                                size: 28,
-                                color: theme.colorScheme.primary),
-                            const SizedBox(width: 10),
-                            const Text('Continue with Google',
-                                style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600)),
-                          ],
-                        ),
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.g_mobiledata_rounded,
+                          size: 28,
+                          color: theme.colorScheme.primary),
+                      const SizedBox(width: 10),
+                      const Text('Continue with Google',
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600)),
+                    ],
+                  ),
                 ),
               ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.3),
 

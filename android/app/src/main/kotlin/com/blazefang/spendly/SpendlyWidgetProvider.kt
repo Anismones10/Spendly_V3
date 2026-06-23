@@ -1,4 +1,5 @@
 package com.blazefang.spendly
+
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
@@ -11,9 +12,9 @@ import es.antonborri.home_widget.HomeWidgetPlugin
 class SpendlyWidgetProvider : AppWidgetProvider() {
 
     override fun onUpdate(
-            context: Context,
-            appWidgetManager: AppWidgetManager,
-            appWidgetIds: IntArray
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetIds: IntArray
     ) {
         for (widgetId in appWidgetIds) {
             updateWidget(context, appWidgetManager, widgetId)
@@ -39,9 +40,9 @@ class SpendlyWidgetProvider : AppWidgetProvider() {
         }
 
         fun updateWidget(
-                context: Context,
-                appWidgetManager: AppWidgetManager,
-                widgetId: Int
+            context: Context,
+            appWidgetManager: AppWidgetManager,
+            widgetId: Int
         ) {
             try {
                 val data = HomeWidgetPlugin.getData(context)
@@ -51,10 +52,15 @@ class SpendlyWidgetProvider : AppWidgetProvider() {
                 val yesterday   = data.getString("yesterday_spent", "0.00") ?: "0.00"
                 val remaining   = data.getString("remaining",       "0.00") ?: "0.00"
                 val lastUpdated = data.getString("last_updated",    "--:--") ?: "--:--"
+                val userName    = data.getString("user_name",       "Spendly") ?: "Spendly"
                 val trend       = data.getInt("trend", 0)
                 val budgetPct   = data.getInt("budget_pct", 0)
 
                 val views = RemoteViews(context.packageName, R.layout.spendly_widget)
+
+                // App name / user name
+                views.setTextViewText(R.id.widget_app_name,
+                    if (userName.isNotEmpty()) userName else "Spendly")
 
                 // ── Remaining (hero) ──────────────────────────────────
                 views.setTextViewText(R.id.widget_remaining, remaining)
@@ -72,9 +78,9 @@ class SpendlyWidgetProvider : AppWidgetProvider() {
                 // ── Trend arrow ───────────────────────────────────────
                 when (trend) {
                     1  -> { views.setTextViewText(R.id.widget_trend, "▲")
-                            views.setTextColor(R.id.widget_trend, Color.parseColor("#E57373")) }
+                        views.setTextColor(R.id.widget_trend, Color.parseColor("#E57373")) }
                     -1 -> { views.setTextViewText(R.id.widget_trend, "▼")
-                            views.setTextColor(R.id.widget_trend, Color.parseColor("#2ECC71")) }
+                        views.setTextColor(R.id.widget_trend, Color.parseColor("#2ECC71")) }
                     else -> views.setTextViewText(R.id.widget_trend, "")
                 }
 

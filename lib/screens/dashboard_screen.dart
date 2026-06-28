@@ -672,11 +672,17 @@ class _WalletCard extends StatelessWidget {
         card.spent > card.totalBalance && card.totalBalance > 0;
 
     final Color cardColor = card.isAllWallets
-        ? const Color(0xFF1E3A5F)
+        ? context.read<SettingsProvider>().allWalletsColor
         : Color(card.colorValue ?? 0xFF1E3A5F);
 
     final Color cardColorDark = card.isAllWallets
-        ? const Color(0xFF0F2440)
+        ? HSLColor.fromColor(context.read<SettingsProvider>().allWalletsColor)
+            .withLightness(
+              (HSLColor.fromColor(context.read<SettingsProvider>().allWalletsColor)
+                      .lightness -
+                  0.08)
+                  .clamp(0.0, 1.0))
+            .toColor()
         : HSLColor.fromColor(Color(card.colorValue ?? 0xFF1E3A5F))
         .withLightness(
       (HSLColor.fromColor(Color(card.colorValue ?? 0xFF1E3A5F))

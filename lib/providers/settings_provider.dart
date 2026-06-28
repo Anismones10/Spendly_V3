@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import '../utils/widget_helper.dart';
-import '../services/sync_service.dart';
 
 class SettingsProvider extends ChangeNotifier {
   final Box _box = Hive.box('settings');
@@ -35,10 +34,20 @@ class SettingsProvider extends ChangeNotifier {
   void setThemeColor(Color color) {
     _box.put('themeColor', color.value);
     notifyListeners();
-    SyncService.syncSettingsNow();
   }
 
-  /// Call this after restoring settings from the cloud, so the UI
+  // ── All Wallets card color ─────────────────────────────────────────────────
+  Color get allWalletsColor {
+    final value = _box.get('allWalletsColor', defaultValue: 0xFF1E3A5F) as int;
+    return Color(value);
+  }
+
+  void setAllWalletsColor(Color color) {
+    _box.put('allWalletsColor', color.value);
+    notifyListeners();
+  }
+
+  /// Call this after restoring settings from the cloud so the UI
   /// (theme, currency, etc.) updates immediately without restarting.
   void refresh() {
     notifyListeners();
@@ -60,7 +69,6 @@ class SettingsProvider extends ChangeNotifier {
   void toggleDarkMode() {
     _box.put('darkMode', !isDarkMode);
     notifyListeners();
-    SyncService.syncSettingsNow();
   }
 
   void toggleSound() {
@@ -77,14 +85,12 @@ class SettingsProvider extends ChangeNotifier {
     _box.put('currency', code);
     notifyListeners();
     WidgetHelper.updateWidget();
-    SyncService.syncSettingsNow();
   }
 
   void setMonthlyBudget(double budget) {
     _box.put('monthlyBudget', budget);
     notifyListeners();
     WidgetHelper.updateWidget();
-    SyncService.syncSettingsNow();
   }
 
   void updateStreak(bool underBudget) {

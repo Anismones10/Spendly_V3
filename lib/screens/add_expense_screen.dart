@@ -7,6 +7,7 @@ import '../providers/expense_provider.dart';
 import '../providers/category_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/wallet_provider.dart';
+import '../models/wallet_model.dart';
 import '../providers/category_budget_provider.dart';
 import '../utils/app_utils.dart';
 import '../utils/category_icons.dart';
@@ -52,7 +53,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       return sum + (double.tryParse(item.amountCtrl.text) ?? 0);
     });
     setState(() => _amountController.text =
-        total > 0 ? total.toStringAsFixed(2) : '');
+    total > 0 ? total.toStringAsFixed(2) : '');
   }
 
   @override
@@ -152,7 +153,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Row(children: [
           Text('⚠️', style: TextStyle(fontSize: 22)),
           SizedBox(width: 10),
@@ -189,7 +190,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     );
     if (result != null) {
       setState(
-          () => _amountController.text = result.toStringAsFixed(2));
+              () => _amountController.text = result.toStringAsFixed(2));
     }
   }
 
@@ -239,7 +240,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     if (wallet == null) return double.infinity;
     final spent = expenses.getTotalForWallet(_selectedWalletId!);
     final currentAmount = widget.existing != null &&
-            widget.existing!.walletId == _selectedWalletId
+        widget.existing!.walletId == _selectedWalletId
         ? widget.existing!.amount
         : 0.0;
     return wallet.balance - spent + currentAmount;
@@ -250,14 +251,14 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     if (_useItems && _items.isNotEmpty) {
       final validItems = _items
           .where((i) =>
-              i.nameCtrl.text.trim().isNotEmpty &&
-              (double.tryParse(i.amountCtrl.text) ?? 0) > 0)
+      i.nameCtrl.text.trim().isNotEmpty &&
+          (double.tryParse(i.amountCtrl.text) ?? 0) > 0)
           .toList();
       if (validItems.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
               content:
-                  Text('Please add at least one valid item.')),
+              Text('Please add at least one valid item.')),
         );
         return;
       }
@@ -275,7 +276,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       }
       final itemLines = validItems
           .map((i) =>
-              '• ${i.nameCtrl.text.trim()}: ${i.amountCtrl.text}')
+      '• ${i.nameCtrl.text.trim()}: ${i.amountCtrl.text}')
           .join('\n');
       if (_noteController.text.trim().isEmpty) {
         _noteController.text = itemLines;
@@ -288,7 +289,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
             content:
-                Text('Please fill in all required fields.')),
+            Text('Please fill in all required fields.')),
       );
       return;
     }
@@ -313,7 +314,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
         if (canOverdraft) {
           // ── Soft warning — credit card mode ────────────────────────────
-          final shouldProceed = await showDialog<bool>(
+          final shouldProceed = await showDialog<int>(
             context: context,
             builder: (ctx) => AlertDialog(
               shape: RoundedRectangleBorder(
@@ -378,18 +379,27 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               ),
               actions: [
                 TextButton(
-                    onPressed: () => Navigator.pop(ctx, false),
+                    onPressed: () => Navigator.pop(ctx, 0),
                     child: const Text('Cancel')),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, 2),
+                  child: const Text('Split Payment'),
+                ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFFF9800)),
-                  onPressed: () => Navigator.pop(ctx, true),
+                  onPressed: () => Navigator.pop(ctx, 1),
                   child: const Text('Proceed Anyway'),
                 ),
               ],
             ),
           );
-          if (shouldProceed != true) return;
+          if (shouldProceed == 2) {
+            await _handleSplitPayment(context: context, amount: amount,
+                remaining: remaining < 0 ? 0 : remaining);
+            return;
+          }
+          if (shouldProceed != 1) return;
 
         } else {
           // ── Hard block — cannot proceed ────────────────────────────────
@@ -471,17 +481,21 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                 ],
               ),
               actions: [
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
+                TextButton(
                     onPressed: () => Navigator.pop(ctx),
-                    child: const Text('OK'),
-                  ),
+                    child: const Text('Cancel')),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF4A90E2)),
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Split Payment'),
                 ),
               ],
             ),
           );
-          return; // hard block
+          await _handleSplitPayment(context: context, amount: amount,
+              remaining: remaining < 0 ? 0 : remaining);
+          return;
         }
       }
     }
@@ -494,7 +508,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         final now = DateTime.now();
         final provider = context.read<ExpenseProvider>();
         final catTotals =
-            provider.getCategoryTotals(now.year, now.month);
+        provider.getCategoryTotals(now.year, now.month);
         final alreadySpent =
             catTotals[_selectedCategoryId!] ?? 0;
         final limit = budgets.getLimitFor(_selectedCategoryId!);
@@ -502,9 +516,9 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         final symbol =
             context.read<SettingsProvider>().currencySymbol;
         final catName = context
-                .read<CategoryProvider>()
-                .getById(_selectedCategoryId!)
-                ?.name ??
+            .read<CategoryProvider>()
+            .getById(_selectedCategoryId!)
+            ?.name ??
             '';
 
         if (amount > remaining) {
@@ -538,14 +552,14 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                   Text(
                     'This expense exceeds your "$catName" budget.',
                     style:
-                        const TextStyle(fontSize: 14, height: 1.5),
+                    const TextStyle(fontSize: 14, height: 1.5),
                   ),
                   const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color:
-                          const Color(0xFFFF9800).withOpacity(0.08),
+                      const Color(0xFFFF9800).withOpacity(0.08),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                           color: const Color(0xFFFF9800)
@@ -634,56 +648,145 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       await SoundHelper.playChaChing();
 
       if (mounted) {
-      final budgets   = context.read<CategoryBudgetProvider>();
-      final settings  = context.read<SettingsProvider>();
-      final catNames  = context.read<CategoryProvider>();
+        final budgets   = context.read<CategoryBudgetProvider>();
+        final settings  = context.read<SettingsProvider>();
+        final catNames  = context.read<CategoryProvider>();
 
-      if (budgets.hasBudget(_selectedCategoryId!)) {
-        final now2      = DateTime.now();
-        final catTotals = provider.getCategoryTotals(now2.year, now2.month);
-        final catSpent  = catTotals[_selectedCategoryId!] ?? 0;
-        final status    = budgets.getStatus(_selectedCategoryId!, catSpent);
-        final limit     = budgets.getLimitFor(_selectedCategoryId!);
-        final catName   = catNames.getById(_selectedCategoryId!)?.name ?? '';
-        final sym       = settings.currencySymbol;
+        if (budgets.hasBudget(_selectedCategoryId!)) {
+          final now2      = DateTime.now();
+          final catTotals = provider.getCategoryTotals(now2.year, now2.month);
+          final catSpent  = catTotals[_selectedCategoryId!] ?? 0;
+          final status    = budgets.getStatus(_selectedCategoryId!, catSpent);
+          final limit     = budgets.getLimitFor(_selectedCategoryId!);
+          final catName   = catNames.getById(_selectedCategoryId!)?.name ?? '';
+          final sym       = settings.currencySymbol;
 
-        if (status == 'danger') {
-          await SoundHelper.playWarning();
+          if (status == 'danger') {
+            await SoundHelper.playWarning();
 
-          // Fire 100% budget notification
-          if (settings.notifEnabled && settings.notifBudget) {
-            final catIndex = context
-                .read<CategoryProvider>()
-                .categories
-                .indexWhere((c) => c.id == _selectedCategoryId);
-            await NotificationHelper.showBudgetWarning(
-              index: catIndex >= 0 ? catIndex : 0,
-              categoryName: catName,
-              spent: '$sym${catSpent.toStringAsFixed(2)}',
-              limit: '$sym${limit.toStringAsFixed(2)}',
-              isOver: true,
-            );
-          }
-        } else if (status == 'warning') {
-          // Fire 80% budget notification
-          if (settings.notifEnabled && settings.notifBudget) {
-            final catIndex = context
-                .read<CategoryProvider>()
-                .categories
-                .indexWhere((c) => c.id == _selectedCategoryId);
-            await NotificationHelper.showBudgetWarning(
-              index: catIndex >= 0 ? catIndex : 0,
-              categoryName: catName,
-              spent: '$sym${catSpent.toStringAsFixed(2)}',
-              limit: '$sym${limit.toStringAsFixed(2)}',
-              isOver: false,
-            );
+            // Fire 100% budget notification
+            if (settings.notifEnabled && settings.notifBudget) {
+              final catIndex = context
+                  .read<CategoryProvider>()
+                  .categories
+                  .indexWhere((c) => c.id == _selectedCategoryId);
+              await NotificationHelper.showBudgetWarning(
+                index: catIndex >= 0 ? catIndex : 0,
+                categoryName: catName,
+                spent: '$sym${catSpent.toStringAsFixed(2)}',
+                limit: '$sym${limit.toStringAsFixed(2)}',
+                isOver: true,
+              );
+            }
+          } else if (status == 'warning') {
+            // Fire 80% budget notification
+            if (settings.notifEnabled && settings.notifBudget) {
+              final catIndex = context
+                  .read<CategoryProvider>()
+                  .categories
+                  .indexWhere((c) => c.id == _selectedCategoryId);
+              await NotificationHelper.showBudgetWarning(
+                index: catIndex >= 0 ? catIndex : 0,
+                categoryName: catName,
+                spent: '$sym${catSpent.toStringAsFixed(2)}',
+                limit: '$sym${limit.toStringAsFixed(2)}',
+                isOver: false,
+              );
+            }
           }
         }
       }
     }
-    }
     if (mounted) Navigator.pop(context);
+  }
+
+
+  // ── Split Payment Handler ────────────────────────────────────────────────
+  Future<void> _handleSplitPayment({
+    required BuildContext context,
+    required double amount,
+    required double remaining,
+  }) async {
+    final walletProvider = context.read<WalletProvider>();
+    final expenseProvider = context.read<ExpenseProvider>();
+    final symbol = context.read<SettingsProvider>().currencySymbol;
+    final primaryWallet = walletProvider.getById(_selectedWalletId!);
+
+    // Build available balance map for all wallets
+    final allAvailable = <String, double>{};
+    for (final w in walletProvider.wallets) {
+      final spent = expenseProvider.getTotalForWallet(w.id);
+      allAvailable[w.id] = w.balance - spent;
+    }
+
+    // Primary wallet covers what it can
+    double stillNeeded = amount - remaining;
+
+    // Other wallets sorted by available balance descending
+    final otherWallets = walletProvider.wallets
+        .where((w) => w.id != _selectedWalletId)
+        .map((w) => (wallet: w, available: allAvailable[w.id] ?? 0.0))
+        .where((e) => e.available > 0)
+        .toList()
+      ..sort((a, b) => b.available.compareTo(a.available));
+
+    if (otherWallets.isEmpty) return;
+
+    // Pre-assign amounts: fill each wallet in order until covered
+    final preAssigned = <String, double>{};
+    double rem = stillNeeded;
+    for (final e in otherWallets) {
+      if (rem <= 0) break;
+      final use = e.available >= rem ? rem : e.available;
+      preAssigned[e.wallet.id] = use;
+      rem -= use;
+    }
+
+    // Show dialog — user can reorder/adjust which wallets to use
+    final confirmed = await showDialog<List<Map<String, dynamic>>>(
+      context: context,
+      builder: (ctx) => _MultiWalletSplitDialog(
+        primaryWallet: primaryWallet,
+        primaryAmount: remaining,
+        otherWallets: otherWallets,
+        preAssigned: preAssigned,
+        totalNeeded: amount,
+        symbol: symbol,
+      ),
+    );
+
+    if (confirmed == null || confirmed.isEmpty) return;
+
+    // Save one expense per wallet
+    final now = DateTime.now();
+    final baseName = _nameController.text.trim();
+    final baseNote = _noteController.text.trim();
+
+    for (int i = 0; i < confirmed.length; i++) {
+      final entry = confirmed[i];
+      final isFirst = i == 0;
+      expenseProvider.addExpense(ExpenseModel(
+        id: AppUtils.generateId(),
+        name: baseName,
+        amount: entry['amount'] as double,
+        categoryId: _selectedCategoryId ?? '',
+        date: _selectedDate,
+        note: isFirst
+            ? (baseNote.isEmpty ? null : baseNote)
+            : '[Split ${i + 1}/${confirmed.length}] $baseNote'.trim(),
+        isRecurring: false,
+        recurringType: null,
+        walletId: entry['walletId'] as String,
+        timeHour: _selectedTime?.hour ?? now.hour,
+        timeMinute: _selectedTime?.minute ?? now.minute,
+      ));
+    }
+
+    if (mounted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Navigator.pop(context);
+      });
+    }
   }
 
   @override
@@ -772,7 +875,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                           ? 'Auto-calculated from items'
                           : 'Tap to enter amount',
                       prefixIcon:
-                          const Icon(Icons.calculate_rounded),
+                      const Icon(Icons.calculate_rounded),
                       suffixText: symbol,
                     ),
                   ),
@@ -837,7 +940,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                         final item = _items[i];
                         return Padding(
                           padding:
-                              const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                          const EdgeInsets.fromLTRB(12, 10, 12, 0),
                           child: Row(
                             children: [
                               Expanded(
@@ -849,12 +952,12 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                                     border: InputBorder.none,
                                     isDense: true,
                                     contentPadding:
-                                        const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical: 10),
+                                    const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 10),
                                   ),
                                   style:
-                                      const TextStyle(fontSize: 14),
+                                  const TextStyle(fontSize: 14),
                                 ),
                               ),
                               Expanded(
@@ -862,16 +965,16 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                                 child: GestureDetector(
                                   onTap: () async {
                                     final result =
-                                        await showModalBottomSheet<
-                                            double>(
+                                    await showModalBottomSheet<
+                                        double>(
                                       context: context,
                                       isScrollControlled: true,
                                       backgroundColor:
-                                          Colors.transparent,
+                                      Colors.transparent,
                                       builder: (_) => CalculatorSheet(
                                         initial: double.tryParse(
-                                                item.amountCtrl
-                                                    .text) ??
+                                            item.amountCtrl
+                                                .text) ??
                                             0,
                                       ),
                                     );
@@ -892,10 +995,10 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                                         border: InputBorder.none,
                                         isDense: true,
                                         contentPadding:
-                                            const EdgeInsets
-                                                .symmetric(
-                                                horizontal: 8,
-                                                vertical: 10),
+                                        const EdgeInsets
+                                            .symmetric(
+                                            horizontal: 8,
+                                            vertical: 10),
                                       ),
                                       style: const TextStyle(
                                           fontSize: 14),
@@ -923,17 +1026,17 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                       }),
                       Padding(
                         padding:
-                            const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                        const EdgeInsets.fromLTRB(12, 8, 12, 0),
                         child: Divider(
                             color: theme.colorScheme.onSurface
                                 .withOpacity(0.1)),
                       ),
                       Padding(
                         padding:
-                            const EdgeInsets.fromLTRB(12, 4, 12, 10),
+                        const EdgeInsets.fromLTRB(12, 4, 12, 10),
                         child: Row(
                           mainAxisAlignment:
-                              MainAxisAlignment.spaceBetween,
+                          MainAxisAlignment.spaceBetween,
                           children: [
                             Text('Total',
                                 style: TextStyle(
@@ -956,7 +1059,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                         child: Container(
                           width: double.infinity,
                           padding:
-                              const EdgeInsets.symmetric(vertical: 12),
+                          const EdgeInsets.symmetric(vertical: 12),
                           decoration: BoxDecoration(
                             color: theme.colorScheme.primary
                                 .withOpacity(0.06),
@@ -1034,16 +1137,16 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                       decoration: BoxDecoration(
                         color: _selectedTime != null
                             ? theme.colorScheme.primary
-                                .withOpacity(0.1)
+                            .withOpacity(0.1)
                             : (isDark
-                                ? const Color(0xFF2A2A2A)
-                                : Colors.grey.shade100),
+                            ? const Color(0xFF2A2A2A)
+                            : Colors.grey.shade100),
                         borderRadius: BorderRadius.circular(16),
                         border: _selectedTime != null
                             ? Border.all(
-                                color: theme.colorScheme.primary
-                                    .withOpacity(0.3),
-                                width: 1.5)
+                            color: theme.colorScheme.primary
+                                .withOpacity(0.3),
+                            width: 1.5)
                             : null,
                       ),
                       child: Row(
@@ -1053,7 +1156,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                               color: _selectedTime != null
                                   ? theme.colorScheme.primary
                                   : theme.colorScheme.onSurface
-                                      .withOpacity(0.4),
+                                  .withOpacity(0.4),
                               size: 18),
                           const SizedBox(width: 6),
                           Text(
@@ -1066,7 +1169,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                               color: _selectedTime != null
                                   ? theme.colorScheme.primary
                                   : theme.colorScheme.onSurface
-                                      .withOpacity(0.5),
+                                  .withOpacity(0.5),
                             ),
                           ),
                           if (_selectedTime != null) ...[
@@ -1100,67 +1203,67 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                     scrollDirection: Axis.horizontal,
                     itemCount: wallets.length,
                     separatorBuilder: (_, __) =>
-                        const SizedBox(width: 10),
+                    const SizedBox(width: 10),
                     itemBuilder: (ctx, i) {
                       final wallet = wallets[i];
                       final isSelected =
                           _selectedWalletId == wallet.id;
                       final walletColor =
-                          Color(wallet.colorValue);
+                      Color(wallet.colorValue);
                       final spent =
-                          expenses.getTotalForWallet(wallet.id);
+                      expenses.getTotalForWallet(wallet.id);
                       final remaining = wallet.balance - spent;
                       final isLow = enteredAmount > 0 &&
                           enteredAmount > remaining;
 
                       return GestureDetector(
                         onTap: () => setState(
-                            () => _selectedWalletId = wallet.id),
+                                () => _selectedWalletId = wallet.id),
                         child: AnimatedContainer(
                           duration:
-                              const Duration(milliseconds: 200),
+                          const Duration(milliseconds: 200),
                           width: 90,
                           padding: const EdgeInsets.symmetric(
                               vertical: 8, horizontal: 6),
                           decoration: BoxDecoration(
                             color: isSelected
                                 ? (isLow
-                                    ? const Color(0xFFE57373)
-                                        .withOpacity(0.15)
-                                    : walletColor.withOpacity(0.15))
+                                ? const Color(0xFFE57373)
+                                .withOpacity(0.15)
+                                : walletColor.withOpacity(0.15))
                                 : (isDark
-                                    ? const Color(0xFF1E1E1E)
-                                    : Colors.white),
+                                ? const Color(0xFF1E1E1E)
+                                : Colors.white),
                             borderRadius:
-                                BorderRadius.circular(14),
+                            BorderRadius.circular(14),
                             border: Border.all(
                               color: isSelected
                                   ? (isLow
-                                      ? const Color(0xFFE57373)
-                                      : walletColor)
+                                  ? const Color(0xFFE57373)
+                                  : walletColor)
                                   : Colors.transparent,
                               width: 2,
                             ),
                             boxShadow: [
                               BoxShadow(
                                   color:
-                                      Colors.black.withOpacity(0.05),
+                                  Colors.black.withOpacity(0.05),
                                   blurRadius: 6),
                             ],
                           ),
                           child: Column(
                             mainAxisAlignment:
-                                MainAxisAlignment.center,
+                            MainAxisAlignment.center,
                             children: [
                               Icon(
                                   WalletProvider.resolveIcon(
                                       wallet.type),
                                   color: isSelected
                                       ? (isLow
-                                          ? const Color(0xFFE57373)
-                                          : walletColor)
+                                      ? const Color(0xFFE57373)
+                                      : walletColor)
                                       : theme.colorScheme.onSurface
-                                          .withOpacity(0.4),
+                                      .withOpacity(0.4),
                                   size: 20),
                               const SizedBox(height: 3),
                               Text(wallet.name,
@@ -1171,12 +1274,12 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                                           : FontWeight.w400,
                                       color: isSelected
                                           ? (isLow
-                                              ? const Color(
-                                                  0xFFE57373)
-                                              : walletColor)
+                                          ? const Color(
+                                          0xFFE57373)
+                                          : walletColor)
                                           : theme.colorScheme
-                                              .onSurface
-                                              .withOpacity(0.6)),
+                                          .onSurface
+                                          .withOpacity(0.6)),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis),
                               if (wallet.balance > 0)
@@ -1184,14 +1287,14 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                                   remaining < 0
                                       ? 'Empty'
                                       : AppUtils.formatAmount(
-                                          remaining, symbol),
+                                      remaining, symbol),
                                   style: TextStyle(
                                       fontSize: 8,
                                       color: remaining <= 0
                                           ? const Color(0xFFE57373)
                                           : theme.colorScheme
-                                              .onSurface
-                                              .withOpacity(0.35)),
+                                          .onSurface
+                                          .withOpacity(0.35)),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -1210,7 +1313,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                       horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
                     color:
-                        const Color(0xFFE57373).withOpacity(0.08),
+                    const Color(0xFFE57373).withOpacity(0.08),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                         color: const Color(0xFFE57373)
@@ -1243,7 +1346,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                     onTap: () {
                       HapticFeedback.lightImpact();
                       setState(
-                          () => _reorderMode = !_reorderMode);
+                              () => _reorderMode = !_reorderMode);
                     },
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
@@ -1253,7 +1356,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                         color: _reorderMode
                             ? theme.colorScheme.primary
                             : theme.colorScheme.primary
-                                .withOpacity(0.1),
+                            .withOpacity(0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Row(
@@ -1297,7 +1400,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                     scrollDirection: Axis.horizontal,
                     itemCount: categories.length,
                     separatorBuilder: (_, __) =>
-                        const SizedBox(width: 12),
+                    const SizedBox(width: 12),
                     itemBuilder: (ctx, i) {
                       final cat = categories[i];
                       final isSelected =
@@ -1308,23 +1411,23 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                           ? budgets.getStatus(cat.id, spent)
                           : 'ok';
                       final statusColor =
-                          budgets.getStatusColor(cat.id, spent);
+                      budgets.getStatusColor(cat.id, spent);
 
                       return GestureDetector(
                         onTap: () => setState(
-                            () => _selectedCategoryId = cat.id),
+                                () => _selectedCategoryId = cat.id),
                         child: AnimatedContainer(
                           duration:
-                              const Duration(milliseconds: 200),
+                          const Duration(milliseconds: 200),
                           width: 72,
                           decoration: BoxDecoration(
                             color: isSelected
                                 ? catColor.withOpacity(0.25)
                                 : (isDark
-                                    ? const Color(0xFF1E1E1E)
-                                    : Colors.white),
+                                ? const Color(0xFF1E1E1E)
+                                : Colors.white),
                             borderRadius:
-                                BorderRadius.circular(16),
+                            BorderRadius.circular(16),
                             border: Border.all(
                               color: isSelected
                                   ? catColor
@@ -1334,7 +1437,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                             boxShadow: [
                               BoxShadow(
                                   color:
-                                      Colors.black.withOpacity(0.05),
+                                  Colors.black.withOpacity(0.05),
                                   blurRadius: 8),
                             ],
                           ),
@@ -1344,7 +1447,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               mainAxisAlignment:
-                                  MainAxisAlignment.center,
+                              MainAxisAlignment.center,
                               children: [
                                 Icon(
                                     CategoryIcons.resolve(cat.icon),
@@ -1361,7 +1464,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                                     color: isSelected
                                         ? catColor
                                         : theme.colorScheme.onSurface
-                                            .withOpacity(0.7),
+                                        .withOpacity(0.7),
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -1370,14 +1473,14 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                                   const SizedBox(height: 2),
                                   Container(
                                     padding:
-                                        const EdgeInsets.symmetric(
-                                            horizontal: 4,
-                                            vertical: 1),
+                                    const EdgeInsets.symmetric(
+                                        horizontal: 4,
+                                        vertical: 1),
                                     decoration: BoxDecoration(
                                       color: statusColor
                                           .withOpacity(0.15),
                                       borderRadius:
-                                          BorderRadius.circular(4),
+                                      BorderRadius.circular(4),
                                     ),
                                     child: Text(
                                       status == 'danger'
@@ -1408,11 +1511,11 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                   final spent =
                       catTotals[_selectedCategoryId!] ?? 0;
                   final status =
-                      budgets.getStatus(_selectedCategoryId!, spent);
+                  budgets.getStatus(_selectedCategoryId!, spent);
                   final statusColor = budgets
                       .getStatusColor(_selectedCategoryId!, spent);
                   final limit =
-                      budgets.getLimitFor(_selectedCategoryId!);
+                  budgets.getLimitFor(_selectedCategoryId!);
                   final remaining = limit - spent;
                   if (status == 'ok') return const SizedBox.shrink();
                   return Container(
@@ -1467,137 +1570,137 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               Builder(builder: (context) {
                 final isChild = widget.existing?.recurringParentId != null;
                 return Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF1E1E1E)
-                      : Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 8)
-                  ],
-                ),
-                child: Column(children: [
-                  Row(children: [
-                    Icon(Icons.repeat_rounded,
-                        color: isChild
-                            ? theme.colorScheme.onSurface.withOpacity(0.3)
-                            : _isRecurring
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.onSurface
-                                .withOpacity(0.5)),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Recurring Expense',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  color: isChild
-                                      ? theme.colorScheme.onSurface.withOpacity(0.4)
-                                      : null)),
-                          if (isChild)
-                            Text(
-                              'Auto-generated expenses cannot be set as recurring',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: const Color(0xFFFF9800).withOpacity(0.8),
-                              ),
-                            )
-                          else if (_isRecurring)
-                            Text(
-                              'Automatically logged every $_recurringType',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: theme.colorScheme.primary,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    Switch.adaptive(
-                      value: isChild ? false : _isRecurring,
-                      onChanged: isChild ? null : (v) =>
-                          setState(() => _isRecurring = v),
-                    ),
-                  ]),
-                  if (_isRecurring) ...[
-                    const SizedBox(height: 12),
-                    // Info box explaining how it works
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primary
-                            .withOpacity(0.06),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.info_outline_rounded,
-                              size: 14,
-                              color: theme.colorScheme.primary
-                                  .withOpacity(0.7)),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Spendly will automatically add this expense on each due date. Missed dates are caught up on next app open.',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: theme.colorScheme.primary
-                                    .withOpacity(0.8),
-                                height: 1.4,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: ['daily', 'weekly', 'monthly']
-                          .map((type) {
-                        return Expanded(
-                          child: GestureDetector(
-                            onTap: () => setState(
-                                () => _recurringType = type),
-                            child: AnimatedContainer(
-                              duration:
-                                  const Duration(milliseconds: 200),
-                              margin: const EdgeInsets.symmetric(
-                                  horizontal: 4),
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 10),
-                              decoration: BoxDecoration(
-                                color: _recurringType == type
-                                    ? theme.colorScheme.primary
-                                    : theme.colorScheme.primary
-                                        .withOpacity(0.1),
-                                borderRadius:
-                                    BorderRadius.circular(10),
-                              ),
-                              child: Text(
-                                type[0].toUpperCase() +
-                                    type.substring(1),
-                                textAlign: TextAlign.center,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFF1E1E1E)
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 8)
+                    ],
+                  ),
+                  child: Column(children: [
+                    Row(children: [
+                      Icon(Icons.repeat_rounded,
+                          color: isChild
+                              ? theme.colorScheme.onSurface.withOpacity(0.3)
+                              : _isRecurring
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.onSurface
+                              .withOpacity(0.5)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Recurring Expense',
                                 style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: _recurringType == type
-                                      ? Colors.white
-                                      : theme.colorScheme.primary,
+                                    fontWeight: FontWeight.w600,
+                                    color: isChild
+                                        ? theme.colorScheme.onSurface.withOpacity(0.4)
+                                        : null)),
+                            if (isChild)
+                              Text(
+                                'Auto-generated expenses cannot be set as recurring',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: const Color(0xFFFF9800).withOpacity(0.8),
+                                ),
+                              )
+                            else if (_isRecurring)
+                              Text(
+                                'Automatically logged every $_recurringType',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: theme.colorScheme.primary,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      Switch.adaptive(
+                        value: isChild ? false : _isRecurring,
+                        onChanged: isChild ? null : (v) =>
+                            setState(() => _isRecurring = v),
+                      ),
+                    ]),
+                    if (_isRecurring) ...[
+                      const SizedBox(height: 12),
+                      // Info box explaining how it works
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary
+                              .withOpacity(0.06),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.info_outline_rounded,
+                                size: 14,
+                                color: theme.colorScheme.primary
+                                    .withOpacity(0.7)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Spendly will automatically add this expense on each due date. Missed dates are caught up on next app open.',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: theme.colorScheme.primary
+                                      .withOpacity(0.8),
+                                  height: 1.4,
                                 ),
                               ),
                             ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ],
-                ]),
-              ).animate().fadeIn(delay: 250.ms);
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: ['daily', 'weekly', 'monthly']
+                            .map((type) {
+                          return Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(
+                                      () => _recurringType = type),
+                              child: AnimatedContainer(
+                                duration:
+                                const Duration(milliseconds: 200),
+                                margin: const EdgeInsets.symmetric(
+                                    horizontal: 4),
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: _recurringType == type
+                                      ? theme.colorScheme.primary
+                                      : theme.colorScheme.primary
+                                      .withOpacity(0.1),
+                                  borderRadius:
+                                  BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  type[0].toUpperCase() +
+                                      type.substring(1),
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: _recurringType == type
+                                        ? Colors.white
+                                        : theme.colorScheme.primary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ]),
+                ).animate().fadeIn(delay: 250.ms);
               }), // end Builder
 
               const SizedBox(height: 32),
@@ -1631,7 +1734,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor:
-            isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        isDark ? const Color(0xFF1E1E1E) : Colors.white,
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20)),
         title: Row(
@@ -1679,11 +1782,11 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   }
 
   Widget _buildReorderList(
-    List categories,
-    CategoryProvider categoryProvider,
-    ThemeData theme,
-    bool isDark,
-  ) {
+      List categories,
+      CategoryProvider categoryProvider,
+      ThemeData theme,
+      bool isDark,
+      ) {
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
@@ -1704,14 +1807,14 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               Icon(Icons.info_outline_rounded,
                   size: 14,
                   color:
-                      theme.colorScheme.primary.withOpacity(0.6)),
+                  theme.colorScheme.primary.withOpacity(0.6)),
               const SizedBox(width: 6),
               Text(
                 'Drag ☰ to reorder categories',
                 style: TextStyle(
                     fontSize: 12,
                     color:
-                        theme.colorScheme.primary.withOpacity(0.7)),
+                    theme.colorScheme.primary.withOpacity(0.7)),
               ),
             ]),
           ),
@@ -1772,7 +1875,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                   ],
                 ),
                 onTap: () => setState(
-                    () => _selectedCategoryId = cat.id),
+                        () => _selectedCategoryId = cat.id),
               );
             },
           ),
@@ -1788,7 +1891,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         fontWeight: FontWeight.w600,
         fontSize: 14,
         color:
-            Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+        Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
       ),
     );
   }
@@ -1837,7 +1940,7 @@ class _BalanceRow extends StatelessWidget {
                 fontSize: 12,
                 color: color,
                 fontWeight:
-                    bold ? FontWeight.w700 : FontWeight.w400)),
+                bold ? FontWeight.w700 : FontWeight.w400)),
         Text(value,
             style: TextStyle(
                 fontSize: 12,
@@ -1851,4 +1954,404 @@ class _BalanceRow extends StatelessWidget {
 class _ExpenseItem {
   final TextEditingController nameCtrl = TextEditingController();
   final TextEditingController amountCtrl = TextEditingController();
+}
+
+// ── Multi-Wallet Split Dialog ─────────────────────────────────────────────────
+class _MultiWalletSplitDialog extends StatefulWidget {
+  final WalletModel? primaryWallet;
+  final double primaryAmount;
+  final List<({WalletModel wallet, double available})> otherWallets;
+  final Map<String, double> preAssigned;
+  final double totalNeeded;
+  final String symbol;
+
+  const _MultiWalletSplitDialog({
+    required this.primaryWallet,
+    required this.primaryAmount,
+    required this.otherWallets,
+    required this.preAssigned,
+    required this.totalNeeded,
+    required this.symbol,
+  });
+
+  @override
+  State<_MultiWalletSplitDialog> createState() =>
+      _MultiWalletSplitDialogState();
+}
+
+class _MultiWalletSplitDialogState extends State<_MultiWalletSplitDialog> {
+  // walletId → amount to use from that wallet (editable)
+  late Map<String, double> _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = Map.from(widget.preAssigned);
+  }
+
+  double get _coveredSoFar =>
+      widget.primaryAmount + _selected.values.fold(0.0, (s, v) => s + v);
+
+  double get _stillNeeded => widget.totalNeeded - _coveredSoFar;
+
+  bool get _fullyFunded => _coveredSoFar >= widget.totalNeeded - 0.001;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: const Color(0xFF4A90E2).withOpacity(0.15),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: const Icon(Icons.account_balance_wallet_rounded,
+              color: Color(0xFF4A90E2), size: 22),
+        ),
+        const SizedBox(width: 12),
+        const Expanded(
+          child: Text('Multi-Wallet Split',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+        ),
+      ]),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Summary bar
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: (_fullyFunded
+                      ? const Color(0xFF2ECC71)
+                      : const Color(0xFFE57373))
+                      .withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: (_fullyFunded
+                        ? const Color(0xFF2ECC71)
+                        : const Color(0xFFE57373))
+                        .withOpacity(0.3),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Total needed',
+                        style: TextStyle(
+                            fontSize: 13,
+                            color: theme.colorScheme.onSurface
+                                .withOpacity(0.6))),
+                    Text(
+                      AppUtils.formatAmount(widget.totalNeeded, widget.symbol),
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // Primary wallet (fixed)
+              _WalletSplitRow(
+                name: widget.primaryWallet?.name ?? 'Primary',
+                icon: WalletProvider.resolveIcon(
+                    widget.primaryWallet?.type ?? ''),
+                available: widget.primaryAmount,
+                assigned: widget.primaryAmount,
+                symbol: widget.symbol,
+                isFixed: true,
+                onChanged: null,
+              ),
+              const SizedBox(height: 6),
+
+              // Other wallets — toggleable and amount-editable
+              ...widget.otherWallets.map((e) {
+                final isUsed = _selected.containsKey(e.wallet.id);
+                final assigned = _selected[e.wallet.id] ?? 0.0;
+
+                return _WalletSplitRow(
+                  name: e.wallet.name,
+                  icon: WalletProvider.resolveIcon(e.wallet.type),
+                  available: e.available,
+                  assigned: assigned,
+                  symbol: widget.symbol,
+                  isFixed: false,
+                  isEnabled: isUsed,
+                  onToggle: () {
+                    setState(() {
+                      if (isUsed) {
+                        _selected.remove(e.wallet.id);
+                      } else {
+                        // Auto-assign what's still needed (capped to available)
+                        final need = _stillNeeded;
+                        if (need > 0) {
+                          _selected[e.wallet.id] =
+                          need > e.available ? e.available : need;
+                        } else {
+                          _selected[e.wallet.id] = 0;
+                        }
+                      }
+                    });
+                  },
+                  onChanged: (val) {
+                    setState(() {
+                      _selected[e.wallet.id] =
+                          val.clamp(0, e.available);
+                    });
+                  },
+                );
+              }),
+
+              const SizedBox(height: 10),
+
+              // Remaining indicator
+              if (!_fullyFunded)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE57373).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(children: [
+                    const Icon(Icons.warning_amber_rounded,
+                        color: Color(0xFFE57373), size: 16),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Still need ${AppUtils.formatAmount(_stillNeeded, widget.symbol)} more',
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFFE57373)),
+                    ),
+                  ]),
+                ),
+
+              if (_fullyFunded)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2ECC71).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(children: [
+                    const Icon(Icons.check_circle_rounded,
+                        color: Color(0xFF2ECC71), size: 16),
+                    const SizedBox(width: 8),
+                    const Text('Fully covered!',
+                        style: TextStyle(
+                            fontSize: 12, color: Color(0xFF2ECC71))),
+                  ]),
+                ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _fullyFunded
+              ? () {
+            // Build result list: primary first, then selected others
+            final result = <Map<String, dynamic>>[
+              {
+                'walletId': widget.primaryWallet?.id ?? '',
+                'amount': widget.primaryAmount,
+              },
+              ..._selected.entries
+                  .where((e) => e.value > 0)
+                  .map((e) =>
+              {'walletId': e.key, 'amount': e.value}),
+            ];
+            Navigator.pop(context, result);
+          }
+              : null,
+          style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF4A90E2)),
+          child: const Text('Split & Save'),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Wallet Split Row ──────────────────────────────────────────────────────────
+class _WalletSplitRow extends StatefulWidget {
+  final String name;
+  final IconData icon;
+  final double available;
+  final double assigned;
+  final String symbol;
+  final bool isFixed;
+  final bool isEnabled;
+  final VoidCallback? onToggle;
+  final void Function(double)? onChanged;
+
+  const _WalletSplitRow({
+    required this.name,
+    required this.icon,
+    required this.available,
+    required this.assigned,
+    required this.symbol,
+    required this.isFixed,
+    this.isEnabled = true,
+    this.onToggle,
+    this.onChanged,
+  });
+
+  @override
+  State<_WalletSplitRow> createState() => _WalletSplitRowState();
+}
+
+class _WalletSplitRowState extends State<_WalletSplitRow> {
+  late TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(
+        text: widget.assigned > 0
+            ? widget.assigned.toStringAsFixed(2)
+            : '');
+  }
+
+  @override
+  void didUpdateWidget(_WalletSplitRow old) {
+    super.didUpdateWidget(old);
+    if (old.assigned != widget.assigned && !_ctrl.text.contains(RegExp(r'[^0-9.]'))) {
+      final newText = widget.assigned > 0
+          ? widget.assigned.toStringAsFixed(2)
+          : '';
+      if (_ctrl.text != newText) {
+        _ctrl.text = newText;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final active = widget.isFixed || widget.isEnabled;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: active
+            ? const Color(0xFF4A90E2).withOpacity(0.07)
+            : Colors.grey.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: active
+              ? const Color(0xFF4A90E2).withOpacity(0.25)
+              : Colors.grey.withOpacity(0.15),
+        ),
+      ),
+      child: Row(children: [
+        // Toggle checkbox (not shown for fixed/primary)
+        if (!widget.isFixed)
+          GestureDetector(
+            onTap: widget.onToggle,
+            child: Container(
+              width: 22,
+              height: 22,
+              margin: const EdgeInsets.only(right: 8),
+              decoration: BoxDecoration(
+                color: widget.isEnabled
+                    ? const Color(0xFF4A90E2)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: widget.isEnabled
+                      ? const Color(0xFF4A90E2)
+                      : Colors.grey.withOpacity(0.4),
+                  width: 1.5,
+                ),
+              ),
+              child: widget.isEnabled
+                  ? const Icon(Icons.check, color: Colors.white, size: 14)
+                  : null,
+            ),
+          ),
+
+        Icon(widget.icon,
+            size: 18,
+            color: active
+                ? const Color(0xFF4A90E2)
+                : Colors.grey.withOpacity(0.4)),
+        const SizedBox(width: 8),
+
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(widget.name,
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: active ? null : Colors.grey.withOpacity(0.5))),
+              Text(
+                'Available: ${AppUtils.formatAmount(widget.available, widget.symbol)}',
+                style: TextStyle(
+                    fontSize: 11,
+                    color: active
+                        ? const Color(0xFF2ECC71)
+                        : Colors.grey.withOpacity(0.4)),
+              ),
+            ],
+          ),
+        ),
+
+        // Amount field
+        if (active)
+          SizedBox(
+            width: 90,
+            child: widget.isFixed
+                ? Text(
+              AppUtils.formatAmount(widget.assigned, widget.symbol),
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF2ECC71)),
+            )
+                : TextField(
+              controller: _ctrl,
+              keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true),
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w600),
+              decoration: InputDecoration(
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 6),
+                prefixText: widget.symbol,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+              onChanged: (v) {
+                final val = double.tryParse(v) ?? 0;
+                widget.onChanged?.call(val);
+              },
+            ),
+          ),
+      ]),
+    );
+  }
 }

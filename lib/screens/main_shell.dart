@@ -92,9 +92,10 @@ final List<_TabDef> _allTabs = [
 const List<String> _defaultTabOrder = [
   'home',
   'expenses',
+  'income',
   'stats',
   'goals',
-  'search',
+
 ];
 
 class MainShell extends StatefulWidget {

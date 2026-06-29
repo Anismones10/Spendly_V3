@@ -702,10 +702,11 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
 
   // ── Split Payment Handler ────────────────────────────────────────────────
+  // ── Multi-Wallet Split Payment ────────────────────────────────────────────
   Future<void> _handleSplitPayment({
     required BuildContext context,
     required double amount,
-    required double remaining,
+    required double remaining, // what the primary wallet covers
   }) async {
     final walletProvider = context.read<WalletProvider>();
     final expenseProvider = context.read<ExpenseProvider>();
@@ -716,11 +717,8 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     final allAvailable = <String, double>{};
     for (final w in walletProvider.wallets) {
       final spent = expenseProvider.getTotalForWallet(w.id);
-      allAvailable[w.id] = w.balance - spent;
+      allAvailable[w.id] = (w.balance - spent).clamp(0, double.infinity);
     }
-
-    // Primary wallet covers what it can
-    double stillNeeded = amount - remaining;
 
     // Other wallets sorted by available balance descending
     final otherWallets = walletProvider.wallets
@@ -730,11 +728,17 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         .toList()
       ..sort((a, b) => b.available.compareTo(a.available));
 
-    if (otherWallets.isEmpty) return;
+    if (otherWallets.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('No other wallets with available balance'),
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
 
-    // Pre-assign amounts: fill each wallet in order until covered
+    // Pre-assign: fill other wallets for whatever the primary didn't cover
     final preAssigned = <String, double>{};
-    double rem = stillNeeded;
+    double rem = amount - remaining;
     for (final e in otherWallets) {
       if (rem <= 0) break;
       final use = e.available >= rem ? rem : e.available;
@@ -742,7 +746,6 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       rem -= use;
     }
 
-    // Show dialog — user can reorder/adjust which wallets to use
     final confirmed = await showDialog<List<Map<String, dynamic>>>(
       context: context,
       builder: (ctx) => _MultiWalletSplitDialog(
@@ -757,23 +760,25 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
     if (confirmed == null || confirmed.isEmpty) return;
 
-    // Save one expense per wallet
+    // Save one expense per wallet split
     final now = DateTime.now();
     final baseName = _nameController.text.trim();
     final baseNote = _noteController.text.trim();
+    final total = confirmed.length;
 
-    for (int i = 0; i < confirmed.length; i++) {
+    for (int i = 0; i < total; i++) {
       final entry = confirmed[i];
-      final isFirst = i == 0;
       expenseProvider.addExpense(ExpenseModel(
         id: AppUtils.generateId(),
         name: baseName,
         amount: entry['amount'] as double,
         categoryId: _selectedCategoryId ?? '',
         date: _selectedDate,
-        note: isFirst
+        note: total == 1
             ? (baseNote.isEmpty ? null : baseNote)
-            : '[Split ${i + 1}/${confirmed.length}] $baseNote'.trim(),
+            : '[Split ${i + 1}/$total] $baseNote'.trim().replaceAll(RegExp(r'\s+$'), '').isNotEmpty
+            ? '[Split ${i + 1}/$total] $baseNote'.trim()
+            : '[Split ${i + 1}/$total]',
         isRecurring: false,
         recurringType: null,
         walletId: entry['walletId'] as String,
@@ -1705,16 +1710,112 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
               const SizedBox(height: 32),
 
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _save,
-                  child: Text(widget.existing != null
-                      ? 'Update Expense'
-                      : 'Add Expense'),
-                ).animate().fadeIn(delay: 300.ms).scale(
-                    begin: const Offset(0.95, 0.95)),
-              ),
+              // Only show split button when adding (not editing) and
+              // there is more than one wallet with available balance
+              if (widget.existing == null)
+                Builder(builder: (ctx) {
+                  final wp = ctx.watch<WalletProvider>();
+                  final ep = ctx.watch<ExpenseProvider>();
+                  final hasMultiple = wp.wallets.length > 1;
+                  if (!hasMultiple) return const SizedBox.shrink();
+                  return Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: _save,
+                              child: const Text('Add Expense'),
+                            ).animate().fadeIn(delay: 300.ms).scale(
+                                begin: const Offset(0.95, 0.95)),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              icon: const Icon(Icons.call_split_rounded,
+                                  size: 16),
+                              label: const Text('Split'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF4A90E2),
+                                side: const BorderSide(
+                                    color: Color(0xFF4A90E2)),
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 14),
+                              ),
+                              onPressed: () async {
+                                // Validate name and amount first
+                                final name = _nameController.text.trim();
+                                final amount = double.tryParse(
+                                    _amountController.text) ??
+                                    0;
+                                if (name.isEmpty || amount <= 0) {
+                                  ScaffoldMessenger.of(context)
+                                      .showSnackBar(const SnackBar(
+                                    content: Text(
+                                        'Enter a name and amount first'),
+                                    behavior: SnackBarBehavior.floating,
+                                  ));
+                                  return;
+                                }
+                                if (_selectedWalletId == null) {
+                                  ScaffoldMessenger.of(context)
+                                      .showSnackBar(const SnackBar(
+                                    content:
+                                    Text('Select a wallet first'),
+                                    behavior: SnackBarBehavior.floating,
+                                  ));
+                                  return;
+                                }
+                                // Get primary wallet available balance
+                                final primaryAvail = ep.getTotalForWallet(
+                                    _selectedWalletId!);
+                                final primaryWallet =
+                                wp.getById(_selectedWalletId!);
+                                final available = (primaryWallet?.balance ??
+                                    0) -
+                                    primaryAvail;
+
+                                // Primary covers what it can (capped at amount)
+                                final primaryUse = (available >= amount
+                                    ? amount
+                                    : (available < 0 ? 0 : available)).toDouble();
+
+                                await _handleSplitPayment(
+                                  context: context,
+                                  amount: amount,
+                                  remaining: primaryUse,
+                                );
+                              },
+                            ).animate().fadeIn(delay: 300.ms),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Use Split to pay with multiple wallets',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withOpacity(0.4),
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  );
+                }),
+
+              if (widget.existing != null)
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _save,
+                    child: const Text('Update Expense'),
+                  ).animate().fadeIn(delay: 300.ms).scale(
+                      begin: const Offset(0.95, 0.95)),
+                ),
+
               const SizedBox(height: 40),
             ],
           ),
@@ -1980,7 +2081,6 @@ class _MultiWalletSplitDialog extends StatefulWidget {
 }
 
 class _MultiWalletSplitDialogState extends State<_MultiWalletSplitDialog> {
-  // walletId → amount to use from that wallet (editable)
   late Map<String, double> _selected;
 
   @override
@@ -1990,17 +2090,18 @@ class _MultiWalletSplitDialogState extends State<_MultiWalletSplitDialog> {
   }
 
   double get _coveredSoFar =>
-      widget.primaryAmount + _selected.values.fold(0.0, (s, v) => s + v);
+      widget.primaryAmount +
+          _selected.values.fold(0.0, (s, v) => s + v);
 
-  double get _stillNeeded => widget.totalNeeded - _coveredSoFar;
+  double get _stillNeeded =>
+      (widget.totalNeeded - _coveredSoFar).clamp(0, double.infinity);
 
-  bool get _fullyFunded => _coveredSoFar >= widget.totalNeeded - 0.001;
+  bool get _fullyFunded =>
+      _coveredSoFar >= widget.totalNeeded - 0.001;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: Row(children: [
@@ -2015,7 +2116,7 @@ class _MultiWalletSplitDialogState extends State<_MultiWalletSplitDialog> {
         ),
         const SizedBox(width: 12),
         const Expanded(
-          child: Text('Multi-Wallet Split',
+          child: Text('Split Payment',
               style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
         ),
       ]),
@@ -2026,7 +2127,7 @@ class _MultiWalletSplitDialogState extends State<_MultiWalletSplitDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Summary bar
+              // Total needed summary
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -2045,13 +2146,14 @@ class _MultiWalletSplitDialogState extends State<_MultiWalletSplitDialog> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Total needed',
+                    Text('Total',
                         style: TextStyle(
                             fontSize: 13,
                             color: theme.colorScheme.onSurface
                                 .withOpacity(0.6))),
                     Text(
-                      AppUtils.formatAmount(widget.totalNeeded, widget.symbol),
+                      AppUtils.formatAmount(
+                          widget.totalNeeded, widget.symbol),
                       style: const TextStyle(
                           fontSize: 14, fontWeight: FontWeight.w700),
                     ),
@@ -2060,7 +2162,7 @@ class _MultiWalletSplitDialogState extends State<_MultiWalletSplitDialog> {
               ),
               const SizedBox(height: 10),
 
-              // Primary wallet (fixed)
+              // Primary wallet (editable amount)
               _WalletSplitRow(
                 name: widget.primaryWallet?.name ?? 'Primary',
                 icon: WalletProvider.resolveIcon(
@@ -2077,7 +2179,6 @@ class _MultiWalletSplitDialogState extends State<_MultiWalletSplitDialog> {
               ...widget.otherWallets.map((e) {
                 final isUsed = _selected.containsKey(e.wallet.id);
                 final assigned = _selected[e.wallet.id] ?? 0.0;
-
                 return _WalletSplitRow(
                   name: e.wallet.name,
                   icon: WalletProvider.resolveIcon(e.wallet.type),
@@ -2091,21 +2192,23 @@ class _MultiWalletSplitDialogState extends State<_MultiWalletSplitDialog> {
                       if (isUsed) {
                         _selected.remove(e.wallet.id);
                       } else {
-                        // Auto-assign what's still needed (capped to available)
                         final need = _stillNeeded;
-                        if (need > 0) {
-                          _selected[e.wallet.id] =
-                          need > e.available ? e.available : need;
-                        } else {
-                          _selected[e.wallet.id] = 0;
-                        }
+                        _selected[e.wallet.id] =
+                        need > e.available ? e.available : need;
                       }
                     });
                   },
                   onChanged: (val) {
                     setState(() {
-                      _selected[e.wallet.id] =
-                          val.clamp(0, e.available);
+                      // Cap at available AND at what's still needed from other wallets
+                      final otherSelected = _selected.entries
+                          .where((entry) => entry.key != e.wallet.id)
+                          .fold(0.0, (s, entry) => s + entry.value);
+                      final maxAllowed = (widget.totalNeeded -
+                          widget.primaryAmount -
+                          otherSelected)
+                          .clamp(0.0, e.available);
+                      _selected[e.wallet.id] = val.clamp(0, maxAllowed);
                     });
                   },
                 );
@@ -2113,7 +2216,7 @@ class _MultiWalletSplitDialogState extends State<_MultiWalletSplitDialog> {
 
               const SizedBox(height: 10),
 
-              // Remaining indicator
+              // Status indicator
               if (!_fullyFunded)
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -2126,14 +2229,15 @@ class _MultiWalletSplitDialogState extends State<_MultiWalletSplitDialog> {
                     const Icon(Icons.warning_amber_rounded,
                         color: Color(0xFFE57373), size: 16),
                     const SizedBox(width: 8),
-                    Text(
-                      'Still need ${AppUtils.formatAmount(_stillNeeded, widget.symbol)} more',
-                      style: const TextStyle(
-                          fontSize: 12, color: Color(0xFFE57373)),
+                    Expanded(
+                      child: Text(
+                        'Still need ${AppUtils.formatAmount(_stillNeeded, widget.symbol)} more',
+                        style: const TextStyle(
+                            fontSize: 12, color: Color(0xFFE57373)),
+                      ),
                     ),
                   ]),
                 ),
-
               if (_fullyFunded)
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -2146,9 +2250,16 @@ class _MultiWalletSplitDialogState extends State<_MultiWalletSplitDialog> {
                     const Icon(Icons.check_circle_rounded,
                         color: Color(0xFF2ECC71), size: 16),
                     const SizedBox(width: 8),
-                    const Text('Fully covered!',
-                        style: TextStyle(
-                            fontSize: 12, color: Color(0xFF2ECC71))),
+                    Text(
+                      _coveredSoFar > widget.totalNeeded + 0.001
+                          ? 'Over by ${AppUtils.formatAmount(_coveredSoFar - widget.totalNeeded, widget.symbol)} — adjust amounts'
+                          : 'Fully covered!',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: _coveredSoFar > widget.totalNeeded + 0.001
+                              ? const Color(0xFFFF9800)
+                              : const Color(0xFF2ECC71)),
+                    ),
                   ]),
                 ),
             ],
@@ -2161,16 +2272,16 @@ class _MultiWalletSplitDialogState extends State<_MultiWalletSplitDialog> {
           child: const Text('Cancel'),
         ),
         FilledButton(
-          onPressed: _fullyFunded
+          onPressed: (_fullyFunded &&
+              _coveredSoFar <= widget.totalNeeded + 0.001)
               ? () {
-            // Build result list: primary first, then selected others
             final result = <Map<String, dynamic>>[
               {
                 'walletId': widget.primaryWallet?.id ?? '',
                 'amount': widget.primaryAmount,
               },
               ..._selected.entries
-                  .where((e) => e.value > 0)
+                  .where((e) => e.value > 0.001)
                   .map((e) =>
               {'walletId': e.key, 'amount': e.value}),
             ];
@@ -2216,32 +2327,49 @@ class _WalletSplitRow extends StatefulWidget {
 
 class _WalletSplitRowState extends State<_WalletSplitRow> {
   late TextEditingController _ctrl;
+  late FocusNode _focus;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = TextEditingController(
-        text: widget.assigned > 0
-            ? widget.assigned.toStringAsFixed(2)
-            : '');
+    _ctrl = TextEditingController();
+    _focus = FocusNode();
+    _setCtrlValue(widget.assigned);
+
+    _focus.addListener(() {
+      if (_focus.hasFocus) {
+        // Clear on focus so user types a fresh number
+        _ctrl.clear();
+      } else {
+        // Restore on blur if left empty
+        if (_ctrl.text.trim().isEmpty) {
+          _setCtrlValue(widget.assigned);
+          widget.onChanged?.call(widget.assigned);
+        }
+      }
+    });
+  }
+
+  void _setCtrlValue(double v) {
+    _ctrl.value = TextEditingValue(
+      text: v > 0 ? v.toStringAsFixed(2) : '',
+      selection: TextSelection.collapsed(
+          offset: v > 0 ? v.toStringAsFixed(2).length : 0),
+    );
   }
 
   @override
   void didUpdateWidget(_WalletSplitRow old) {
     super.didUpdateWidget(old);
-    if (old.assigned != widget.assigned && !_ctrl.text.contains(RegExp(r'[^0-9.]'))) {
-      final newText = widget.assigned > 0
-          ? widget.assigned.toStringAsFixed(2)
-          : '';
-      if (_ctrl.text != newText) {
-        _ctrl.text = newText;
-      }
+    if (old.assigned != widget.assigned && !_focus.hasFocus) {
+      _setCtrlValue(widget.assigned);
     }
   }
 
   @override
   void dispose() {
     _ctrl.dispose();
+    _focus.dispose();
     super.dispose();
   }
 
@@ -2263,7 +2391,6 @@ class _WalletSplitRowState extends State<_WalletSplitRow> {
         ),
       ),
       child: Row(children: [
-        // Toggle checkbox (not shown for fixed/primary)
         if (!widget.isFixed)
           GestureDetector(
             onTap: widget.onToggle,
@@ -2288,14 +2415,12 @@ class _WalletSplitRowState extends State<_WalletSplitRow> {
                   : null,
             ),
           ),
-
         Icon(widget.icon,
             size: 18,
             color: active
                 ? const Color(0xFF4A90E2)
                 : Colors.grey.withOpacity(0.4)),
         const SizedBox(width: 8),
-
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2316,8 +2441,6 @@ class _WalletSplitRowState extends State<_WalletSplitRow> {
             ],
           ),
         ),
-
-        // Amount field
         if (active)
           SizedBox(
             width: 90,
@@ -2332,6 +2455,7 @@ class _WalletSplitRowState extends State<_WalletSplitRow> {
             )
                 : TextField(
               controller: _ctrl,
+              focusNode: _focus,
               keyboardType: const TextInputType.numberWithOptions(
                   decimal: true),
               textAlign: TextAlign.right,
@@ -2347,7 +2471,15 @@ class _WalletSplitRowState extends State<_WalletSplitRow> {
               ),
               onChanged: (v) {
                 final val = double.tryParse(v) ?? 0;
-                widget.onChanged?.call(val);
+                // Cap at available balance — can't use more than wallet has
+                final capped = val > widget.available
+                    ? widget.available
+                    : val;
+                if (capped != val) {
+                  // Correct the field if over limit
+                  _setCtrlValue(capped);
+                }
+                widget.onChanged?.call(capped);
               },
             ),
           ),

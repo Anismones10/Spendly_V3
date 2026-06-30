@@ -26,6 +26,48 @@ class _LoansScreenState extends State<LoansScreen>
   final GlobalKey _borrowingTabKey = GlobalKey();
   final GlobalKey _addButtonKey = GlobalKey();
 
+  // ── Selection mode ────────────────────────────────────────────────────────
+  final Set<String> _selectedIds = {};
+  bool get _isSelecting => _selectedIds.isNotEmpty;
+
+  void _toggleSelection(String id) {
+    setState(() {
+      if (_selectedIds.contains(id)) _selectedIds.remove(id);
+      else _selectedIds.add(id);
+    });
+  }
+
+  void _clearSelection() => setState(() => _selectedIds.clear());
+
+  void _selectAll(List<dynamic> all) {
+    setState(() => _selectedIds.addAll(all.map((e) => e.id as String)));
+  }
+
+  Future<void> _deleteSelected(BuildContext context) async {
+    final count = _selectedIds.length;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Delete Selected'),
+        content: Text('Delete $count loan${count == 1 ? '' : 's'}?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      final provider = context.read<LoanProvider>();
+      for (final id in _selectedIds.toList()) provider.deleteLoan(id);
+      _clearSelection();
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -61,12 +103,34 @@ class _LoansScreenState extends State<LoansScreen>
     return Scaffold(
       backgroundColor:
           isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
-      appBar: AppBar(
-        backgroundColor:
-            isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
-        title: const Text('Loans',
-            style: TextStyle(fontWeight: FontWeight.w700)),
-      ),
+      appBar: _isSelecting
+          ? AppBar(
+              backgroundColor:
+                  isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              leading: IconButton(
+                icon: const Icon(Icons.close_rounded),
+                onPressed: _clearSelection,
+              ),
+              title: Text('${_selectedIds.length} selected',
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+              actions: [
+                TextButton(
+                  onPressed: () => _selectAll([...loans.lending, ...loans.borrowing]),
+                  child: const Text('All'),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_rounded, color: Colors.red),
+                  tooltip: 'Delete',
+                  onPressed: () => _deleteSelected(context),
+                ),
+              ],
+            )
+          : AppBar(
+              backgroundColor:
+                  isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
+              title: const Text('Loans',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
+            ),
       body: Column(
         children: [
           // ── Net balance summary card ──────────────────────────────────
@@ -378,11 +442,17 @@ class _LoansScreenState extends State<LoansScreen>
                 _LoanList(
                     loans: loans.lending,
                     symbol: symbol,
-                    type: 'lending'),
+                    type: 'lending',
+                    selectedIds: _selectedIds,
+                    isSelecting: _isSelecting,
+                    onToggleSelect: _toggleSelection),
                 _LoanList(
                     loans: loans.borrowing,
                     symbol: symbol,
-                    type: 'borrowing'),
+                    type: 'borrowing',
+                    selectedIds: _selectedIds,
+                    isSelecting: _isSelecting,
+                    onToggleSelect: _toggleSelection),
               ],
             ),
           ),
@@ -417,11 +487,17 @@ class _LoanList extends StatelessWidget {
   final List<LoanModel> loans;
   final String symbol;
   final String type;
+  final Set<String> selectedIds;
+  final bool isSelecting;
+  final ValueChanged<String> onToggleSelect;
 
   const _LoanList({
     required this.loans,
     required this.symbol,
     required this.type,
+    required this.selectedIds,
+    required this.isSelecting,
+    required this.onToggleSelect,
   });
 
   @override
@@ -442,10 +518,44 @@ class _LoanList extends StatelessWidget {
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
       itemCount: loans.length,
-      itemBuilder: (ctx, i) => _LoanTile(
-        loan: loans[i],
-        symbol: symbol,
-      ).animate().fadeIn(delay: (i * 50).ms).slideX(begin: 0.08),
+      itemBuilder: (ctx, i) {
+        final loan = loans[i];
+        final isSelected = selectedIds.contains(loan.id);
+        return GestureDetector(
+          onLongPress: () => onToggleSelect(loan.id),
+          onTap: isSelecting ? () => onToggleSelect(loan.id) : null,
+          child: Stack(
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: isSelected
+                      ? Border.all(color: const Color(0xFF4A90E2), width: 2)
+                      : null,
+                  color: isSelected
+                      ? const Color(0xFF4A90E2).withOpacity(0.07)
+                      : Colors.transparent,
+                ),
+                child: _LoanTile(loan: loan, symbol: symbol),
+              ),
+              if (isSelected)
+                Positioned(
+                  top: 12, left: 12,
+                  child: Container(
+                    width: 22, height: 22,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF4A90E2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.check_rounded,
+                        color: Colors.white, size: 14),
+                  ),
+                ),
+            ],
+          ),
+        ).animate().fadeIn(delay: (i * 50).ms).slideX(begin: 0.08);
+      },
     );
   }
 }

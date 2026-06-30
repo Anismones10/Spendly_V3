@@ -37,8 +37,54 @@ IconData _resolveGoalIcon(String? key) {
   return found['icon'] as IconData;
 }
 
-class GoalsScreen extends StatelessWidget {
+class GoalsScreen extends StatefulWidget {
   const GoalsScreen({super.key});
+
+  @override
+  State<GoalsScreen> createState() => _GoalsScreenState();
+}
+
+class _GoalsScreenState extends State<GoalsScreen> {
+  final Set<String> _selectedIds = {};
+  bool get _isSelecting => _selectedIds.isNotEmpty;
+
+  void _toggleSelection(String id) {
+    setState(() {
+      if (_selectedIds.contains(id)) _selectedIds.remove(id);
+      else _selectedIds.add(id);
+    });
+  }
+
+  void _clearSelection() => setState(() => _selectedIds.clear());
+
+  void _selectAll(List<dynamic> all) {
+    setState(() => _selectedIds.addAll(all.map((e) => e.id as String)));
+  }
+
+  Future<void> _deleteSelected(BuildContext context) async {
+    final count = _selectedIds.length;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Delete Selected'),
+        content: Text('Delete $count goal${count == 1 ? '' : 's'}?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      final provider = context.read<GoalProvider>();
+      for (final id in _selectedIds.toList()) provider.deleteGoal(id);
+      _clearSelection();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,14 +94,38 @@ class GoalsScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
+    final allGoals = [...goals.activeGoals, ...goals.completedGoals];
+
     return Scaffold(
       backgroundColor:
           isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
-      appBar: AppBar(
-        backgroundColor:
-            isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
-        title: const Text('Goals'),
-      ),
+      appBar: _isSelecting
+          ? AppBar(
+              backgroundColor:
+                  isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              leading: IconButton(
+                icon: const Icon(Icons.close_rounded),
+                onPressed: _clearSelection,
+              ),
+              title: Text('${_selectedIds.length} selected',
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+              actions: [
+                TextButton(
+                  onPressed: () => _selectAll(allGoals),
+                  child: const Text('All'),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_rounded, color: Colors.red),
+                  tooltip: 'Delete',
+                  onPressed: () => _deleteSelected(context),
+                ),
+              ],
+            )
+          : AppBar(
+              backgroundColor:
+                  isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
+              title: const Text('Goals'),
+            ),
       body: goals.goals.isEmpty
           ? const EmptyState(
               icon: Icons.flag_rounded,
@@ -68,19 +138,91 @@ class GoalsScreen extends StatelessWidget {
                 if (goals.activeGoals.isNotEmpty) ...[
                   _sectionLabel('Active Goals', theme),
                   ...goals.activeGoals.asMap().entries.map(
-                        (e) => _GoalCard(goal: e.value, symbol: symbol)
-                            .animate()
-                            .fadeIn(delay: (e.key * 60).ms)
-                            .slideY(begin: 0.1),
+                        (e) {
+                          final isSelected = _selectedIds.contains(e.value.id);
+                          return GestureDetector(
+                            onLongPress: () => _toggleSelection(e.value.id),
+                            onTap: _isSelecting ? () => _toggleSelection(e.value.id) : null,
+                            child: Stack(
+                              children: [
+                                AnimatedContainer(
+                                  duration: const Duration(milliseconds: 150),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: isSelected
+                                        ? Border.all(color: const Color(0xFFFF9800), width: 2)
+                                        : null,
+                                    color: isSelected
+                                        ? const Color(0xFFFF9800).withOpacity(0.07)
+                                        : Colors.transparent,
+                                  ),
+                                  child: _GoalCard(goal: e.value, symbol: symbol),
+                                ),
+                                if (isSelected)
+                                  Positioned(
+                                    top: 12, left: 12,
+                                    child: Container(
+                                      width: 22, height: 22,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFFFF9800),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(Icons.check_rounded,
+                                          color: Colors.white, size: 14),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          )
+                              .animate()
+                              .fadeIn(delay: (e.key * 60).ms)
+                              .slideY(begin: 0.1);
+                        },
                       ),
                 ],
                 if (goals.completedGoals.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   _sectionLabel('Completed', theme),
                   ...goals.completedGoals.asMap().entries.map(
-                        (e) => _GoalCard(goal: e.value, symbol: symbol)
-                            .animate()
-                            .fadeIn(delay: (e.key * 60).ms),
+                        (e) {
+                          final isSelected = _selectedIds.contains(e.value.id);
+                          return GestureDetector(
+                            onLongPress: () => _toggleSelection(e.value.id),
+                            onTap: _isSelecting ? () => _toggleSelection(e.value.id) : null,
+                            child: Stack(
+                              children: [
+                                AnimatedContainer(
+                                  duration: const Duration(milliseconds: 150),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: isSelected
+                                        ? Border.all(color: const Color(0xFFFF9800), width: 2)
+                                        : null,
+                                    color: isSelected
+                                        ? const Color(0xFFFF9800).withOpacity(0.07)
+                                        : Colors.transparent,
+                                  ),
+                                  child: _GoalCard(goal: e.value, symbol: symbol),
+                                ),
+                                if (isSelected)
+                                  Positioned(
+                                    top: 12, left: 12,
+                                    child: Container(
+                                      width: 22, height: 22,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFFFF9800),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(Icons.check_rounded,
+                                          color: Colors.white, size: 14),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          )
+                              .animate()
+                              .fadeIn(delay: (e.key * 60).ms);
+                        },
                       ),
                 ],
               ],

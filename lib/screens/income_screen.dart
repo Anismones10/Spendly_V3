@@ -9,9 +9,55 @@ import '../utils/app_utils.dart';
 import '../widgets/empty_state.dart';
 import 'add_income_screen.dart';
 
-class IncomeScreen extends StatelessWidget {
+class IncomeScreen extends StatefulWidget {
   final VoidCallback? onMoreTap;
   const IncomeScreen({super.key, this.onMoreTap});
+
+  @override
+  State<IncomeScreen> createState() => _IncomeScreenState();
+}
+
+class _IncomeScreenState extends State<IncomeScreen> {
+  final Set<String> _selectedIds = {};
+  bool get _isSelecting => _selectedIds.isNotEmpty;
+
+  void _toggleSelection(String id) {
+    setState(() {
+      if (_selectedIds.contains(id)) _selectedIds.remove(id);
+      else _selectedIds.add(id);
+    });
+  }
+
+  void _clearSelection() => setState(() => _selectedIds.clear());
+
+  void _selectAll(List<IncomeModel> all) {
+    setState(() => _selectedIds.addAll(all.map((e) => e.id)));
+  }
+
+  Future<void> _deleteSelected(BuildContext context) async {
+    final count = _selectedIds.length;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Delete Selected'),
+        content: Text('Delete $count income entr${count == 1 ? 'y' : 'ies'}?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      final provider = context.read<IncomeProvider>();
+      for (final id in _selectedIds.toList()) provider.deleteIncome(id);
+      _clearSelection();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,27 +77,49 @@ class IncomeScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor:
           isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
-      appBar: AppBar(
-        backgroundColor:
-            isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
-        title: const Text('Income'),
-        actions: [
-          if (onMoreTap != null)
-            GestureDetector(
-              onTap: onMoreTap,
-              child: Container(
-                margin: const EdgeInsets.only(right: 16),
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Icon(Icons.more_horiz_rounded,
-                    color: theme.colorScheme.primary, size: 20),
+      appBar: _isSelecting
+          ? AppBar(
+              backgroundColor:
+                  isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              leading: IconButton(
+                icon: const Icon(Icons.close_rounded),
+                onPressed: _clearSelection,
               ),
+              title: Text('${_selectedIds.length} selected',
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+              actions: [
+                TextButton(
+                  onPressed: () => _selectAll(monthIncomeList),
+                  child: const Text('All'),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_rounded, color: Colors.red),
+                  tooltip: 'Delete',
+                  onPressed: () => _deleteSelected(context),
+                ),
+              ],
+            )
+          : AppBar(
+              backgroundColor:
+                  isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
+              title: const Text('Income'),
+              actions: [
+                if (widget.onMoreTap != null)
+                  GestureDetector(
+                    onTap: widget.onMoreTap,
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 16),
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Icon(Icons.more_horiz_rounded,
+                          color: theme.colorScheme.primary, size: 20),
+                    ),
+                  ),
+              ],
             ),
-        ],
-      ),
       body: monthIncomeList.isEmpty
           ? Column(
               children: [
@@ -85,13 +153,46 @@ class IncomeScreen extends StatelessWidget {
 
                 // Income tiles
                 ...monthIncomeList.asMap().entries.map(
-                      (e) => _IncomeTile(
-                        income: e.value,
-                        symbol: symbol,
-                      )
-                          .animate()
-                          .fadeIn(delay: (e.key * 50).ms)
-                          .slideX(begin: 0.08),
+                      (e) {
+                        final isSelected = _selectedIds.contains(e.value.id);
+                        return GestureDetector(
+                          onLongPress: () => _toggleSelection(e.value.id),
+                          onTap: _isSelecting ? () => _toggleSelection(e.value.id) : null,
+                          child: Stack(
+                            children: [
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 150),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: isSelected
+                                      ? Border.all(color: const Color(0xFF2ECC71), width: 2)
+                                      : null,
+                                  color: isSelected
+                                      ? const Color(0xFF2ECC71).withOpacity(0.07)
+                                      : Colors.transparent,
+                                ),
+                                child: _IncomeTile(income: e.value, symbol: symbol),
+                              ),
+                              if (isSelected)
+                                Positioned(
+                                  top: 12, left: 12,
+                                  child: Container(
+                                    width: 22, height: 22,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFF2ECC71),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.check_rounded,
+                                        color: Colors.white, size: 14),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        )
+                            .animate()
+                            .fadeIn(delay: (e.key * 50).ms)
+                            .slideX(begin: 0.08);
+                      },
                     ),
               ],
             ),

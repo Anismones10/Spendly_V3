@@ -26,6 +26,132 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   String _periodFilter = 'all';
   String? _walletFilter;
 
+  // ── Selection mode ────────────────────────────────────────────────────────
+  final Set<String> _selectedIds = {};
+  bool get _isSelecting => _selectedIds.isNotEmpty;
+
+  void _toggleSelection(String id) {
+    setState(() {
+      if (_selectedIds.contains(id)) {
+        _selectedIds.remove(id);
+      } else {
+        _selectedIds.add(id);
+      }
+    });
+  }
+
+  void _selectAll(List<ExpenseModel> all) {
+    setState(() {
+      _selectedIds.addAll(all.map((e) => e.id));
+    });
+  }
+
+  void _clearSelection() {
+    setState(() => _selectedIds.clear());
+  }
+
+  Future<void> _deleteSelected(BuildContext context, ExpenseProvider expenses) async {
+    final count = _selectedIds.length;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Delete Selected'),
+        content: Text('Delete $count expense${count == 1 ? '' : 's'}? This cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      for (final id in _selectedIds.toList()) {
+        expenses.deleteExpense(id);
+      }
+      _clearSelection();
+    }
+  }
+
+  Future<void> _moveCategorySelected(BuildContext context) async {
+    final categories = context.read<CategoryProvider>().categories;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final selectedCat = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(ctx).padding.bottom + 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(child: Container(width: 40, height: 4,
+                decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(2)))),
+            const SizedBox(height: 16),
+            const Text('Move to Category',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 16),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: categories.map((cat) {
+                  final color = Color(cat.colorValue);
+                  return GestureDetector(
+                    onTap: () => Navigator.pop(ctx, cat.id),
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: color.withOpacity(0.2)),
+                      ),
+                      child: Row(children: [
+                        Container(width: 36, height: 36,
+                            decoration: BoxDecoration(
+                                color: color.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(10)),
+                            child: Icon(CategoryIcons.resolve(cat.icon), color: color, size: 18)),
+                        const SizedBox(width: 12),
+                        Text(cat.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                      ]),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (selectedCat != null) {
+      final provider = context.read<ExpenseProvider>();
+      for (final id in _selectedIds.toList()) {
+        final e = provider.allExpenses.firstWhere((x) => x.id == id, orElse: () => provider.allExpenses.first);
+        provider.updateExpense(ExpenseModel(
+          id: e.id, name: e.name, amount: e.amount,
+          categoryId: selectedCat, date: e.date, note: e.note,
+          isRecurring: e.isRecurring, recurringType: e.recurringType,
+          walletId: e.walletId, timeHour: e.timeHour, timeMinute: e.timeMinute,
+          recurringParentId: e.recurringParentId,
+          recurringLastGenerated: e.recurringLastGenerated,
+        ));
+      }
+      _clearSelection();
+    }
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -476,57 +602,84 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     return Scaffold(
       backgroundColor:
           isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
-      appBar: AppBar(
-        backgroundColor:
-            isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
-        title: const Text('Expenses'),
-        actions: [
-          // ── Recurring button ───────────────────────────────────────
-          IconButton(
-            icon: const Icon(Icons.repeat_rounded),
-            onPressed: () => _showRecurringManager(context, expenses),
-            tooltip: 'Manage Recurring',
-          ),
-          // ── Filter button ──────────────────────────────────────────
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.tune_rounded),
-                onPressed: () => _showSortFilter(context),
-                tooltip: 'Sort & Filter',
+      appBar: _isSelecting
+          ? AppBar(
+              backgroundColor:
+                  isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              leading: IconButton(
+                icon: const Icon(Icons.close_rounded),
+                onPressed: _clearSelection,
               ),
-              if (hasActiveFilter)
-                Positioned(
-                  right: 8,
-                  top: 8,
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primary,
-                      shape: BoxShape.circle,
+              title: Text('${_selectedIds.length} selected',
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+              actions: [
+                TextButton(
+                  onPressed: () => _selectAll(list),
+                  child: const Text('All'),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.folder_rounded),
+                  tooltip: 'Move Category',
+                  onPressed: () => _moveCategorySelected(context),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_rounded, color: Colors.red),
+                  tooltip: 'Delete',
+                  onPressed: () => _deleteSelected(context, expenses),
+                ),
+              ],
+            )
+          : AppBar(
+              backgroundColor:
+                  isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
+              title: const Text('Expenses'),
+              actions: [
+                // ── Recurring button ───────────────────────────────────────
+                IconButton(
+                  icon: const Icon(Icons.repeat_rounded),
+                  onPressed: () => _showRecurringManager(context, expenses),
+                  tooltip: 'Manage Recurring',
+                ),
+                // ── Filter button ──────────────────────────────────────────
+                Stack(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.tune_rounded),
+                      onPressed: () => _showSortFilter(context),
+                      tooltip: 'Sort & Filter',
+                    ),
+                    if (hasActiveFilter)
+                      Positioned(
+                        right: 8,
+                        top: 8,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                // ── More button ────────────────────────────────────────────
+                if (widget.onMoreTap != null)
+                  GestureDetector(
+                    onTap: widget.onMoreTap,
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 4),
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Icon(Icons.more_horiz_rounded,
+                          color: theme.colorScheme.primary, size: 20),
                     ),
                   ),
-                ),
-            ],
-          ),
-          // ── More button ────────────────────────────────────────────
-          if (widget.onMoreTap != null)
-            GestureDetector(
-              onTap: widget.onMoreTap,
-              child: Container(
-                margin: const EdgeInsets.only(right: 4),
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Icon(Icons.more_horiz_rounded,
-                    color: theme.colorScheme.primary, size: 20),
-              ),
+              ],
             ),
-        ],
-      ),
       body: Column(
         children: [
           // ── Search ────────────────────────────────────────────────────────
@@ -750,8 +903,36 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                                 ),
                               Stack(
                                 children: [
-                                  ExpenseTile(
-                                      expense: expense, symbol: symbol),
+                                  GestureDetector(
+                                    onLongPress: () => _toggleSelection(expense.id),
+                                    onTap: _isSelecting ? () => _toggleSelection(expense.id) : null,
+                                    child: AnimatedContainer(
+                                      duration: const Duration(milliseconds: 150),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: _selectedIds.contains(expense.id)
+                                            ? Border.all(color: theme.colorScheme.primary, width: 2)
+                                            : null,
+                                        color: _selectedIds.contains(expense.id)
+                                            ? theme.colorScheme.primary.withOpacity(0.07)
+                                            : Colors.transparent,
+                                      ),
+                                      child: ExpenseTile(expense: expense, symbol: symbol),
+                                    ),
+                                  ),
+                                  if (_selectedIds.contains(expense.id))
+                                    Positioned(
+                                      top: 12, left: 12,
+                                      child: Container(
+                                        width: 22, height: 22,
+                                        decoration: BoxDecoration(
+                                          color: theme.colorScheme.primary,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(Icons.check_rounded,
+                                            color: Colors.white, size: 14),
+                                      ),
+                                    ),
                                   Positioned(
                                     top: 8,
                                     right: 8,
@@ -839,9 +1020,44 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                                 ),
                               ).animate().fadeIn(delay: (i * 40).ms),
                               ...dayExpenses.asMap().entries.map((entry) {
-                                return ExpenseTile(
-                                  expense: entry.value,
-                                  symbol: symbol,
+                                final expense = entry.value;
+                                final isSelected = _selectedIds.contains(expense.id);
+                                return GestureDetector(
+                                  onLongPress: () => _toggleSelection(expense.id),
+                                  onTap: _isSelecting ? () => _toggleSelection(expense.id) : null,
+                                  child: Stack(
+                                    children: [
+                                      AnimatedContainer(
+                                        duration: const Duration(milliseconds: 150),
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(16),
+                                          border: isSelected
+                                              ? Border.all(color: theme.colorScheme.primary, width: 2)
+                                              : null,
+                                          color: isSelected
+                                              ? theme.colorScheme.primary.withOpacity(0.07)
+                                              : Colors.transparent,
+                                        ),
+                                        child: ExpenseTile(
+                                          expense: expense,
+                                          symbol: symbol,
+                                        ),
+                                      ),
+                                      if (isSelected)
+                                        Positioned(
+                                          top: 12, left: 12,
+                                          child: Container(
+                                            width: 22, height: 22,
+                                            decoration: BoxDecoration(
+                                              color: theme.colorScheme.primary,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(Icons.check_rounded,
+                                                color: Colors.white, size: 14),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
                                 )
                                     .animate()
                                     .fadeIn(

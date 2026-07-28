@@ -7,6 +7,7 @@ import '../providers/expense_provider.dart';
 import '../providers/category_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/wallet_provider.dart';
+import '../models/wallet_model.dart';
 import '../widgets/expense_tile.dart';
 import '../widgets/empty_state.dart';
 import '../utils/app_utils.dart';
@@ -260,6 +261,124 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             _walletFilter = null;
           });
         },
+      ),
+    );
+  }
+
+  void _showSplitDetail(BuildContext context, ExpenseModel expense) {
+    final walletProvider = context.read<WalletProvider>();
+    final symbol = context.read<SettingsProvider>().currencySymbol;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    // Parse SPLIT_PART|groupId|partIndex/total|walletId:amt|...|NOTE:note
+    final note = expense.note ?? '';
+    final parts = note.split('|');
+    String userNote = '';
+    final splits = <Map<String, dynamic>>[];
+
+    for (int i = 3; i < parts.length; i++) {
+      if (parts[i].startsWith('NOTE:')) {
+        userNote = parts[i].substring(5);
+      } else if (parts[i].contains(':')) {
+        final kv = parts[i].split(':');
+        final wallet = walletProvider.getById(kv[0]);
+        final amount = double.tryParse(kv[1]) ?? 0;
+        splits.add({'wallet': wallet, 'walletId': kv[0], 'amount': amount});
+      }
+    }
+
+    // Total = sum of all split parts
+    final total = splits.fold(0.0, (s, e) => s + (e['amount'] as double));
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4A90E2).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.call_split_rounded,
+                    color: Color(0xFF4A90E2), size: 20),
+              ),
+              const SizedBox(width: 12),
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(expense.name,
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w700)),
+                Text(AppUtils.formatAmount(total, symbol),
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: theme.colorScheme.onSurface.withOpacity(0.5))),
+              ]),
+            ]),
+            const SizedBox(height: 16),
+            const Text('Split across wallets:',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            ...splits.map((s) {
+              final w = s['wallet'] as WalletModel?;
+              final amount = s['amount'] as double;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4A90E2).withOpacity(0.07),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color: const Color(0xFF4A90E2).withOpacity(0.2)),
+                ),
+                child: Row(children: [
+                  Icon(WalletProvider.resolveIcon(w?.type ?? ''),
+                      color: const Color(0xFF4A90E2), size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(w?.name ?? s['walletId'] as String,
+                        style: const TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w600)),
+                  ),
+                  Text(AppUtils.formatAmount(amount, symbol),
+                      style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF2ECC71))),
+                ]),
+              );
+            }),
+            if (userNote.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text('Note: $userNote',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.onSurface.withOpacity(0.5))),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -586,13 +705,54 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final list = _applyWalletFilter(expenses.filteredExpenses);
+    final rawList = _applyWalletFilter(expenses.filteredExpenses);
+
+    // For split expenses: show only part 1 (which represents the full split)
+    // but show its total amount = sum of all parts in the group
+    final splitGroupTotals = <String, double>{};
+    for (final e in rawList) {
+      if (e.note?.startsWith('SPLIT_PART|') == true) {
+        final parts = e.note!.split('|');
+        if (parts.length > 1) {
+          final groupId = parts[1];
+          splitGroupTotals[groupId] =
+              (splitGroupTotals[groupId] ?? 0) + e.amount;
+        }
+      }
+    }
+
+    // Keep only part 1 of each split group for display
+    final seenGroups = <String>{};
+    final list = rawList.where((e) {
+      if (e.note?.startsWith('SPLIT_PART|') == true) {
+        final parts = e.note!.split('|');
+        if (parts.length > 2) {
+          final groupId = parts[1];
+          final partFraction = parts[2].split('/');
+          final partIndex = int.tryParse(partFraction[0]) ?? 1;
+          if (partIndex == 1) {
+            seenGroups.add(groupId);
+            return true; // show only part 1
+          }
+          return false; // hide parts 2+
+        }
+      }
+      return true; // non-split expenses always shown
+    }).toList();
     final grouped = _groupByDay(list);
     final days = grouped.keys.toList()
       ..sort((a, b) => expenses.sortBy == 'dateAsc'
           ? a.compareTo(b)   // oldest first
           : b.compareTo(a)); // newest first (default)
-    final totalFiltered = list.fold(0.0, (s, e) => s + e.amount);
+    final totalFiltered = list.fold(0.0, (s, e) {
+      if (e.note?.startsWith('SPLIT_PART|') == true) {
+        final parts = e.note!.split('|');
+        if (parts.length > 1) {
+          return s + (splitGroupTotals[parts[1]] ?? e.amount);
+        }
+      }
+      return s + e.amount;
+    });
 
     final hasActiveFilter = _periodFilter != 'all' ||
         expenses.filterCategory != null ||
@@ -904,8 +1064,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                               Stack(
                                 children: [
                                   GestureDetector(
-                                    onLongPress: () => _toggleSelection(expense.id),
-                                    onTap: _isSelecting ? () => _toggleSelection(expense.id) : null,
+                                    onLongPress: _isSelecting ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => AddExpenseScreen(existing: expense))) : () => _toggleSelection(expense.id),
+                                    onTap: _isSelecting
+                                        ? () => _toggleSelection(expense.id)
+                                        : (expense.note?.startsWith('SPLIT_PART|') == true)
+                                            ? () => _showSplitDetail(context, expense)
+                                            : null,
                                     child: AnimatedContainer(
                                       duration: const Duration(milliseconds: 150),
                                       decoration: BoxDecoration(
@@ -917,7 +1081,26 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                                             ? theme.colorScheme.primary.withOpacity(0.07)
                                             : Colors.transparent,
                                       ),
-                                      child: ExpenseTile(expense: expense, symbol: symbol),
+                                      child: Stack(
+                                        children: [
+                                          ExpenseTile(expense: expense, symbol: symbol, isSelecting: _isSelecting),
+                                          if (expense.note?.startsWith('SPLIT_PART|') == true)
+                                            Positioned(
+                                              top: 8, right: 8,
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFF4A90E2).withOpacity(0.15),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                  border: Border.all(color: const Color(0xFF4A90E2).withOpacity(0.3)),
+                                                ),
+                                                child: const Text('split',
+                                                  style: TextStyle(fontSize: 9, color: Color(0xFF4A90E2), fontWeight: FontWeight.w700),
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                   if (_selectedIds.contains(expense.id))
@@ -975,8 +1158,15 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                         itemBuilder: (ctx, i) {
                           final day = days[i];
                           final dayExpenses = grouped[day]!;
-                          final dayTotal = dayExpenses.fold(
-                              0.0, (s, e) => s + e.amount);
+                          final dayTotal = dayExpenses.fold(0.0, (s, e) {
+                            if (e.note?.startsWith('SPLIT_PART|') == true) {
+                              final parts = e.note!.split('|');
+                              if (parts.length > 1) {
+                                return s + (splitGroupTotals[parts[1]] ?? e.amount);
+                              }
+                            }
+                            return s + e.amount;
+                          });
 
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1023,7 +1213,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                                 final expense = entry.value;
                                 final isSelected = _selectedIds.contains(expense.id);
                                 return GestureDetector(
-                                  onLongPress: () => _toggleSelection(expense.id),
+                                  onLongPress: _isSelecting ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => AddExpenseScreen(existing: expense))) : () => _toggleSelection(expense.id),
                                   onTap: _isSelecting ? () => _toggleSelection(expense.id) : null,
                                   child: Stack(
                                     children: [
@@ -1041,6 +1231,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                                         child: ExpenseTile(
                                           expense: expense,
                                           symbol: symbol,
+                                          isSelecting: _isSelecting,
                                         ),
                                       ),
                                       if (isSelected)

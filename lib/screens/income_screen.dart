@@ -5,6 +5,7 @@ import '../models/income_model.dart';
 import '../providers/income_provider.dart';
 import '../providers/expense_provider.dart';
 import '../providers/settings_provider.dart';
+import '../providers/wallet_provider.dart';
 import '../utils/app_utils.dart';
 import '../widgets/empty_state.dart';
 import 'add_income_screen.dart';
@@ -472,6 +473,41 @@ class _IncomeTile extends StatelessWidget {
                                 .withOpacity(0.4),
                           ),
                         ),
+                        if (income.walletId != null) ...[
+                          const SizedBox(width: 6),
+                          Builder(builder: (ctx) {
+                            final walletProvider = ctx.watch<WalletProvider>();
+                            final w = walletProvider.getById(income.walletId!);
+                            if (w == null) return const SizedBox.shrink();
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: Color(w.colorValue).withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    WalletProvider.resolveIcon(w.type),
+                                    size: 9,
+                                    color: Color(w.colorValue),
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    w.name,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Color(w.colorValue),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
+                        ],
                       ],
                     ),
                     if (income.note != null && income.note!.isNotEmpty)

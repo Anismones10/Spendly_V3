@@ -268,6 +268,7 @@ class SyncService {
       'isDarkMode':   _settings.get('darkMode',     defaultValue: false),
       'monthlyBudget': _settings.get('monthlyBudget', defaultValue: 0.0),
       'themeColor':   _settings.get('themeColor',   defaultValue: 0xFF2196F3),
+      'allWalletsColor': _settings.get('allWalletsColor', defaultValue: 0xFF1E3A5F),
       'notifEnabled': _settings.get('notifEnabled', defaultValue: false),
       'notifDaily':   _settings.get('notifDaily',   defaultValue: true),
       'notifWeekly':  _settings.get('notifWeekly',  defaultValue: true),
@@ -318,6 +319,7 @@ class SyncService {
     // Reset account-specific flags (keep other settings like theme/currency)
     _settings.put('dataMigrated', false);
     _settings.put('lastSyncTime', 0);
+    _settings.put('skipWalletSeed', true); // prevent duplicate seeding on next login
   }
 
   // ── Restore from Firestore to Hive ────────────────────────────────────────
@@ -496,6 +498,9 @@ class SyncService {
     }
     if (d['themeColor'] != null) {
       _settings.put('themeColor', d['themeColor']);
+    }
+    if (d['allWalletsColor'] != null) {
+      _settings.put('allWalletsColor', d['allWalletsColor']);
     }
     if (d['notifEnabled'] != null) {
       _settings.put('notifEnabled', d['notifEnabled']);

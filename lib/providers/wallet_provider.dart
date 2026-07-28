@@ -32,7 +32,15 @@ class WalletProvider extends ChangeNotifier {
   }
 
   void _seedDefaults() {
-    // Only add defaults if this is the first launch
+    // Only add defaults if this is the first launch AND
+    // we haven't just switched accounts (which will restore from cloud)
+    final skip = Hive.box('settings')
+        .get('skipWalletSeed', defaultValue: false) as bool;
+    if (skip) {
+      // Clear the flag so next normal launch seeds correctly if needed
+      Hive.box('settings').put('skipWalletSeed', false);
+      return;
+    }
     if (_box.isEmpty) {
       for (final w in _defaults) {
         _box.put(w.id, w);

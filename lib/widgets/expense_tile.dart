@@ -11,9 +11,16 @@ import '../screens/add_expense_screen.dart';
 class ExpenseTile extends StatelessWidget {
   final ExpenseModel expense;
   final String symbol;
+  final bool isSelecting;
+  final double? overrideAmount; // used to show split group total
 
-  const ExpenseTile(
-      {super.key, required this.expense, required this.symbol});
+  const ExpenseTile({
+    super.key,
+    required this.expense,
+    required this.symbol,
+    this.isSelecting = false,
+    this.overrideAmount,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -25,10 +32,40 @@ class ExpenseTile extends StatelessWidget {
         : null;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final hasNote =
-        expense.note != null && expense.note!.trim().isNotEmpty;
-    final hasTime =
-        expense.timeHour != null && expense.timeMinute != null;
+
+    // Parse SPLIT_PART note
+    // Format: SPLIT_PART|groupId|partIndex/total|walletId:amt|...|NOTE:note
+    final isSplitPart = expense.note?.startsWith('SPLIT_PART|') == true;
+    String? userNote;
+    List<({String walletId, double amount})> splitWallets = [];
+    int splitPart = 1;
+    int splitTotal = 1;
+
+    if (isSplitPart) {
+      final parts = expense.note!.split('|');
+      // parts[0]=SPLIT_PART, parts[1]=groupId, parts[2]=partIndex/total
+      // parts[3..N]=walletId:amount, optional NOTE:note
+      if (parts.length > 2) {
+        final fraction = parts[2].split('/');
+        splitPart = int.tryParse(fraction[0]) ?? 1;
+        splitTotal = int.tryParse(fraction.length > 1 ? fraction[1] : '1') ?? 1;
+      }
+      for (int i = 3; i < parts.length; i++) {
+        if (parts[i].startsWith('NOTE:')) {
+          userNote = parts[i].substring(5);
+        } else if (parts[i].contains(':')) {
+          final kv = parts[i].split(':');
+          final amt = double.tryParse(kv[1]) ?? 0;
+          splitWallets.add((walletId: kv[0], amount: amt));
+        }
+      }
+    } else {
+      final hasNote = expense.note != null && expense.note!.trim().isNotEmpty;
+      userNote = hasNote ? expense.note : null;
+    }
+
+    final hasNote = userNote != null && userNote.isNotEmpty;
+    final hasTime = expense.timeHour != null && expense.timeMinute != null;
     final isRecurringInstance = expense.recurringParentId != null;
 
     return Dismissible(
@@ -70,7 +107,7 @@ class ExpenseTile extends StatelessWidget {
             color: Colors.white, size: 28),
       ),
       child: GestureDetector(
-        onTap: () => Navigator.push(
+        onTap: isSelecting ? null : () => Navigator.push(
           context,
           MaterialPageRoute(
               builder: (_) =>
@@ -226,8 +263,43 @@ class ExpenseTile extends StatelessWidget {
                             fontWeight: FontWeight.w500,
                           ),
                         ),
-                        // Wallet pill
-                        if (wallet != null) ...[
+                        // Wallet pill(s) — show all split wallets or single wallet
+                        if (isSplitPart && splitWallets.isNotEmpty) ...[
+                          ...splitWallets.map((sw) {
+                            final sw_wallet = wallets.getById(sw.walletId);
+                            if (sw_wallet == null) return const SizedBox.shrink();
+                            return Padding(
+                              padding: const EdgeInsets.only(left: 4),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: Color(sw_wallet.colorValue)
+                                      .withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                        WalletProvider.resolveIcon(sw_wallet.type),
+                                        size: 9,
+                                        color: Color(sw_wallet.colorValue)),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      sw_wallet.name,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Color(sw_wallet.colorValue),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }),
+                        ] else if (wallet != null) ...[
                           const SizedBox(width: 6),
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -330,7 +402,12 @@ class ExpenseTile extends StatelessWidget {
 
               // ── Amount ───────────────────────────────────────────────
               Text(
-                AppUtils.formatAmount(expense.amount, symbol),
+                AppUtils.formatAmount(
+                  isSplitPart && splitWallets.isNotEmpty
+                      ? splitWallets.fold(0.0, (s, e) => s + e.amount)
+                      : expense.amount,
+                  symbol,
+                ),
                 style: const TextStyle(
                     fontWeight: FontWeight.w700, fontSize: 16),
               ),
@@ -605,7 +682,17 @@ class ExpenseTile extends StatelessWidget {
                         .withOpacity(0.15)),
               ),
               child: Text(
-                expense.note!,
+                () {
+                  final n = expense.note ?? '';
+                  if (n.startsWith('SPLIT_PART|')) {
+                    final parts = n.split('|');
+                    for (final p in parts) {
+                      if (p.startsWith('NOTE:')) return p.substring(5);
+                    }
+                    return '';
+                  }
+                  return n;
+                }(),
                 style: TextStyle(
                   fontSize: 14,
                   height: 1.6,

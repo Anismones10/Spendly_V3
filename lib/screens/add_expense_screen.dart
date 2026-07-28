@@ -760,25 +760,31 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
     if (confirmed == null || confirmed.isEmpty) return;
 
-    // Save one expense per wallet split
     final now = DateTime.now();
     final baseName = _nameController.text.trim();
     final baseNote = _noteController.text.trim();
+    final splitGroupId = AppUtils.generateId(); // shared ID linking split parts
     final total = confirmed.length;
 
+    // Save one expense per wallet — each tagged with splitGroupId in note
+    // Format: "SPLIT_PART|groupId|partIndex/total|walletId1:amt1|...|NOTE:note"
+    // This gives correct per-wallet accounting while keeping parts linked
     for (int i = 0; i < total; i++) {
       final entry = confirmed[i];
+      final walletAmounts = confirmed
+          .map((e) => '${e['walletId']}:${e['amount']}')
+          .join('|');
+      final encodedNote =
+          'SPLIT_PART|$splitGroupId|${i + 1}/$total|$walletAmounts'
+          '${baseNote.isNotEmpty ? '|NOTE:$baseNote' : ''}';
+
       expenseProvider.addExpense(ExpenseModel(
         id: AppUtils.generateId(),
         name: baseName,
         amount: entry['amount'] as double,
         categoryId: _selectedCategoryId ?? '',
         date: _selectedDate,
-        note: total == 1
-            ? (baseNote.isEmpty ? null : baseNote)
-            : '[Split ${i + 1}/$total] $baseNote'.trim().replaceAll(RegExp(r'\s+$'), '').isNotEmpty
-            ? '[Split ${i + 1}/$total] $baseNote'.trim()
-            : '[Split ${i + 1}/$total]',
+        note: encodedNote,
         isRecurring: false,
         recurringType: null,
         walletId: entry['walletId'] as String,
@@ -2082,22 +2088,24 @@ class _MultiWalletSplitDialog extends StatefulWidget {
 
 class _MultiWalletSplitDialogState extends State<_MultiWalletSplitDialog> {
   late Map<String, double> _selected;
+  late double _primaryAmount;
 
   @override
   void initState() {
     super.initState();
+    _primaryAmount = widget.primaryAmount;
     _selected = Map.from(widget.preAssigned);
   }
 
   double get _coveredSoFar =>
-      widget.primaryAmount +
-          _selected.values.fold(0.0, (s, v) => s + v);
+      _primaryAmount + _selected.values.fold(0.0, (s, v) => s + v);
 
   double get _stillNeeded =>
       (widget.totalNeeded - _coveredSoFar).clamp(0, double.infinity);
 
   bool get _fullyFunded =>
-      _coveredSoFar >= widget.totalNeeded - 0.001;
+      _coveredSoFar >= widget.totalNeeded - 0.001 &&
+      _coveredSoFar <= widget.totalNeeded + 0.001;
 
   @override
   Widget build(BuildContext context) {
@@ -2162,16 +2170,21 @@ class _MultiWalletSplitDialogState extends State<_MultiWalletSplitDialog> {
               ),
               const SizedBox(height: 10),
 
-              // Primary wallet (editable amount)
+              // Primary wallet — now editable so user can choose how much to use
               _WalletSplitRow(
                 name: widget.primaryWallet?.name ?? 'Primary',
                 icon: WalletProvider.resolveIcon(
                     widget.primaryWallet?.type ?? ''),
                 available: widget.primaryAmount,
-                assigned: widget.primaryAmount,
+                assigned: _primaryAmount,
                 symbol: widget.symbol,
-                isFixed: true,
-                onChanged: null,
+                isFixed: false,
+                isEnabled: true,
+                onChanged: (val) {
+                  setState(() {
+                    _primaryAmount = val.clamp(0, widget.primaryAmount);
+                  });
+                },
               ),
               const SizedBox(height: 6),
 
@@ -2205,7 +2218,7 @@ class _MultiWalletSplitDialogState extends State<_MultiWalletSplitDialog> {
                           .where((entry) => entry.key != e.wallet.id)
                           .fold(0.0, (s, entry) => s + entry.value);
                       final maxAllowed = (widget.totalNeeded -
-                          widget.primaryAmount -
+                          _primaryAmount -
                           otherSelected)
                           .clamp(0.0, e.available);
                       _selected[e.wallet.id] = val.clamp(0, maxAllowed);
@@ -2272,13 +2285,12 @@ class _MultiWalletSplitDialogState extends State<_MultiWalletSplitDialog> {
           child: const Text('Cancel'),
         ),
         FilledButton(
-          onPressed: (_fullyFunded &&
-              _coveredSoFar <= widget.totalNeeded + 0.001)
+          onPressed: _fullyFunded
               ? () {
             final result = <Map<String, dynamic>>[
               {
                 'walletId': widget.primaryWallet?.id ?? '',
-                'amount': widget.primaryAmount,
+                'amount': _primaryAmount,
               },
               ..._selected.entries
                   .where((e) => e.value > 0.001)

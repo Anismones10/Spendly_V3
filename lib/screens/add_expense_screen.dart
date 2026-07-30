@@ -1592,6 +1592,8 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               const SizedBox(height: 20),
 
               // ── Recurring ─────────────────────────────────────────────
+              // Hide for split expenses (split and recurring are mutually exclusive)
+              if (widget.existing?.note?.startsWith('SPLIT_PART|') != true)
               Builder(builder: (context) {
                 final isChild = widget.existing?.recurringParentId != null;
                 return Container(
@@ -1730,14 +1732,12 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
               const SizedBox(height: 32),
 
-              // Only show split button when adding (not editing) and
-              // there is more than one wallet with available balance
-              if (widget.existing == null && !_isRecurring)
+              // Add Expense / Split buttons
+              if (widget.existing == null)
                 Builder(builder: (ctx) {
                   final wp = ctx.watch<WalletProvider>();
                   final ep = ctx.watch<ExpenseProvider>();
-                  final hasMultiple = wp.wallets.length > 1;
-                  if (!hasMultiple) return const SizedBox.shrink();
+                  final hasMultiple = wp.wallets.length > 1 && !_isRecurring;
                   return Column(
                     children: [
                       Row(
@@ -1749,79 +1749,71 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                             ).animate().fadeIn(delay: 300.ms).scale(
                                 begin: const Offset(0.95, 0.95)),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              icon: const Icon(Icons.call_split_rounded,
-                                  size: 16),
-                              label: const Text('Split'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xFF4A90E2),
-                                side: const BorderSide(
-                                    color: Color(0xFF4A90E2)),
-                                padding: const EdgeInsets.symmetric(
-                                    vertical: 14),
-                              ),
-                              onPressed: () async {
-                                // Validate name and amount first
-                                final name = _nameController.text.trim();
-                                final amount = double.tryParse(
-                                    _amountController.text) ??
-                                    0;
-                                if (name.isEmpty || amount <= 0) {
-                                  ScaffoldMessenger.of(context)
-                                      .showSnackBar(const SnackBar(
-                                    content: Text(
-                                        'Enter a name and amount first'),
-                                    behavior: SnackBarBehavior.floating,
-                                  ));
-                                  return;
-                                }
-                                if (_selectedWalletId == null) {
-                                  ScaffoldMessenger.of(context)
-                                      .showSnackBar(const SnackBar(
-                                    content:
-                                    Text('Select a wallet first'),
-                                    behavior: SnackBarBehavior.floating,
-                                  ));
-                                  return;
-                                }
-                                // Get primary wallet available balance
-                                final primaryAvail = ep.getTotalForWallet(
-                                    _selectedWalletId!);
-                                final primaryWallet =
-                                wp.getById(_selectedWalletId!);
-                                final available = (primaryWallet?.balance ??
-                                    0) -
-                                    primaryAvail;
-
-                                // Primary covers what it can (capped at amount)
-                                final primaryUse = (available >= amount
-                                    ? amount
-                                    : (available < 0 ? 0 : available)).toDouble();
-
-                                await _handleSplitPayment(
-                                  context: context,
-                                  amount: amount,
-                                  remaining: primaryUse,
-                                );
-                              },
-                            ).animate().fadeIn(delay: 300.ms),
-                          ),
+                          if (hasMultiple) ...[
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                icon: const Icon(Icons.call_split_rounded,
+                                    size: 16),
+                                label: const Text('Split'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFF4A90E2),
+                                  side: const BorderSide(
+                                      color: Color(0xFF4A90E2)),
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 14),
+                                ),
+                                onPressed: () async {
+                                  final name = _nameController.text.trim();
+                                  final amount = double.tryParse(
+                                      _amountController.text) ?? 0;
+                                  if (name.isEmpty || amount <= 0) {
+                                    ScaffoldMessenger.of(context)
+                                        .showSnackBar(const SnackBar(
+                                      content: Text('Enter a name and amount first'),
+                                      behavior: SnackBarBehavior.floating,
+                                    ));
+                                    return;
+                                  }
+                                  if (_selectedWalletId == null) {
+                                    ScaffoldMessenger.of(context)
+                                        .showSnackBar(const SnackBar(
+                                      content: Text('Select a wallet first'),
+                                      behavior: SnackBarBehavior.floating,
+                                    ));
+                                    return;
+                                  }
+                                  final primaryAvail = ep.getTotalForWallet(_selectedWalletId!);
+                                  final primaryWallet = wp.getById(_selectedWalletId!);
+                                  final available = (primaryWallet?.balance ?? 0) - primaryAvail;
+                                  final primaryUse = (available >= amount
+                                      ? amount
+                                      : (available < 0 ? 0 : available)).toDouble();
+                                  await _handleSplitPayment(
+                                    context: context,
+                                    amount: amount,
+                                    remaining: primaryUse,
+                                  );
+                                },
+                              ).animate().fadeIn(delay: 300.ms),
+                            ),
+                          ],
                         ],
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Use Split to pay with multiple wallets',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withOpacity(0.4),
+                      if (hasMultiple) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          'Use Split to pay with multiple wallets',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withOpacity(0.4),
+                          ),
+                          textAlign: TextAlign.center,
                         ),
-                        textAlign: TextAlign.center,
-                      ),
+                      ],
                     ],
                   );
                 }),
@@ -1851,53 +1843,131 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     final theme  = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    return showDialog<bool>(
+    return showModalBottomSheet<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor:
-        isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20)),
-        title: Row(
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 36),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
+            // Handle
             Container(
-              width: 36, height: 36,
+              width: 36, height: 4,
               decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withOpacity(0.12),
+                color: Colors.grey.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            // Icon + title
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(Icons.repeat_rounded,
-                  color: theme.colorScheme.primary, size: 20),
+                  color: theme.colorScheme.primary, size: 28),
             ),
-            const SizedBox(width: 10),
-            const Expanded(
-              child: Text('Update Recurring Expense',
+            const SizedBox(height: 12),
+            const Text('Update Recurring Expense',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            Text(
+              'This is a recurring template.\nHow would you like to apply your changes?',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.5,
+                color: theme.colorScheme.onSurface.withOpacity(0.6),
+              ),
+            ),
+            const SizedBox(height: 24),
+            // Template only option
+            GestureDetector(
+              onTap: () => Navigator.pop(ctx, false),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                      color: theme.colorScheme.primary.withOpacity(0.3)),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      Icon(Icons.event_note_rounded,
+                          color: theme.colorScheme.primary, size: 18),
+                      const SizedBox(width: 8),
+                      Text('Template only',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            color: theme.colorScheme.primary,
+                          )),
+                    ]),
+                    const SizedBox(height: 4),
+                    Text('Changes apply to future recurring instances only',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurface.withOpacity(0.5),
+                        )),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            // Update all option
+            GestureDetector(
+              onTap: () => Navigator.pop(ctx, true),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(children: [
+                      Icon(Icons.update_rounded,
+                          color: Colors.white, size: 18),
+                      SizedBox(width: 8),
+                      Text('Update all',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            color: Colors.white,
+                          )),
+                    ]),
+                    const SizedBox(height: 4),
+                    Text('Update template and all existing instances',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white.withOpacity(0.75),
+                        )),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, null),
+              child: Text('Cancel',
                   style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w700)),
+                    color: theme.colorScheme.onSurface.withOpacity(0.5),
+                  )),
             ),
           ],
         ),
-        content: const Text(
-          'This is a recurring template. How would you like to apply your changes?',
-          style: TextStyle(fontSize: 13, height: 1.5),
-        ),
-        actions: [
-          // Cancel
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, null),
-            child: const Text('Cancel'),
-          ),
-          // Template only
-          OutlinedButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Template only'),
-          ),
-          // Update all
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Update all'),
-          ),
-        ],
       ),
     );
   }

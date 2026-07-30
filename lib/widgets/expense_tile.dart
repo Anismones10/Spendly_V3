@@ -224,23 +224,33 @@ class ExpenseTile extends StatelessWidget {
                             ),
                           ),
                         ],
-                        if (hasNote) ...[
+                        if (hasNote || isSplitPart) ...[
                           const SizedBox(width: 4),
                           GestureDetector(
-                            onTap: () =>
-                                _showNote(context, isDark, theme),
+                            onTap: () => _showNote(
+                                context, isDark, theme,
+                                isSplitPart: isSplitPart,
+                                splitWallets: splitWallets,
+                                userNote: userNote,
+                                symbol: symbol,
+                              ),
                             child: Container(
                               padding: const EdgeInsets.all(4),
                               decoration: BoxDecoration(
-                                color: theme.colorScheme.primary
-                                    .withOpacity(0.1),
+                                color: isSplitPart
+                                    ? const Color(0xFF4A90E2).withOpacity(0.1)
+                                    : theme.colorScheme.primary.withOpacity(0.1),
                                 borderRadius:
                                     BorderRadius.circular(8),
                               ),
                               child: Icon(
-                                Icons.sticky_note_2_outlined,
+                                isSplitPart
+                                    ? Icons.call_split_rounded
+                                    : Icons.sticky_note_2_outlined,
                                 size: 14,
-                                color: theme.colorScheme.primary,
+                                color: isSplitPart
+                                    ? const Color(0xFF4A90E2)
+                                    : theme.colorScheme.primary,
                               ),
                             ),
                           ),
@@ -616,7 +626,14 @@ class ExpenseTile extends StatelessWidget {
   }
 
   void _showNote(
-      BuildContext context, bool isDark, ThemeData theme) {
+      BuildContext context,
+      bool isDark,
+      ThemeData theme, {
+      required bool isSplitPart,
+      required List<({String walletId, double amount})> splitWallets,
+      required String? userNote,
+      required String symbol,
+  }) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -681,23 +698,62 @@ class ExpenseTile extends StatelessWidget {
                     color: theme.colorScheme.primary
                         .withOpacity(0.15)),
               ),
-              child: Text(
-                () {
-                  final n = expense.note ?? '';
-                  if (n.startsWith('SPLIT_PART|')) {
-                    final parts = n.split('|');
-                    for (final p in parts) {
-                      if (p.startsWith('NOTE:')) return p.substring(5);
-                    }
-                    return '';
-                  }
-                  return n;
-                }(),
-                style: TextStyle(
-                  fontSize: 14,
-                  height: 1.6,
-                  color:
-                      theme.colorScheme.onSurface.withOpacity(0.8),
+              child: isSplitPart
+                  ? Consumer<WalletProvider>(
+                      builder: (ctx, walletProvider, _) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Split Payment:',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13)),
+                            const SizedBox(height: 8),
+                            ...splitWallets.map((sw) {
+                              final w = walletProvider.getById(sw.walletId);
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 4),
+                                child: Row(children: [
+                                  Icon(
+                                    WalletProvider.resolveIcon(w?.type ?? ''),
+                                    size: 14,
+                                    color: w != null
+                                        ? Color(w.colorValue)
+                                        : Colors.grey,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    w?.name ?? sw.walletId,
+                                    style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500),
+                                  ),
+                                  const Spacer(),
+                                  Text(
+                                    AppUtils.formatAmount(sw.amount, symbol),
+                                    style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700),
+                                  ),
+                                ]),
+                              );
+                            }),
+                            if (userNote != null && userNote!.isNotEmpty) ...[
+                              const Divider(height: 16),
+                              Text(userNote!,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: theme.colorScheme.onSurface
+                                        .withOpacity(0.7),
+                                  )),
+                            ],
+                          ],
+                        );
+                      },
+                    )
+                  : Text(
+                      expense.note ?? '',
+                      style: TextStyle(
                 ),
               ),
             ),

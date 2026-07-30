@@ -266,11 +266,39 @@ class ExpenseProvider extends ChangeNotifier {
     WidgetHelper.updateWidget();
   }
 
-  /// Deletes an expense. If it's a recurring parent, deletes all its instances too.
+  /// Deletes an expense. If it's a recurring parent, deletes all its instances.
+  /// If it's a split part, deletes ALL parts in the same split group.
   void deleteExpense(String id) {
     final expense = _box.get(id);
-    if (expense != null && expense.isRecurring) {
-      // Delete all generated instances
+    if (expense == null) {
+      _box.delete(id);
+      notifyListeners();
+      return;
+    }
+
+    // If it's a split part, delete ALL parts with the same groupId
+    if (expense.note?.startsWith('SPLIT_PART|') == true) {
+      final parts = expense.note!.split('|');
+      if (parts.length > 1) {
+        final groupId = parts[1];
+        final splitKeys = _box.values
+            .where((e) =>
+                e.note?.startsWith('SPLIT_PART|') == true &&
+                e.note!.split('|').length > 1 &&
+                e.note!.split('|')[1] == groupId)
+            .map((e) => e.id)
+            .toList();
+        for (final key in splitKeys) {
+          _box.delete(key);
+        }
+        notifyListeners();
+        WidgetHelper.updateWidget();
+        return;
+      }
+    }
+
+    // If it's a recurring parent, delete all its instances too
+    if (expense.isRecurring) {
       final instanceKeys = _box.values
           .where((e) => e.recurringParentId == id)
           .map((e) => e.id)
@@ -279,8 +307,10 @@ class ExpenseProvider extends ChangeNotifier {
         _box.delete(key);
       }
     }
+
     _box.delete(id);
     notifyListeners();
+    WidgetHelper.updateWidget();
   }
 
   /// Deletes only the generated instances of a recurring parent (keeps parent).

@@ -102,8 +102,21 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
             .trim();
         _noteController.text = extraNote;
       } else {
-        // Normal note — no items
-        _noteController.text = note;
+        // For split expenses, extract only the user note (not the encoding)
+        if (note.startsWith('SPLIT_PART|')) {
+          final parts = note.split('|');
+          String userNote = '';
+          for (final p in parts) {
+            if (p.startsWith('NOTE:')) {
+              userNote = p.substring(5);
+              break;
+            }
+          }
+          _noteController.text = userNote;
+        } else {
+          // Normal note — no items
+          _noteController.text = note;
+        }
       }
     } else {
       // Default time to now
@@ -794,6 +807,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     }
 
     if (mounted) {
+      await SoundHelper.playChaChing();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) Navigator.pop(context);
       });
@@ -1718,7 +1732,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
               // Only show split button when adding (not editing) and
               // there is more than one wallet with available balance
-              if (widget.existing == null)
+              if (widget.existing == null && !_isRecurring)
                 Builder(builder: (ctx) {
                   final wp = ctx.watch<WalletProvider>();
                   final ep = ctx.watch<ExpenseProvider>();

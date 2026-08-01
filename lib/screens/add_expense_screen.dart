@@ -1594,141 +1594,141 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               // ── Recurring ─────────────────────────────────────────────
               // Hide for split expenses (split and recurring are mutually exclusive)
               if (widget.existing?.note?.startsWith('SPLIT_PART|') != true)
-              Builder(builder: (context) {
-                final isChild = widget.existing?.recurringParentId != null;
-                return Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? const Color(0xFF1E1E1E)
-                        : Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 8)
-                    ],
-                  ),
-                  child: Column(children: [
-                    Row(children: [
-                      Icon(Icons.repeat_rounded,
-                          color: isChild
-                              ? theme.colorScheme.onSurface.withOpacity(0.3)
-                              : _isRecurring
-                              ? theme.colorScheme.primary
-                              : theme.colorScheme.onSurface
-                              .withOpacity(0.5)),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Recurring Expense',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    color: isChild
-                                        ? theme.colorScheme.onSurface.withOpacity(0.4)
-                                        : null)),
-                            if (isChild)
-                              Text(
-                                'Auto-generated expenses cannot be set as recurring',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: const Color(0xFFFF9800).withOpacity(0.8),
-                                ),
-                              )
-                            else if (_isRecurring)
-                              Text(
-                                'Automatically logged every $_recurringType',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: theme.colorScheme.primary,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      Switch.adaptive(
-                        value: isChild ? false : _isRecurring,
-                        onChanged: isChild ? null : (v) =>
-                            setState(() => _isRecurring = v),
-                      ),
-                    ]),
-                    if (_isRecurring) ...[
-                      const SizedBox(height: 12),
-                      // Info box explaining how it works
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primary
-                              .withOpacity(0.06),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.info_outline_rounded,
-                                size: 14,
-                                color: theme.colorScheme.primary
-                                    .withOpacity(0.7)),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Spendly will automatically add this expense on each due date. Missed dates are caught up on next app open.',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: theme.colorScheme.primary
-                                      .withOpacity(0.8),
-                                  height: 1.4,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: ['daily', 'weekly', 'monthly']
-                            .map((type) {
-                          return Expanded(
-                            child: GestureDetector(
-                              onTap: () => setState(
-                                      () => _recurringType = type),
-                              child: AnimatedContainer(
-                                duration:
-                                const Duration(milliseconds: 200),
-                                margin: const EdgeInsets.symmetric(
-                                    horizontal: 4),
-                                padding: const EdgeInsets.symmetric(
-                                    vertical: 10),
-                                decoration: BoxDecoration(
-                                  color: _recurringType == type
-                                      ? theme.colorScheme.primary
-                                      : theme.colorScheme.primary
-                                      .withOpacity(0.1),
-                                  borderRadius:
-                                  BorderRadius.circular(10),
-                                ),
-                                child: Text(
-                                  type[0].toUpperCase() +
-                                      type.substring(1),
-                                  textAlign: TextAlign.center,
+                Builder(builder: (context) {
+                  final isChild = widget.existing?.recurringParentId != null;
+                  return Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? const Color(0xFF1E1E1E)
+                          : Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 8)
+                      ],
+                    ),
+                    child: Column(children: [
+                      Row(children: [
+                        Icon(Icons.repeat_rounded,
+                            color: isChild
+                                ? theme.colorScheme.onSurface.withOpacity(0.3)
+                                : _isRecurring
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.onSurface
+                                .withOpacity(0.5)),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Recurring Expense',
                                   style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: _recurringType == type
-                                        ? Colors.white
-                                        : theme.colorScheme.primary,
+                                      fontWeight: FontWeight.w600,
+                                      color: isChild
+                                          ? theme.colorScheme.onSurface.withOpacity(0.4)
+                                          : null)),
+                              if (isChild)
+                                Text(
+                                  'Auto-generated expenses cannot be set as recurring',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: const Color(0xFFFF9800).withOpacity(0.8),
+                                  ),
+                                )
+                              else if (_isRecurring)
+                                Text(
+                                  'Automatically logged every $_recurringType',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: theme.colorScheme.primary,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        Switch.adaptive(
+                          value: isChild ? false : _isRecurring,
+                          onChanged: isChild ? null : (v) =>
+                              setState(() => _isRecurring = v),
+                        ),
+                      ]),
+                      if (_isRecurring) ...[
+                        const SizedBox(height: 12),
+                        // Info box explaining how it works
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary
+                                .withOpacity(0.06),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.info_outline_rounded,
+                                  size: 14,
+                                  color: theme.colorScheme.primary
+                                      .withOpacity(0.7)),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Spendly will automatically add this expense on each due date. Missed dates are caught up on next app open.',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: theme.colorScheme.primary
+                                        .withOpacity(0.8),
+                                    height: 1.4,
                                   ),
                                 ),
                               ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ],
-                  ]),
-                ).animate().fadeIn(delay: 250.ms);
-              }), // end Builder
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: ['daily', 'weekly', 'monthly']
+                              .map((type) {
+                            return Expanded(
+                              child: GestureDetector(
+                                onTap: () => setState(
+                                        () => _recurringType = type),
+                                child: AnimatedContainer(
+                                  duration:
+                                  const Duration(milliseconds: 200),
+                                  margin: const EdgeInsets.symmetric(
+                                      horizontal: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: _recurringType == type
+                                        ? theme.colorScheme.primary
+                                        : theme.colorScheme.primary
+                                        .withOpacity(0.1),
+                                    borderRadius:
+                                    BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    type[0].toUpperCase() +
+                                        type.substring(1),
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: _recurringType == type
+                                          ? Colors.white
+                                          : theme.colorScheme.primary,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ]),
+                  ).animate().fadeIn(delay: 250.ms);
+                }), // end Builder
 
               const SizedBox(height: 32),
 
@@ -2189,7 +2189,7 @@ class _MultiWalletSplitDialogState extends State<_MultiWalletSplitDialog> {
 
   bool get _fullyFunded =>
       _coveredSoFar >= widget.totalNeeded - 0.001 &&
-      _coveredSoFar <= widget.totalNeeded + 0.001;
+          _coveredSoFar <= widget.totalNeeded + 0.001;
 
   @override
   Widget build(BuildContext context) {

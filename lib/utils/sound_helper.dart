@@ -20,6 +20,13 @@ class SoundHelper {
     } catch (_) {}
   }
 
+  static Future<void> playIncome() async {
+    if (!_enabled) return;
+    try {
+      await _player.play(AssetSource('sounds/income.mp3'));
+    } catch (_) {}
+  }
+
   static Future<void> playWarning() async {
     if (!_enabled) return;
     try {

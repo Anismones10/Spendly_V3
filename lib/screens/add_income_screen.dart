@@ -6,6 +6,7 @@ import '../providers/income_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/wallet_provider.dart';
 import '../utils/app_utils.dart';
+import '../utils/sound_helper.dart';
 
 const List<Map<String, dynamic>> _incomeSources = [
   {'key': 'salary',     'label': 'Salary',     'icon': Icons.work_rounded,           'color': 0xFF2ECC71},
@@ -129,7 +130,7 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
     return '$hour:$min $period';
   }
 
-  void _save() {
+  Future<void> _save() async {
     if (_nameController.text.isEmpty ||
         _amountController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -167,8 +168,9 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
       provider.updateIncome(income);
     } else {
       provider.addIncome(income);
+      await SoundHelper.playIncome();
     }
-    Navigator.pop(context);
+    if (mounted) Navigator.pop(context);
   }
 
   @override
@@ -348,27 +350,39 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
             ),
             const SizedBox(height: 10),
             if (wallets.isEmpty)
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF2A2A2A)
-                      : Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline_rounded,
-                        color: theme.colorScheme.primary,
-                        size: 18),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Text(
-                        'Add wallets in Settings → Wallets first.',
-                        style: TextStyle(fontSize: 12),
+              GestureDetector(
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.pushNamed(context, '/settings');
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withOpacity(0.07),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                        color: theme.colorScheme.primary.withOpacity(0.25)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.add_card_rounded,
+                          color: theme.colorScheme.primary, size: 18),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Tap to add wallets in Settings → Wallets',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                      Icon(Icons.chevron_right_rounded,
+                          color: theme.colorScheme.primary.withOpacity(0.5),
+                          size: 16),
+                    ],
+                  ),
                 ),
               )
             else

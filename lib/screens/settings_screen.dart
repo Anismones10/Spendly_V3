@@ -42,10 +42,10 @@ class SettingsScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor:
-          isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
+      isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
       appBar: AppBar(
         backgroundColor:
-            isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
+        isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
         title: const Text('Settings'),
       ),
       body: ListView(
@@ -61,16 +61,22 @@ class SettingsScreen extends StatelessWidget {
             children: [
               _SettingTile(
                 icon: Icons.dark_mode_rounded,
+                subtitleColor: const Color(0xFF5C6BC0),
+                iconColor: const Color(0xFF5C6BC0),
                 title: 'Dark Mode',
                 trailing: _SmoothSwitch(hiveKey: 'darkMode', defaultValue: false, onToggle: () => settings.toggleDarkMode()),
               ),
               _SettingTile(
                 icon: Icons.volume_up_rounded,
+                subtitleColor: const Color(0xFF7E57C2),
+                iconColor: const Color(0xFF7E57C2),
                 title: 'Sound Effects',
                 trailing: _SmoothSwitch(hiveKey: 'soundEnabled', defaultValue: true, onToggle: () => settings.toggleSound()),
               ),
               _SettingTile(
                 icon: Icons.vibration_rounded,
+                subtitleColor: const Color(0xFF26C6DA),
+                iconColor: const Color(0xFF26C6DA),
                 title: 'Haptic Feedback',
                 trailing: _SmoothSwitch(hiveKey: 'hapticEnabled', defaultValue: true, onToggle: () => settings.toggleHaptic()),
               ),
@@ -79,6 +85,8 @@ class SettingsScreen extends StatelessWidget {
                   icon: Icons.currency_exchange_rounded,
                   title: 'Currency',
                   subtitle: s.currency,
+                  subtitleColor: const Color(0xFF43A047),
+                  iconColor: const Color(0xFF43A047),
                   onTap: () => _pickCurrency(ctx, s),
                 ),
               ),
@@ -100,9 +108,11 @@ class SettingsScreen extends StatelessWidget {
                 icon: Icons.notifications_active_rounded,
                 title: 'Notification Settings',
                 subtitle: 'Reminders, budget alerts & weekly summary',
+                subtitleColor: const Color(0xFFEF6C00),
+                iconColor: const Color(0xFFEF6C00),
                 onTap: () => Navigator.push(context,
-                  MaterialPageRoute(
-                    builder: (_) => const NotificationSettingsScreen())),
+                    MaterialPageRoute(
+                        builder: (_) => const NotificationSettingsScreen())),
               ),
             ],
           ),
@@ -127,19 +137,25 @@ class SettingsScreen extends StatelessWidget {
                 icon: Icons.account_balance_wallet_rounded,
                 title: 'Manage Wallets',
                 subtitle: 'Cash, Card, Bank accounts',
+                subtitleColor: const Color(0xFF42A5F5),
+                iconColor: const Color(0xFF42A5F5),
                 onTap: () => _manageWallets(context),
               ),
               _SettingTile(
                 icon: Icons.swap_horiz_rounded,
                 title: 'Transfer Between Wallets',
                 subtitle: 'Move money from one wallet to another',
+                subtitleColor: const Color(0xFF7E57C2),
+                iconColor: const Color(0xFF7E57C2),
                 onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const TransferScreen())),
+                    MaterialPageRoute(builder: (_) => const TransferScreen())),
               ),
               _SettingTile(
                 icon: Icons.pie_chart_rounded,
                 title: 'Category Budgets',
                 subtitle: 'Set spending limits per category',
+                subtitleColor: const Color(0xFFEF6C00),
+                iconColor: const Color(0xFFEF6C00),
                 onTap: () => _manageCategoryBudgets(context),
               ),
               _SettingTile(
@@ -161,13 +177,17 @@ class SettingsScreen extends StatelessWidget {
                 icon: Icons.picture_as_pdf_rounded,
                 title: 'Export PDF Report',
                 subtitle: 'Full report with charts, pies & tables',
+                subtitleColor: const Color(0xFFE53935),
+                iconColor: const Color(0xFFE53935),
                 onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const ExportScreen())),
+                    MaterialPageRoute(builder: (_) => const ExportScreen())),
               ),
               _SettingTile(
                 icon: Icons.receipt_long_rounded,
                 title: 'Export Expenses (CSV)',
                 subtitle: 'Save expenses as spreadsheet',
+                subtitleColor: const Color(0xFF42A5F5),
+                iconColor: const Color(0xFF42A5F5),
                 onTap: () async {
                   final expenses   = context.read<ExpenseProvider>();
                   final categories = context.read<CategoryProvider>();
@@ -182,6 +202,8 @@ class SettingsScreen extends StatelessWidget {
                 icon: Icons.trending_up_rounded,
                 title: 'Export Income (CSV)',
                 subtitle: 'Save income as spreadsheet',
+                subtitleColor: const Color(0xFF66BB6A),
+                iconColor: const Color(0xFF66BB6A),
                 onTap: () async {
                   final income = context.read<IncomeProvider>();
                   await CsvHelper.exportIncome(
@@ -192,6 +214,8 @@ class SettingsScreen extends StatelessWidget {
                 icon: Icons.handshake_rounded,
                 title: 'Export Loans (CSV)',
                 subtitle: 'Save lending & borrowing as spreadsheet',
+                subtitleColor: const Color(0xFFEF6C00),
+                iconColor: const Color(0xFFEF6C00),
                 onTap: () async {
                   final loans = context.read<LoanProvider>();
                   await CsvHelper.exportLoans(
@@ -202,6 +226,8 @@ class SettingsScreen extends StatelessWidget {
                 icon: Icons.download_for_offline_rounded,
                 title: 'Export All Data (CSV)',
                 subtitle: 'Expenses + Income + Loans in one file',
+                subtitleColor: const Color(0xFF7E57C2),
+                iconColor: const Color(0xFF7E57C2),
                 onTap: () async {
                   final expenses   = context.read<ExpenseProvider>();
                   final categories = context.read<CategoryProvider>();
@@ -209,16 +235,16 @@ class SettingsScreen extends StatelessWidget {
                   final loans      = context.read<LoanProvider>();
                   final Map<String, CategoryModel> catMap = {
                     for (final c in categories.categories) c.id: c
-              };
-              await CsvHelper.exportAll(
-                expenses.allExpenses,
-                catMap,
-                income.allIncome,
-                loans.allLoans,
-                settings.currencySymbol,
-              );
-            },
-          ),
+                  };
+                  await CsvHelper.exportAll(
+                    expenses.allExpenses,
+                    catMap,
+                    income.allIncome,
+                    loans.allLoans,
+                    settings.currencySymbol,
+                  );
+                },
+              ),
             ],
           ),
           const SizedBox(height: 10),
@@ -235,6 +261,8 @@ class SettingsScreen extends StatelessWidget {
                 title: 'Clear All Data',
                 subtitle: 'Permanently delete everything',
                 titleColor: Colors.red,
+                subtitleColor: const Color(0xFFEF5350),
+                iconColor: const Color(0xFFEF5350),
                 onTap: () => _confirmClear(context),
               ),
             ],
@@ -266,8 +294,10 @@ class SettingsScreen extends StatelessWidget {
                 icon: Icons.info_outline_rounded,
                 title: 'About Spendly',
                 subtitle: 'Version 1.1.0 · Made by Mones',
+                subtitleColor: const Color(0xFF78909C),
+                iconColor: const Color(0xFF78909C),
                 onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const AboutScreen())),
+                    MaterialPageRoute(builder: (_) => const AboutScreen())),
               ),
             ],
           ),
@@ -417,7 +447,7 @@ class _SecuritySectionState extends State<_SecuritySection> {
 
           return Dialog(
             backgroundColor:
-                isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            isDark ? const Color(0xFF1E1E1E) : Colors.white,
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20)),
             child: Padding(
@@ -450,9 +480,9 @@ class _SecuritySectionState extends State<_SecuritySection> {
                           color: errorMsg != null
                               ? Colors.red
                               : filled
-                                  ? theme.colorScheme.primary
-                                  : theme.colorScheme.onSurface
-                                      .withOpacity(0.15),
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.onSurface
+                              .withOpacity(0.15),
                         ),
                       );
                     }),
@@ -472,15 +502,15 @@ class _SecuritySectionState extends State<_SecuritySection> {
                   // Mini keypad
                   ...[ ['1','2','3'], ['4','5','6'], ['7','8','9'] ]
                       .map((row) => Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: row.map((d) => _MiniKey(
-                            digit: d,
-                            onTap: () => onKey(d),
-                          )).toList(),
-                        ),
-                      )),
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: row.map((d) => _MiniKey(
+                        digit: d,
+                        onTap: () => onKey(d),
+                      )).toList(),
+                    ),
+                  )),
 
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -556,7 +586,7 @@ class _SecuritySectionState extends State<_SecuritySection> {
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius:
-              const BorderRadius.vertical(top: Radius.circular(24)),
+          const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         padding: EdgeInsets.fromLTRB(
             24, 16, 24, MediaQuery.of(ctx).padding.bottom + 24),
@@ -599,8 +629,8 @@ class _SecuritySectionState extends State<_SecuritySection> {
                     color: isSelected
                         ? theme.colorScheme.primary.withOpacity(0.08)
                         : (isDark
-                            ? const Color(0xFF2A2A2A)
-                            : Colors.grey.shade50),
+                        ? const Color(0xFF2A2A2A)
+                        : Colors.grey.shade50),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: isSelected
@@ -613,13 +643,13 @@ class _SecuritySectionState extends State<_SecuritySection> {
                     children: [
                       Expanded(
                         child: Text(_timeoutLabels[i],
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: isSelected
-                                ? FontWeight.w700 : FontWeight.w500,
-                            color: isSelected
-                                ? theme.colorScheme.primary : null,
-                          )),
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: isSelected
+                                  ? FontWeight.w700 : FontWeight.w500,
+                              color: isSelected
+                                  ? theme.colorScheme.primary : null,
+                            )),
                       ),
                       if (isSelected)
                         Icon(Icons.check_circle_rounded,
@@ -663,6 +693,8 @@ class _SecuritySectionState extends State<_SecuritySection> {
             icon: Icons.pin_rounded,
             title: 'Change PIN',
             subtitle: 'Update your current PIN',
+            subtitleColor: const Color(0xFF26A69A),
+            iconColor: const Color(0xFF26A69A),
             onTap: _changePin,
           ),
 
@@ -671,6 +703,8 @@ class _SecuritySectionState extends State<_SecuritySection> {
             icon: Icons.fingerprint_rounded,
             title: 'Biometric Unlock',
             subtitle: 'Use fingerprint or face to unlock',
+            subtitleColor: const Color(0xFF5C6BC0),
+            iconColor: const Color(0xFF5C6BC0),
             trailing: Switch.adaptive(
               value: _bioEnabled,
               onChanged: _toggleBiometric,
@@ -682,6 +716,8 @@ class _SecuritySectionState extends State<_SecuritySection> {
             icon: Icons.timer_rounded,
             title: 'Lock After',
             subtitle: _timeoutLabel() + ' of background',
+            subtitleColor: const Color(0xFFEF6C00),
+            iconColor: const Color(0xFFEF6C00),
             onTap: _showTimeoutPicker,
           ),
         ],
@@ -709,10 +745,10 @@ class _CategoryBudgetsPage extends StatelessWidget {
 
     return Scaffold(
       backgroundColor:
-          isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
+      isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
       appBar: AppBar(
         backgroundColor:
-            isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
+        isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
         title: const Text('Category Budgets'),
       ),
       body: ListView(
@@ -894,14 +930,14 @@ class _CategoryBudgetsPage extends StatelessWidget {
       backgroundColor: Colors.transparent,
       builder: (ctx) => Padding(
         padding:
-            EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
         child: Container(
           decoration: BoxDecoration(
             color: Theme.of(ctx).brightness == Brightness.dark
                 ? const Color(0xFF1E1E1E)
                 : Colors.white,
             borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(24)),
+            const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -937,7 +973,7 @@ class _CategoryBudgetsPage extends StatelessWidget {
               TextField(
                 controller: ctrl,
                 keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
+                const TextInputType.numberWithOptions(decimal: true),
                 autofocus: true,
                 decoration: InputDecoration(
                   hintText: 'Monthly limit',
@@ -985,10 +1021,10 @@ class _WalletsPage extends StatelessWidget {
 
     return Scaffold(
       backgroundColor:
-          isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
+      isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
       appBar: AppBar(
         backgroundColor:
-            isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
+        isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
         title: const Text('Wallets'),
         actions: [
           if (wallets.length >= 2)
@@ -1002,218 +1038,218 @@ class _WalletsPage extends StatelessWidget {
       ),
       body: wallets.isEmpty
           ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.account_balance_wallet_outlined,
-                      size: 64,
-                      color: theme.colorScheme.onSurface.withOpacity(0.2)),
-                  const SizedBox(height: 12),
-                  Text('No wallets yet',
-                      style: TextStyle(
-                          color: theme.colorScheme.onSurface.withOpacity(0.4),
-                          fontSize: 16)),
-                ],
-              ),
-            )
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.account_balance_wallet_outlined,
+                size: 64,
+                color: theme.colorScheme.onSurface.withOpacity(0.2)),
+            const SizedBox(height: 12),
+            Text('No wallets yet',
+                style: TextStyle(
+                    color: theme.colorScheme.onSurface.withOpacity(0.4),
+                    fontSize: 16)),
+          ],
+        ),
+      )
           : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-              children: [
-                // ── All Wallets Card Color ──────────────────────────────
-                Consumer<SettingsProvider>(
-                  builder: (_, settings, __) {
-                    const palette = [
-                      Color(0xFF1E3A5F), Color(0xFF0F2440),
-                      Color(0xFF2196F3), Color(0xFF1565C0),
-                      Color(0xFF6A1B9A), Color(0xFF283593),
-                      Color(0xFF00695C), Color(0xFF37474F),
-                      Color(0xFF4A148C), Color(0xFF1B5E20),
-                      Color(0xFFB71C1C), Color(0xFFE65100),
-                    ];
-                    final current = settings.allWalletsColor;
-                    return Container(
-                      padding: const EdgeInsets.all(16),
-                      margin: const EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 8)],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(children: [
-                            Container(
-                              width: 36, height: 36,
-                              decoration: BoxDecoration(
-                                color: current.withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Icon(Icons.account_balance_wallet_rounded,
-                                  color: current, size: 18),
-                            ),
-                            const SizedBox(width: 12),
-                            const Text('All Wallets Card Color',
-                                style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600)),
-                          ]),
-                          const SizedBox(height: 14),
-                          Wrap(
-                            spacing: 10, runSpacing: 10,
-                            children: palette.map((color) {
-                              final isSelected = current.value == color.value;
-                              return GestureDetector(
-                                onTap: () => settings.setAllWalletsColor(color),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  width: isSelected ? 36 : 30,
-                                  height: isSelected ? 36 : 30,
-                                  decoration: BoxDecoration(
-                                    color: color,
-                                    shape: BoxShape.circle,
-                                    border: isSelected
-                                        ? Border.all(
-                                            color: theme.colorScheme.onSurface,
-                                            width: 2.5)
-                                        : null,
-                                    boxShadow: isSelected
-                                        ? [BoxShadow(
-                                            color: color.withOpacity(0.5),
-                                            blurRadius: 8)]
-                                        : null,
-                                  ),
-                                  child: isSelected
-                                      ? const Icon(Icons.check_rounded,
-                                          color: Colors.white, size: 16)
-                                      : null,
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+        children: [
+          // ── All Wallets Card Color ──────────────────────────────
+          Consumer<SettingsProvider>(
+            builder: (_, settings, __) {
+              const palette = [
+                Color(0xFF1E3A5F), Color(0xFF0F2440),
+                Color(0xFF2196F3), Color(0xFF1565C0),
+                Color(0xFF6A1B9A), Color(0xFF283593),
+                Color(0xFF00695C), Color(0xFF37474F),
+                Color(0xFF4A148C), Color(0xFF1B5E20),
+                Color(0xFFB71C1C), Color(0xFFE65100),
+              ];
+              final current = settings.allWalletsColor;
+              return Container(
+                padding: const EdgeInsets.all(16),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 8)],
                 ),
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        theme.colorScheme.primary,
-                        theme.colorScheme.primary.withOpacity(0.7),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: theme.colorScheme.primary.withOpacity(0.3),
-                        blurRadius: 16, offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.account_balance_wallet_rounded,
-                          color: Colors.white, size: 28),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Total Balance',
-                                style: TextStyle(
-                                    color: Colors.white70, fontSize: 13)),
-                            Text(
-                              AppUtils.formatAmount(
-                                  walletProvider.totalBalance, symbol),
-                              style: const TextStyle(
-                                color: Colors.white, fontSize: 24,
-                                fontWeight: FontWeight.w800),
-                            ),
-                          ],
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      Container(
+                        width: 36, height: 36,
+                        decoration: BoxDecoration(
+                          color: current.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(10),
                         ),
+                        child: Icon(Icons.account_balance_wallet_rounded,
+                            color: current, size: 18),
                       ),
-                      if (wallets.length >= 2)
-                        GestureDetector(
-                          onTap: () => Navigator.push(context,
-                              MaterialPageRoute(
-                                  builder: (_) => const TransferScreen())),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
+                      const SizedBox(width: 12),
+                      const Text('All Wallets Card Color',
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600)),
+                    ]),
+                    const SizedBox(height: 14),
+                    Wrap(
+                      spacing: 10, runSpacing: 10,
+                      children: palette.map((color) {
+                        final isSelected = current.value == color.value;
+                        return GestureDetector(
+                          onTap: () => settings.setAllWalletsColor(color),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            width: isSelected ? 36 : 30,
+                            height: isSelected ? 36 : 30,
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(12),
+                              color: color,
+                              shape: BoxShape.circle,
+                              border: isSelected
+                                  ? Border.all(
+                                  color: theme.colorScheme.onSurface,
+                                  width: 2.5)
+                                  : null,
+                              boxShadow: isSelected
+                                  ? [BoxShadow(
+                                  color: color.withOpacity(0.5),
+                                  blurRadius: 8)]
+                                  : null,
                             ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.swap_horiz_rounded,
-                                    color: Colors.white, size: 18),
-                                SizedBox(width: 6),
-                                Text('Transfer',
-                                    style: TextStyle(
-                                        color: Colors.white, fontSize: 13,
-                                        fontWeight: FontWeight.w700)),
-                              ],
-                            ),
+                            child: isSelected
+                                ? const Icon(Icons.check_rounded,
+                                color: Colors.white, size: 16)
+                                : null,
                           ),
-                        ),
-                    ],
-                  ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
                 ),
-                ...wallets.map((wallet) => _WalletTile(
-                      wallet: wallet, symbol: symbol,
-                      onEdit: () =>
-                          _showWalletSheet(context, existing: wallet),
-                      onDelete: wallets.length > 1
-                          ? () async {
-                              final confirmed = await showDialog<bool>(
-                                context: context,
-                                builder: (_) => AlertDialog(
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(20)),
-                                  title: const Row(children: [
-                                    Icon(Icons.warning_amber_rounded,
-                                        color: Colors.red),
-                                    SizedBox(width: 10),
-                                    Text('Delete Wallet'),
-                                  ]),
-                                  content: Text(
-                                    'Are you sure you want to delete "${wallet.name}"?\n\n'
-                                    'All expense records linked to this wallet will still exist but will show no wallet.',
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.pop(context, false),
-                                      child: const Text('Cancel'),
-                                    ),
-                                    TextButton(
-                                      style: TextButton.styleFrom(
-                                          foregroundColor: Colors.red),
-                                      onPressed: () =>
-                                          Navigator.pop(context, true),
-                                      child: const Text('Delete'),
-                                    ),
-                                  ],
-                                ),
-                              );
-                              if (confirmed == true) {
-                                walletProvider.deleteWallet(wallet.id);
-                              }
-                            }
-                          : null,
-                    )),
+              );
+            },
+          ),
+          Container(
+            padding: const EdgeInsets.all(20),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  theme.colorScheme.primary,
+                  theme.colorScheme.primary.withOpacity(0.7),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: theme.colorScheme.primary.withOpacity(0.3),
+                  blurRadius: 16, offset: const Offset(0, 6),
+                ),
               ],
             ),
+            child: Row(
+              children: [
+                const Icon(Icons.account_balance_wallet_rounded,
+                    color: Colors.white, size: 28),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Total Balance',
+                          style: TextStyle(
+                              color: Colors.white70, fontSize: 13)),
+                      Text(
+                        AppUtils.formatAmount(
+                            walletProvider.totalBalance, symbol),
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 24,
+                            fontWeight: FontWeight.w800),
+                      ),
+                    ],
+                  ),
+                ),
+                if (wallets.length >= 2)
+                  GestureDetector(
+                    onTap: () => Navigator.push(context,
+                        MaterialPageRoute(
+                            builder: (_) => const TransferScreen())),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.swap_horiz_rounded,
+                              color: Colors.white, size: 18),
+                          SizedBox(width: 6),
+                          Text('Transfer',
+                              style: TextStyle(
+                                  color: Colors.white, fontSize: 13,
+                                  fontWeight: FontWeight.w700)),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          ...wallets.map((wallet) => _WalletTile(
+            wallet: wallet, symbol: symbol,
+            onEdit: () =>
+                _showWalletSheet(context, existing: wallet),
+            onDelete: wallets.length > 1
+                ? () async {
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (_) => AlertDialog(
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20)),
+                  title: const Row(children: [
+                    Icon(Icons.warning_amber_rounded,
+                        color: Colors.red),
+                    SizedBox(width: 10),
+                    Text('Delete Wallet'),
+                  ]),
+                  content: Text(
+                    'Are you sure you want to delete "${wallet.name}"?\n\n'
+                        'All expense records linked to this wallet will still exist but will show no wallet.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () =>
+                          Navigator.pop(context, false),
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      style: TextButton.styleFrom(
+                          foregroundColor: Colors.red),
+                      onPressed: () =>
+                          Navigator.pop(context, true),
+                      child: const Text('Delete'),
+                    ),
+                  ],
+                ),
+              );
+              if (confirmed == true) {
+                walletProvider.deleteWallet(wallet.id);
+              }
+            }
+                : null,
+          )),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showWalletSheet(context),
         icon: const Icon(Icons.add_rounded),
@@ -1402,7 +1438,7 @@ class _WalletSheetState extends State<_WalletSheet> {
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius:
-              const BorderRadius.vertical(top: Radius.circular(28)),
+          const BorderRadius.vertical(top: Radius.circular(28)),
         ),
         padding: const EdgeInsets.all(24),
         child: SingleChildScrollView(
@@ -1413,8 +1449,8 @@ class _WalletSheetState extends State<_WalletSheet> {
               Center(child: Container(
                 width: 40, height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(2)),
+                    color: Colors.grey.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(2)),
               )),
               const SizedBox(height: 20),
               Text(widget.existing != null ? 'Edit Wallet' : 'New Wallet',
@@ -1450,8 +1486,8 @@ class _WalletSheetState extends State<_WalletSheet> {
                           color: isSelected
                               ? _selectedColor.withOpacity(0.15)
                               : (isDark
-                                  ? const Color(0xFF2A2A2A)
-                                  : Colors.grey.shade100),
+                              ? const Color(0xFF2A2A2A)
+                              : Colors.grey.shade100),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: isSelected
@@ -1465,7 +1501,7 @@ class _WalletSheetState extends State<_WalletSheet> {
                                 color: isSelected
                                     ? _selectedColor
                                     : theme.colorScheme.onSurface
-                                        .withOpacity(0.35),
+                                    .withOpacity(0.35),
                                 size: 20),
                             const SizedBox(height: 4),
                             Text(t['label'] as String,
@@ -1475,7 +1511,7 @@ class _WalletSheetState extends State<_WalletSheet> {
                                     color: isSelected
                                         ? _selectedColor
                                         : theme.colorScheme.onSurface
-                                            .withOpacity(0.4))),
+                                        .withOpacity(0.4))),
                           ],
                         ),
                       ),
@@ -1505,13 +1541,13 @@ class _WalletSheetState extends State<_WalletSheet> {
                         ),
                         boxShadow: isSelected
                             ? [BoxShadow(
-                                color: color.withOpacity(0.6),
-                                blurRadius: 10, spreadRadius: 2)]
+                            color: color.withOpacity(0.6),
+                            blurRadius: 10, spreadRadius: 2)]
                             : null,
                       ),
                       child: isSelected
                           ? const Icon(Icons.check_rounded,
-                              color: Colors.white, size: 18)
+                          color: Colors.white, size: 18)
                           : null,
                     ),
                   );
@@ -1547,10 +1583,10 @@ class _CategoriesPage extends StatelessWidget {
 
     return Scaffold(
       backgroundColor:
-          isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
+      isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
       appBar: AppBar(
         backgroundColor:
-            isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
+        isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
         title: const Text('Categories'),
       ),
       body: ListView(
@@ -1576,23 +1612,23 @@ class _CategoriesPage extends StatelessWidget {
                   style: const TextStyle(fontWeight: FontWeight.w600)),
               trailing: cat.isCustom
                   ? IconButton(
-                      icon: const Icon(Icons.delete_outline_rounded,
-                          color: Colors.red),
-                      onPressed: () => cats.deleteCustomCategory(cat.id),
-                    )
+                icon: const Icon(Icons.delete_outline_rounded,
+                    color: Colors.red),
+                onPressed: () => cats.deleteCustomCategory(cat.id),
+              )
                   : Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Color(cat.colorValue).withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text('Default',
-                          style: TextStyle(
-                              fontSize: 11,
-                              color: Color(cat.colorValue),
-                              fontWeight: FontWeight.w600)),
-                    ),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Color(cat.colorValue).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text('Default',
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: Color(cat.colorValue),
+                        fontWeight: FontWeight.w600)),
+              ),
             ),
           );
         }).toList(),
@@ -1622,7 +1658,7 @@ class _CategoriesPage extends StatelessWidget {
               color: Theme.of(ctx).brightness == Brightness.dark
                   ? const Color(0xFF1E1E1E) : Colors.white,
               borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(24)),
+              const BorderRadius.vertical(top: Radius.circular(24)),
             ),
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
@@ -1707,13 +1743,13 @@ class _CategoriesPage extends StatelessWidget {
                             ),
                             boxShadow: isSelected
                                 ? [BoxShadow(
-                                    color: color.withOpacity(0.5),
-                                    blurRadius: 8, spreadRadius: 2)]
+                                color: color.withOpacity(0.5),
+                                blurRadius: 8, spreadRadius: 2)]
                                 : null,
                           ),
                           child: isSelected
                               ? const Icon(Icons.check_rounded,
-                                  color: Colors.white, size: 18)
+                              color: Colors.white, size: 18)
                               : null,
                         ),
                       );
@@ -1794,8 +1830,8 @@ class _ExpandableSectionState extends State<_ExpandableSection> {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10, offset: const Offset(0, 3)),
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10, offset: const Offset(0, 3)),
         ],
       ),
       child: ClipRRect(
@@ -1822,9 +1858,9 @@ class _ExpandableSectionState extends State<_ExpandableSection> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(widget.title,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700)),
+                          style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700)),
                     ),
                     AnimatedRotation(
                       turns: _expanded ? 0.5 : 0,
@@ -1846,14 +1882,14 @@ class _ExpandableSectionState extends State<_ExpandableSection> {
                 curve: Curves.easeInOut,
                 child: _expanded
                     ? Column(
-                        children: [
-                          Divider(
-                            height: 1,
-                            color: theme.colorScheme.onSurface
-                                .withOpacity(0.07)),
-                          ...widget.children,
-                        ],
-                      )
+                  children: [
+                    Divider(
+                        height: 1,
+                        color: theme.colorScheme.onSurface
+                            .withOpacity(0.07)),
+                    ...widget.children,
+                  ],
+                )
                     : const SizedBox(width: double.infinity, height: 0),
               ),
             ),
@@ -1891,15 +1927,23 @@ class _SettingTile extends StatelessWidget {
   final Widget? trailing;
   final VoidCallback? onTap;
   final Color? titleColor;
+  final Color? subtitleColor;
+  final Color? iconColor;
 
   const _SettingTile({
     required this.icon, required this.title,
-    this.subtitle, this.trailing, this.onTap, this.titleColor,
+    this.subtitle, this.trailing, this.onTap,
+    this.titleColor, this.subtitleColor, this.iconColor,
   });
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+    final effectiveIconColor = iconColor ?? theme.colorScheme.primary;
+    final effectiveSubtitleColor = subtitleColor ??
+        theme.colorScheme.onSurface.withOpacity(0.45);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
@@ -1912,12 +1956,17 @@ class _SettingTile extends StatelessWidget {
       child: ListTile(
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16)),
-        leading: Icon(icon,
-            color: Theme.of(context).colorScheme.primary),
+        leading: Icon(icon, color: effectiveIconColor),
         title: Text(title,
             style: TextStyle(
                 fontWeight: FontWeight.w600, color: titleColor)),
-        subtitle: subtitle != null ? Text(subtitle!) : null,
+        subtitle: subtitle != null
+            ? Text(subtitle!,
+            style: TextStyle(
+              fontSize: 12,
+              color: effectiveSubtitleColor,
+            ))
+            : null,
         trailing: trailing ??
             (onTap != null
                 ? const Icon(Icons.chevron_right_rounded)
@@ -1963,10 +2012,10 @@ class _CurrencyPickerSheetState extends State<_CurrencyPickerSheet> {
     final isSearching = _query.isNotEmpty;
     final filtered = isSearching
         ? SettingsProvider.currencies
-            .where((c) =>
-                c['code']!.toLowerCase().contains(_query) ||
-                c['label']!.toLowerCase().contains(_query))
-            .toList()
+        .where((c) =>
+    c['code']!.toLowerCase().contains(_query) ||
+        c['label']!.toLowerCase().contains(_query))
+        .toList()
         : <Map<String, String>>[];
 
     return DraggableScrollableSheet(
@@ -1977,7 +2026,7 @@ class _CurrencyPickerSheetState extends State<_CurrencyPickerSheet> {
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius:
-              const BorderRadius.vertical(top: Radius.circular(28)),
+          const BorderRadius.vertical(top: Radius.circular(28)),
         ),
         child: Column(
           children: [
@@ -1988,8 +2037,8 @@ class _CurrencyPickerSheetState extends State<_CurrencyPickerSheet> {
                   Center(child: Container(
                     width: 40, height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(2)),
+                        color: Colors.grey.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(2)),
                   )),
                   const SizedBox(height: 16),
                   Row(
@@ -2023,12 +2072,12 @@ class _CurrencyPickerSheetState extends State<_CurrencyPickerSheet> {
                       prefixIcon: const Icon(Icons.search_rounded),
                       suffixIcon: _query.isNotEmpty
                           ? IconButton(
-                              icon: const Icon(Icons.close_rounded),
-                              onPressed: () {
-                                _searchCtrl.clear();
-                                setState(() => _query = '');
-                              },
-                            )
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () {
+                          _searchCtrl.clear();
+                          setState(() => _query = '');
+                        },
+                      )
                           : null,
                     ),
                   ),
@@ -2039,71 +2088,71 @@ class _CurrencyPickerSheetState extends State<_CurrencyPickerSheet> {
             Expanded(
               child: isSearching
                   ? filtered.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.search_off_rounded, size: 48,
-                                  color: theme.colorScheme.onSurface
-                                      .withOpacity(0.2)),
-                              const SizedBox(height: 12),
-                              Text('No currency found',
-                                  style: TextStyle(
-                                      color: theme.colorScheme.onSurface
-                                          .withOpacity(0.4))),
-                            ],
-                          ),
-                        )
-                      : ListView.builder(
-                          controller: controller,
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                          itemCount: filtered.length,
-                          itemBuilder: (ctx, i) {
-                            final code  = filtered[i]['code']!;
-                            final label = filtered[i]['label']!;
-                            return _CurrencyTile(
-                              code: code, label: label,
-                              isSelected: widget.settings.currency == code,
-                              theme: theme, isDark: isDark,
-                              onTap: () {
-                                Navigator.pop(context);
-                                widget.settings.setCurrency(code);
-                              },
-                            );
-                          },
-                        )
+                  ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.search_off_rounded, size: 48,
+                        color: theme.colorScheme.onSurface
+                            .withOpacity(0.2)),
+                    const SizedBox(height: 12),
+                    Text('No currency found',
+                        style: TextStyle(
+                            color: theme.colorScheme.onSurface
+                                .withOpacity(0.4))),
+                  ],
+                ),
+              )
+                  : ListView.builder(
+                controller: controller,
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                itemCount: filtered.length,
+                itemBuilder: (ctx, i) {
+                  final code  = filtered[i]['code']!;
+                  final label = filtered[i]['label']!;
+                  return _CurrencyTile(
+                    code: code, label: label,
+                    isSelected: widget.settings.currency == code,
+                    theme: theme, isDark: isDark,
+                    onTap: () {
+                      Navigator.pop(context);
+                      widget.settings.setCurrency(code);
+                    },
+                  );
+                },
+              )
                   : ListView(
-                      controller: controller,
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                      children: _regions.entries.map((region) {
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
-                              child: Text(region.key.toUpperCase(),
-                                  style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 1.2,
-                                      color: theme.colorScheme.primary)),
-                            ),
-                            ...region.value.map((code) {
-                              final label = allCurrencies[code] ?? code;
-                              return _CurrencyTile(
-                                code: code, label: label,
-                                isSelected: widget.settings.currency == code,
-                                theme: theme, isDark: isDark,
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  widget.settings.setCurrency(code);
-                                },
-                              );
-                            }),
-                          ],
+                controller: controller,
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                children: _regions.entries.map((region) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
+                        child: Text(region.key.toUpperCase(),
+                            style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1.2,
+                                color: theme.colorScheme.primary)),
+                      ),
+                      ...region.value.map((code) {
+                        final label = allCurrencies[code] ?? code;
+                        return _CurrencyTile(
+                          code: code, label: label,
+                          isSelected: widget.settings.currency == code,
+                          theme: theme, isDark: isDark,
+                          onTap: () {
+                            Navigator.pop(context);
+                            widget.settings.setCurrency(code);
+                          },
                         );
-                      }).toList(),
-                    ),
+                      }),
+                    ],
+                  );
+                }).toList(),
+              ),
             ),
           ],
         ),
@@ -2209,18 +2258,18 @@ class _ColorThemeTile extends StatelessWidget {
                     shape: BoxShape.circle,
                     border: isSelected
                         ? Border.all(
-                            color: theme.colorScheme.onSurface,
-                            width: 2.5)
+                        color: theme.colorScheme.onSurface,
+                        width: 2.5)
                         : null,
                     boxShadow: isSelected
                         ? [BoxShadow(
-                            color: color.withOpacity(0.5),
-                            blurRadius: 8)]
+                        color: color.withOpacity(0.5),
+                        blurRadius: 8)]
                         : null,
                   ),
                   child: isSelected
                       ? const Icon(Icons.check_rounded,
-                          color: Colors.white, size: 16)
+                      color: Colors.white, size: 16)
                       : null,
                 ),
               );
@@ -2324,8 +2373,8 @@ class _MiniKey extends StatelessWidget {
         ),
         child: Center(
           child: Text(digit,
-            style: const TextStyle(
-                fontSize: 20, fontWeight: FontWeight.w600)),
+              style: const TextStyle(
+                  fontSize: 20, fontWeight: FontWeight.w600)),
         ),
       ),
     );
@@ -2375,7 +2424,7 @@ class _SyncTileState extends State<_SyncTile> {
 
     return ListTile(
       contentPadding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: Container(
         width: 36, height: 36,
         decoration: BoxDecoration(
@@ -2384,13 +2433,13 @@ class _SyncTileState extends State<_SyncTile> {
         ),
         child: _syncing
             ? Padding(
-                padding: const EdgeInsets.all(8),
-                child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: theme.colorScheme.primary),
-              )
+          padding: const EdgeInsets.all(8),
+          child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: theme.colorScheme.primary),
+        )
             : const Icon(Icons.cloud_sync_rounded,
-                color: Color(0xFF42A5F5), size: 18),
+            color: Color(0xFF42A5F5), size: 18),
       ),
       title: const Text('Sync to Cloud',
           style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
@@ -2472,8 +2521,8 @@ class _AccountTileState extends State<_AccountTile> {
           ]),
           content: const Text(
             'You need an internet connection to switch accounts.\n\n'
-            'Your data is stored locally — please connect to the internet '
-            'so we can sync your data before switching.',
+                'Your data is stored locally — please connect to the internet '
+                'so we can sync your data before switching.',
           ),
           actions: [
             TextButton(
@@ -2498,7 +2547,7 @@ class _AccountTileState extends State<_AccountTile> {
         ]),
         content: const Text(
           'Your data will be synced to the cloud before switching accounts. '
-          'This ensures nothing is lost.\n\nContinue?',
+              'This ensures nothing is lost.\n\nContinue?',
         ),
         actions: [
           TextButton(
@@ -2538,7 +2587,7 @@ class _AccountTileState extends State<_AccountTile> {
           ]),
           content: const Text(
             'We could not sync your data to the cloud. '
-            'Switching now may result in data loss.\n\nProceed anyway?',
+                'Switching now may result in data loss.\n\nProceed anyway?',
           ),
           actions: [
             TextButton(
@@ -2574,7 +2623,7 @@ class _AccountTileState extends State<_AccountTile> {
 
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => login_nav.LoginScreen()),
-      (route) => false,
+          (route) => false,
     );
   }
 
@@ -2592,22 +2641,22 @@ class _AccountTileState extends State<_AccountTile> {
         ),
         child: _loading
             ? const Padding(
-                padding: EdgeInsets.all(8),
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: Color(0xFF26A69A)),
-              )
+          padding: EdgeInsets.all(8),
+          child: CircularProgressIndicator(
+              strokeWidth: 2, color: Color(0xFF26A69A)),
+        )
             : Icon(widget.icon, color: const Color(0xFF26A69A), size: 18),
       ),
       title: Text(widget.title,
           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
       subtitle: Text(widget.subtitle,
-          style: TextStyle(
+          style: const TextStyle(
               fontSize: 11,
-              color: theme.colorScheme.onSurface.withOpacity(0.5))),
+              color: Color(0xFF26A69A))),
       trailing: _loading
           ? null
           : Icon(Icons.chevron_right_rounded,
-              color: theme.colorScheme.onSurface.withOpacity(0.3), size: 20),
+          color: theme.colorScheme.onSurface.withOpacity(0.3), size: 20),
       onTap: _loading ? null : _handleTap,
     );
   }

@@ -113,26 +113,6 @@ class _ExpandableSectionState extends State<_ExpandableSection> {
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  final String text;
-  const _SectionHeader(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8, left: 4),
-      child: Text(
-        text.toUpperCase(),
-        style: TextStyle(
-          fontSize: 11, fontWeight: FontWeight.w700,
-          letterSpacing: 1.2,
-          color: Theme.of(context).colorScheme.primary,
-        ),
-      ),
-    );
-  }
-}
-
 class _SettingTile extends StatelessWidget {
   final IconData icon;
   final String title;

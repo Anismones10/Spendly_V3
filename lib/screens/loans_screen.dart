@@ -943,8 +943,6 @@ class _LoanTile extends StatelessWidget {
 
   void _showPayment(BuildContext context) {
     final ctrl = TextEditingController();
-    final symbol =
-        context.read<SettingsProvider>().currencySymbol;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(

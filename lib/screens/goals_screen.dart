@@ -5,7 +5,6 @@ import '../models/goal_model.dart';
 import '../providers/goal_provider.dart';
 import '../providers/settings_provider.dart';
 import '../utils/app_utils.dart';
-import '../utils/category_icons.dart';
 import '../widgets/empty_state.dart';
 
 // Available goal icons

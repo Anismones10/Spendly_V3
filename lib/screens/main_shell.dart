@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:hive/hive.dart';
-import 'package:provider/provider.dart';
-import '../providers/settings_provider.dart';
 import 'dashboard_screen.dart';
 import 'expenses_screen.dart';
 import 'income_screen.dart';

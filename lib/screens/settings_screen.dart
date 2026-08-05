@@ -24,7 +24,6 @@ import 'notification_settings_screen.dart';
 import '../utils/category_icons.dart';
 import '../models/category_model.dart';
 import '../utils/app_utils.dart';
-import '../utils/app_theme.dart';
 import '../utils/pin_helper.dart';
 import '../services/auth_service.dart';
 import '../services/sync_service.dart';

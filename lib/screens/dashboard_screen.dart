@@ -12,7 +12,6 @@ import '../providers/category_provider.dart';
 import '../providers/category_budget_provider.dart';
 import '../providers/loan_provider.dart';
 import '../providers/wallet_provider.dart';
-import '../models/wallet_model.dart';
 import 'income_screen.dart';
 import 'global_search_screen.dart';
 import '../widgets/insight_card.dart';

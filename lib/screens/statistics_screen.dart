@@ -522,11 +522,6 @@ class _OverviewTabState extends State<_OverviewTab> {
                 : 100.0;
             // Round up to a clean interval
             final rawInterval = chartMax / 4;
-            final magnitude = rawInterval > 0
-                ? (rawInterval / (10 * (rawInterval / 10).floor())).isNaN
-                ? 1.0
-                : 1.0
-                : 1.0;
             final yInterval = rawInterval <= 50
                 ? (rawInterval / 10).ceil() * 10.0
                 : rawInterval <= 500

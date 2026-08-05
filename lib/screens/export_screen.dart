@@ -511,8 +511,6 @@ class _PreviewBanner extends StatelessWidget {
       if (includeGoals)    ('Goals',    const Color(0xFF9C27B0)),
     ];
 
-    final theme = Theme.of(context);
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),

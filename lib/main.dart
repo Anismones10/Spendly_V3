@@ -23,7 +23,6 @@ import 'providers/loan_provider.dart';
 import 'providers/wallet_provider.dart';
 import 'providers/category_budget_provider.dart';
 import 'providers/transfer_provider.dart';
-import 'screens/main_shell.dart';
 import 'screens/splash_screen.dart';
 import 'screens/add_expense_screen.dart';
 import 'screens/income_screen.dart';import 'utils/app_theme.dart';

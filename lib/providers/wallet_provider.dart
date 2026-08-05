@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import '../models/wallet_model.dart';
-import '../utils/app_utils.dart';
 import '../utils/widget_helper.dart';
 
 class WalletProvider extends ChangeNotifier {

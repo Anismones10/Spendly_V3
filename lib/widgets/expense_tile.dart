@@ -12,14 +12,12 @@ class ExpenseTile extends StatelessWidget {
   final ExpenseModel expense;
   final String symbol;
   final bool isSelecting;
-  final double? overrideAmount; // used to show split group total
 
   const ExpenseTile({
     super.key,
     required this.expense,
     required this.symbol,
     this.isSelecting = false,
-    this.overrideAmount,
   });
 
   @override
@@ -32,40 +30,10 @@ class ExpenseTile extends StatelessWidget {
         : null;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-
-    // Parse SPLIT_PART note
-    // Format: SPLIT_PART|groupId|partIndex/total|walletId:amt|...|NOTE:note
-    final isSplitPart = expense.note?.startsWith('SPLIT_PART|') == true;
-    String? userNote;
-    List<({String walletId, double amount})> splitWallets = [];
-    int splitPart = 1;
-    int splitTotal = 1;
-
-    if (isSplitPart) {
-      final parts = expense.note!.split('|');
-      // parts[0]=SPLIT_PART, parts[1]=groupId, parts[2]=partIndex/total
-      // parts[3..N]=walletId:amount, optional NOTE:note
-      if (parts.length > 2) {
-        final fraction = parts[2].split('/');
-        splitPart = int.tryParse(fraction[0]) ?? 1;
-        splitTotal = int.tryParse(fraction.length > 1 ? fraction[1] : '1') ?? 1;
-      }
-      for (int i = 3; i < parts.length; i++) {
-        if (parts[i].startsWith('NOTE:')) {
-          userNote = parts[i].substring(5);
-        } else if (parts[i].contains(':')) {
-          final kv = parts[i].split(':');
-          final amt = double.tryParse(kv[1]) ?? 0;
-          splitWallets.add((walletId: kv[0], amount: amt));
-        }
-      }
-    } else {
-      final hasNote = expense.note != null && expense.note!.trim().isNotEmpty;
-      userNote = hasNote ? expense.note : null;
-    }
-
-    final hasNote = userNote != null && userNote.isNotEmpty;
-    final hasTime = expense.timeHour != null && expense.timeMinute != null;
+    final hasNote =
+        expense.note != null && expense.note!.trim().isNotEmpty;
+    final hasTime =
+        expense.timeHour != null && expense.timeMinute != null;
     final isRecurringInstance = expense.recurringParentId != null;
 
     return Dismissible(
@@ -206,51 +174,39 @@ class ExpenseTile extends StatelessWidget {
                         ),
                         if (isRecurringInstance) ...[
                           const SizedBox(width: 4),
-                          Tooltip(
-                            message: 'Auto-generated recurring',
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 5, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                  color: Colors.orange.withOpacity(0.3)),
+                            ),
+                            child: const Icon(
+                              Icons.repeat_rounded,
+                              size: 10,
+                              color: Colors.orange,
+                            ),
+                          ),
+                        ],
+                        if (hasNote) ...[
+                          const SizedBox(width: 4),
+                          GestureDetector(
+                            onTap: () =>
+                                _showNote(context, isDark, theme),
                             child: Container(
-                              padding: const EdgeInsets.all(3),
+                              padding: const EdgeInsets.all(4),
                               decoration: BoxDecoration(
                                 color: theme.colorScheme.primary
                                     .withOpacity(0.1),
                                 borderRadius:
-                                    BorderRadius.circular(6),
-                              ),
-                              child: Icon(
-                                Icons.repeat_rounded,
-                                size: 12,
-                                color: theme.colorScheme.primary,
-                              ),
-                            ),
-                          ),
-                        ],
-                        if (hasNote || isSplitPart) ...[
-                          const SizedBox(width: 4),
-                          GestureDetector(
-                            onTap: () => _showNote(
-                                context, isDark, theme,
-                                isSplitPart: isSplitPart,
-                                splitWallets: splitWallets,
-                                userNote: userNote,
-                                symbol: symbol,
-                              ),
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                color: isSplitPart
-                                    ? const Color(0xFF4A90E2).withOpacity(0.1)
-                                    : theme.colorScheme.primary.withOpacity(0.1),
-                                borderRadius:
                                     BorderRadius.circular(8),
                               ),
                               child: Icon(
-                                isSplitPart
-                                    ? Icons.call_split_rounded
-                                    : Icons.sticky_note_2_outlined,
+                                Icons.sticky_note_2_outlined,
                                 size: 14,
-                                color: isSplitPart
-                                    ? const Color(0xFF4A90E2)
-                                    : theme.colorScheme.primary,
+                                color: theme.colorScheme.primary,
                               ),
                             ),
                           ),
@@ -273,43 +229,8 @@ class ExpenseTile extends StatelessWidget {
                             fontWeight: FontWeight.w500,
                           ),
                         ),
-                        // Wallet pill(s) — show all split wallets or single wallet
-                        if (isSplitPart && splitWallets.isNotEmpty) ...[
-                          ...splitWallets.map((sw) {
-                            final sw_wallet = wallets.getById(sw.walletId);
-                            if (sw_wallet == null) return const SizedBox.shrink();
-                            return Padding(
-                              padding: const EdgeInsets.only(left: 4),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 1),
-                                decoration: BoxDecoration(
-                                  color: Color(sw_wallet.colorValue)
-                                      .withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                        WalletProvider.resolveIcon(sw_wallet.type),
-                                        size: 9,
-                                        color: Color(sw_wallet.colorValue)),
-                                    const SizedBox(width: 3),
-                                    Text(
-                                      sw_wallet.name,
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: Color(sw_wallet.colorValue),
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          }),
-                        ] else if (wallet != null) ...[
+                        // Wallet pill
+                        if (wallet != null) ...[
                           const SizedBox(width: 6),
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -342,24 +263,35 @@ class ExpenseTile extends StatelessWidget {
                             ),
                           ),
                         ],
-                        // Recurring badge
+                        // Recurring badge — icon style matching split badge
                         if (expense.isRecurring) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.primary
-                                  .withOpacity(0.1),
-                              borderRadius:
-                                  BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              expense.recurringType ?? 'recurring',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: theme.colorScheme.primary,
-                                fontWeight: FontWeight.w600,
+                          const SizedBox(width: 4),
+                          GestureDetector(
+                            onTap: () => _showRecurringInfo(context, isDark, theme),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                    color: Colors.orange.withOpacity(0.3)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.repeat_rounded,
+                                      size: 10, color: Colors.orange),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    expense.recurringType ?? 'recurring',
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.orange,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
@@ -412,17 +344,53 @@ class ExpenseTile extends StatelessWidget {
 
               // ── Amount ───────────────────────────────────────────────
               Text(
-                AppUtils.formatAmount(
-                  isSplitPart && splitWallets.isNotEmpty
-                      ? splitWallets.fold(0.0, (s, e) => s + e.amount)
-                      : expense.amount,
-                  symbol,
-                ),
+                AppUtils.formatAmount(expense.amount, symbol),
                 style: const TextStyle(
                     fontWeight: FontWeight.w700, fontSize: 16),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  void _showRecurringInfo(BuildContext context, bool isDark, ThemeData theme) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.repeat_rounded,
+                  color: Colors.orange, size: 24),
+            ),
+            const SizedBox(height: 12),
+            Text('Recurring Expense',
+                style: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 6),
+            Text(
+              'This expense repeats ${expense.recurringType ?? 'regularly'}.',
+              style: TextStyle(
+                  fontSize: 13,
+                  color: theme.colorScheme.onSurface.withOpacity(0.55)),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     );
@@ -626,14 +594,7 @@ class ExpenseTile extends StatelessWidget {
   }
 
   void _showNote(
-      BuildContext context,
-      bool isDark,
-      ThemeData theme, {
-      required bool isSplitPart,
-      required List<({String walletId, double amount})> splitWallets,
-      required String? userNote,
-      required String symbol,
-  }) {
+      BuildContext context, bool isDark, ThemeData theme) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -698,62 +659,13 @@ class ExpenseTile extends StatelessWidget {
                     color: theme.colorScheme.primary
                         .withOpacity(0.15)),
               ),
-              child: isSplitPart
-                  ? Consumer<WalletProvider>(
-                      builder: (ctx, walletProvider, _) {
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Split Payment:',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13)),
-                            const SizedBox(height: 8),
-                            ...splitWallets.map((sw) {
-                              final w = walletProvider.getById(sw.walletId);
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 4),
-                                child: Row(children: [
-                                  Icon(
-                                    WalletProvider.resolveIcon(w?.type ?? ''),
-                                    size: 14,
-                                    color: w != null
-                                        ? Color(w.colorValue)
-                                        : Colors.grey,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    w?.name ?? sw.walletId,
-                                    style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w500),
-                                  ),
-                                  const Spacer(),
-                                  Text(
-                                    AppUtils.formatAmount(sw.amount, symbol),
-                                    style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w700),
-                                  ),
-                                ]),
-                              );
-                            }),
-                            if (userNote != null && userNote!.isNotEmpty) ...[
-                              const Divider(height: 16),
-                              Text(userNote!,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: theme.colorScheme.onSurface
-                                        .withOpacity(0.7),
-                                  )),
-                            ],
-                          ],
-                        );
-                      },
-                    )
-                  : Text(
-                      expense.note ?? '',
-                      style: TextStyle(
+              child: Text(
+                expense.note!,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.6,
+                  color:
+                      theme.colorScheme.onSurface.withOpacity(0.8),
                 ),
               ),
             ),

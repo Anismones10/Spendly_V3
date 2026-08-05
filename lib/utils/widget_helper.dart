@@ -6,7 +6,7 @@ import '../models/wallet_model.dart';
 /// Writes all widget data to HomeWidget storage and triggers a UI refresh.
 /// Call this whenever expenses or wallet balances change.
 class WidgetHelper {
-  static const String _appGroupId   = 'group.com.example.expense_tracker';
+  static const String _appGroupId   = 'group.com.blazefang.spendly';
   static const String _androidClass = 'SpendlyWidgetProvider';
 
   /// Main entry point — reads from Hive directly (no Provider needed)

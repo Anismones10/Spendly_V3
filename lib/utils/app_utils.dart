@@ -2,8 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 class AppUtils {
+  /// Monotonic counter appended to the timestamp. The system clock is not
+  /// fine-grained enough on its own — several hundred calls can land in the
+  /// same tick — so the counter is what actually guarantees uniqueness for
+  /// IDs created in the same session.
+  static int _idCounter = 0;
+
   static String generateId() =>
-      '${DateTime.now().millisecondsSinceEpoch}_${(1000 + (DateTime.now().microsecond % 9000))}';
+      '${DateTime.now().microsecondsSinceEpoch}_${_idCounter++}';
 
   static String formatAmount(double amount, String symbol) {
     final formatter = NumberFormat('#,##0.00');

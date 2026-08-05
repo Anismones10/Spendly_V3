@@ -69,7 +69,7 @@ void main() async {
   await NotificationHelper.init();
 
   // ── Home widget init ───────────────────────────────────────────────────
-  await HomeWidget.setAppGroupId('group.com.example.expense_tracker');
+  await HomeWidget.setAppGroupId('group.com.blazefang.spendly');
   await WidgetHelper.updateWidget(); // push initial data to widget
 
   final settingsBox  = Hive.box('settings');
@@ -141,7 +141,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     _widgetChannel.setMethodCallHandler((call) async {
       if (call.method == 'onWidgetAction') {
         final action = call.arguments as String?;
-        debugPrint('🔵 onWidgetAction: $action');
         if (action == 'add_expense') {
           _pushScreenWhenReady(() => const AddExpenseScreen());
         } else if (action == 'income') {

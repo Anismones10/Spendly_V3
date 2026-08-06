@@ -559,12 +559,6 @@ class _LockScreenState extends State<LockScreen>
     );
   }
 
-  // ── Reset PIN with secret word ───────────────────────────────────────────────
-  void _showResetConfirm(BuildContext context) {
-    // This option is now handled by _showSecretWordInput
-    _showSecretWordInput(context);
-  }
-
 } // end _LockScreenState
 
 // ── Recovery option tile ───────────────────────────────────────────────────────

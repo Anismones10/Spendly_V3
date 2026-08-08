@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hive/hive.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../providers/expense_provider.dart';
@@ -8,8 +9,21 @@ import '../providers/category_provider.dart';
 import '../utils/app_utils.dart';
 import '../utils/category_icons.dart';
 
-class DailySummaryCard extends StatelessWidget {
+class DailySummaryCard extends StatefulWidget {
   const DailySummaryCard({super.key});
+
+  @override
+  State<DailySummaryCard> createState() => _DailySummaryCardState();
+}
+
+class _DailySummaryCardState extends State<DailySummaryCard> {
+  final Box _box = Hive.box('settings');
+
+  // The detail rows can be folded away for a shorter dashboard. Default is
+  // expanded, so nobody silently loses a row they were reading; the choice
+  // sticks once it is made.
+  bool get _collapsed =>
+      _box.get('dailySummaryCollapsed', defaultValue: false) as bool;
 
   @override
   Widget build(BuildContext context) {
@@ -115,6 +129,25 @@ class DailySummaryCard extends StatelessWidget {
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: primary,
+                ),
+              ),
+              // Whole header is not tappable on purpose — a card this size
+              // invites stray taps, and collapsing should be deliberate.
+              const SizedBox(width: 4),
+              InkWell(
+                onTap: () {
+                  _box.put('dailySummaryCollapsed', !_collapsed);
+                  setState(() {});
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: AnimatedRotation(
+                    turns: _collapsed ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(Icons.keyboard_arrow_up_rounded,
+                        size: 20, color: primary.withOpacity(0.7)),
+                  ),
                 ),
               ),
             ],
@@ -242,134 +275,64 @@ class DailySummaryCard extends StatelessWidget {
             }).toList(),
           ),
 
-          // ── Top category today ──────────────────────────────────────
-          if (topCat != null) ...[
-            const SizedBox(height: 16),
-            Divider(color: Colors.grey.withOpacity(0.12)),
-            const SizedBox(height: 12),
-            Row(
+          // ── Details ─────────────────────────────────────────────────
+          // Three one-line facts. They used to be full-width rows with 32px
+          // icon tiles and a divider each, which cost about as much height as
+          // the week chart for a fraction of the information.
+          AnimatedCrossFade(
+            duration: const Duration(milliseconds: 200),
+            sizeCurve: Curves.easeOut,
+            crossFadeState: _collapsed
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            secondChild: const SizedBox(width: double.infinity),
+            firstChild: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 32, height: 32,
-                  decoration: BoxDecoration(
-                    color: Color(topCat.colorValue).withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(CategoryIcons.resolve(topCat.icon),
-                      color: Color(topCat.colorValue), size: 16),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Top category today',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: theme.colorScheme.onSurface.withOpacity(0.45),
-                          fontWeight: FontWeight.w500,
-                        )),
-                      Text(topCat.name,
-                        style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w700)),
-                    ],
-                  ),
-                ),
-                Text(
-                  AppUtils.formatAmount(topCatAmount, symbol),
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
+                const SizedBox(height: 14),
+                Divider(color: Colors.grey.withOpacity(0.12)),
+                const SizedBox(height: 10),
+
+                if (topCat != null)
+                  _DetailRow(
+                    icon: CategoryIcons.resolve(topCat.icon),
                     color: Color(topCat.colorValue),
+                    label: 'Top category',
+                    hint: topCat.name,
+                    value: AppUtils.formatAmount(topCatAmount, symbol),
                   ),
-                ),
-              ],
-            ),
-          ],
 
-          // ── Average per day ─────────────────────────────────────────
-          const SizedBox(height: 12),
-          Divider(color: Colors.grey.withOpacity(0.12)),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              // Same 32×32 tile as the category row above, so the two read as
-              // one list instead of two unrelated styles.
-              Container(
-                width: 32, height: 32,
-                decoration: BoxDecoration(
-                  color: avgColor.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(Icons.speed_rounded, color: avgColor, size: 18),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Average per day',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: theme.colorScheme.onSurface.withOpacity(0.45),
-                        fontWeight: FontWeight.w500,
-                      )),
-                    Text(
-                      avgPerDay <= 0
-                          ? 'This month'
-                          : vsAvg > 0
-                              ? 'Today is ${AppUtils.formatAmount(vsAvg, symbol)} above'
-                              : vsAvg < 0
-                                  ? 'Today is ${AppUtils.formatAmount(-vsAvg, symbol)} below'
-                                  : 'Today is right on it',
-                      style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w700),
-                    ),
-                  ],
-                ),
-              ),
-              Text(
-                AppUtils.formatAmount(avgPerDay, symbol),
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
+                _DetailRow(
+                  icon: Icons.speed_rounded,
                   color: avgColor,
+                  label: 'Average per day',
+                  hint: avgPerDay <= 0
+                      ? null
+                      : vsAvg > 0
+                          ? '${AppUtils.formatAmount(vsAvg, symbol)} above today'
+                          : vsAvg < 0
+                              ? '${AppUtils.formatAmount(-vsAvg, symbol)} below today'
+                              : 'right on it',
+                  value: AppUtils.formatAmount(avgPerDay, symbol),
                 ),
-              ),
-            ],
-          ),
 
-          // ── Monthly pace ────────────────────────────────────────────
-          if (monthlyBudget > 0) ...[
-            const SizedBox(height: 12),
-            Divider(color: Colors.grey.withOpacity(0.12)),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Icon(
-                  isOnTrack ? Icons.check_circle_rounded : Icons.warning_amber_rounded,
-                  size: 16,
-                  color: isOnTrack ? const Color(0xFF2ECC71) : const Color(0xFFFF9800),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    isOnTrack
-                        ? 'On track — projected ${AppUtils.formatAmount(projectedMonthly, symbol)} this month'
-                        : 'At this pace you\'ll spend ${AppUtils.formatAmount(projectedMonthly, symbol)} — ${AppUtils.formatAmount(projectedMonthly - monthlyBudget, symbol)} over budget',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: isOnTrack
-                          ? const Color(0xFF2ECC71)
-                          : const Color(0xFFFF9800),
-                      fontWeight: FontWeight.w500,
-                      height: 1.4,
-                    ),
+                if (monthlyBudget > 0)
+                  _DetailRow(
+                    icon: isOnTrack
+                        ? Icons.check_circle_rounded
+                        : Icons.warning_amber_rounded,
+                    color: isOnTrack
+                        ? const Color(0xFF2ECC71)
+                        : const Color(0xFFFF9800),
+                    label: isOnTrack ? 'On track' : 'Over budget',
+                    hint: isOnTrack
+                        ? 'projected this month'
+                        : '${AppUtils.formatAmount(projectedMonthly - monthlyBudget, symbol)} over',
+                    value: AppUtils.formatAmount(projectedMonthly, symbol),
                   ),
-                ),
               ],
             ),
-          ],
+          ),
         ],
       ),
     ).animate().fadeIn(duration: 400.ms);
@@ -384,6 +347,63 @@ class DailySummaryCard extends StatelessWidget {
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday',
                   'Friday', 'Saturday', 'Sunday'];
     return days[now.weekday - 1];
+  }
+}
+
+/// One line of the detail section: icon, label, muted hint, amount.
+///
+/// Deliberately flat — a bare 16px icon rather than a tinted 32px tile, so
+/// three of these stack in less height than one of the old rows.
+class _DetailRow extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String label;
+
+  /// Secondary text after the label. Null when there is nothing to add.
+  final String? hint;
+  final String value;
+
+  const _DetailRow({
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.value,
+    this.hint,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 10),
+          Text(label,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+          if (hint != null) ...[
+            const SizedBox(width: 6),
+            // Takes the squeeze so a long category name never pushes the
+            // amount off the edge.
+            Expanded(
+              child: Text(
+                hint!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    fontSize: 11, color: onSurface.withOpacity(0.45)),
+              ),
+            ),
+          ] else
+            const Spacer(),
+          const SizedBox(width: 6),
+          Text(value,
+              style: TextStyle(
+                  fontSize: 12.5, fontWeight: FontWeight.w700, color: color)),
+        ],
+      ),
+    );
   }
 }
 

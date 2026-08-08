@@ -938,9 +938,15 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       }
     }
 
-    // Keep only part 1 of each split group for display
+    // Keep only part 1 of each split group for display.
+    //
+    // A wallet filter has already reduced each group to the single part that
+    // wallet paid, so collapsing by part index would drop the whole expense
+    // whenever that part happened to be 2nd or later. With the filter on, the
+    // surviving part is exactly what should be listed.
     final seenGroups = <String>{};
     final list = rawList.where((e) {
+      if (_walletFilter != null) return true;
       if (e.note?.startsWith('SPLIT_PART|') == true) {
         final parts = e.note!.split('|');
         if (parts.length > 2) {
@@ -1181,6 +1187,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                             symbol: symbol,
                             isSelecting: _isSelecting,
                             threshold: highThreshold,
+                            walletFilter: _walletFilter,
                             selected: _selectedIds.contains(expense.id),
                           ),
                         ),
@@ -1303,6 +1310,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                               symbol: symbol,
                               isSelecting: _isSelecting,
                               threshold: highThreshold,
+                              walletFilter: _walletFilter,
                               selected: isSelected,
                               // The day header above already carries the
                               // date, so the tile only needs the time.

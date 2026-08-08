@@ -281,12 +281,17 @@ class ListFilterBar extends StatelessWidget {
         if (activeFilters.isNotEmpty)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: activeFilters
-                  .map((f) => _ActiveChip(filter: f))
-                  .toList(),
+            // Left-aligned: the Column centres its children by default, which
+            // left this row floating in the middle while the search box,
+            // period chips and the list below it all start at the same margin.
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children:
+                    activeFilters.map((f) => _ActiveChip(filter: f)).toList(),
+              ),
             ),
           ),
       ],

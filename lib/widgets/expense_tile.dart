@@ -12,7 +12,13 @@ class ExpenseTile extends StatelessWidget {
   final ExpenseModel expense;
   final String symbol;
   final bool isSelecting;
-  final double? overrideAmount; // used to show split group total
+
+  /// When the list is filtered to one wallet, only that wallet's share of a
+  /// split belongs on the tile. Without this the tile reads the whole split
+  /// out of its note and shows every wallet at the full amount, which does not
+  /// add up to the day header or the list total beside it.
+  final String? walletFilter;
+
   // Daily threshold from Calendar. Amounts above it are flagged.
   // Null or 0 means no flagging.
   final double? threshold;
@@ -28,7 +34,7 @@ class ExpenseTile extends StatelessWidget {
     required this.expense,
     required this.symbol,
     this.isSelecting = false,
-    this.overrideAmount,
+    this.walletFilter,
     this.threshold,
     this.selected = false,
     this.showDate = true,
@@ -63,6 +69,14 @@ class ExpenseTile extends StatelessWidget {
           final amt = double.tryParse(kv[1]) ?? 0;
           splitWallets.add((walletId: kv[0], amount: amt));
         }
+      }
+      // Filtered to one wallet: drop the shares that wallet had nothing to do
+      // with, so the pill and the amount describe the same spending the rest
+      // of the screen is counting.
+      if (walletFilter != null) {
+        final mine =
+            splitWallets.where((w) => w.walletId == walletFilter).toList();
+        if (mine.isNotEmpty) splitWallets = mine;
       }
     } else {
       final hasNote = expense.note != null && expense.note!.trim().isNotEmpty;

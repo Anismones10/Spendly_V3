@@ -477,7 +477,9 @@ class _OverviewTabState extends State<_OverviewTab> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(cat?.name ?? e.key,
+                              // Falling back to e.key printed the raw category
+                              // id for expenses with no category.
+                              Text(cat?.name ?? 'Uncategorized',
                                   style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                               Text(AppUtils.formatAmount(e.value, symbol),
                                   style: TextStyle(fontWeight: FontWeight.w700,
@@ -857,7 +859,7 @@ class _CategoriesTab extends StatelessWidget {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(cat?.name ?? e.key,
+                                    Text(cat?.name ?? 'Uncategorized',
                                         style: TextStyle(
                                           fontSize: 12,
                                           fontWeight: isTouched
@@ -939,7 +941,7 @@ class _CategoriesTab extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(cat?.name ?? e.value.key,
+                      Text(cat?.name ?? 'Uncategorized',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,

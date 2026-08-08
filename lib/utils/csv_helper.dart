@@ -20,7 +20,7 @@ class CsvHelper {
       ...expenses.map((e) => [
         e.date.toIso8601String().split('T')[0],
         e.name,
-        categories[e.categoryId]?.name ?? e.categoryId,
+        categories[e.categoryId]?.name ?? 'Uncategorized',
         e.amount,
         e.note ?? '',
         e.isRecurring ? (e.recurringType ?? 'Yes') : 'No',
@@ -100,7 +100,7 @@ class CsvHelper {
       ...expenses.map((e) => [
         e.date.toIso8601String().split('T')[0],
         e.name,
-        categories[e.categoryId]?.name ?? e.categoryId,
+        categories[e.categoryId]?.name ?? 'Uncategorized',
         e.amount,
         e.note ?? '',
         e.isRecurring ? (e.recurringType ?? 'Yes') : 'No',

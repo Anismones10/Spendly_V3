@@ -191,10 +191,11 @@ class ExpenseTile extends StatelessWidget {
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
+                      // Grey rather than the accent when there is no category,
+                      // to match the muted 'Uncategorized' label below.
                       color: cat != null
                           ? Color(cat.colorValue).withOpacity(0.15)
-                          : theme.colorScheme.primary
-                          .withOpacity(0.15),
+                          : theme.colorScheme.onSurface.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(14),
                     ),
                     alignment: Alignment.center,
@@ -202,7 +203,7 @@ class ExpenseTile extends StatelessWidget {
                       CategoryIcons.resolve(cat?.icon ?? ''),
                       color: cat != null
                           ? Color(cat.colorValue)
-                          : const Color(0xFF4A90E2),
+                          : theme.colorScheme.onSurface.withOpacity(0.45),
                       size: 22,
                     ),
                   ),
@@ -327,14 +328,20 @@ class ExpenseTile extends StatelessWidget {
                     // Badges row
                     Row(
                       children: [
-                        // Category name
+                        // Category name.
+                        //
+                        // No category is a normal state — it can be skipped when
+                        // adding an expense, and deleting a category leaves its
+                        // expenses behind. 'Unknown' read like a real category
+                        // whose name happened to be Unknown, and the accent
+                        // colour reinforced that; muted grey says it is absent.
                         Text(
-                          cat?.name ?? 'Unknown',
+                          cat?.name ?? 'Uncategorized',
                           style: TextStyle(
                             fontSize: 12,
                             color: cat != null
                                 ? Color(cat.colorValue)
-                                : theme.colorScheme.primary,
+                                : theme.colorScheme.onSurface.withOpacity(0.45),
                             fontWeight: FontWeight.w500,
                           ),
                         ),

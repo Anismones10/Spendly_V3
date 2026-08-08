@@ -1330,7 +1330,7 @@ class PdfHelper {
                 ? pw.BoxDecoration(color: _light) : null,
             children: [
               _tc((i + 1).toString(), center: true),
-              _tc(cat?.name ?? e.key),
+              _tc(cat?.name ?? 'Uncategorized'),
               _tc(_fmt(e.value, sym), right: true),
               _tc(pct.toStringAsFixed(1) + '%', center: true),
             ],
@@ -1547,7 +1547,7 @@ class PdfHelper {
       Map<String, CategoryModel> categories,
       ) {
     return entries.asMap().entries.map((e) => _Slice(
-      label: categories[e.value.key]?.name ?? e.value.key,
+      label: categories[e.value.key]?.name ?? 'Uncategorized',
       value: e.value.value,
       color: _catColors[e.key % _catColors.length],
     )).toList();

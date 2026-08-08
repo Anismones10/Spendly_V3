@@ -17,6 +17,10 @@ class _SecuritySectionState extends State<_SecuritySection> {
   bool get _bioEnabled  => _box.get('lockBiometric', defaultValue: true)  as bool;
   int  get _timeoutMins => _box.get('lockTimeout',   defaultValue: 30)    as int;
 
+  // Stored inverted so the warning is on for everyone by default.
+  bool get _screenshotWarn =>
+      !(_box.get('screenshotWarnDisabled', defaultValue: false) as bool);
+
   static const _timeoutOptions = [0, 1, 5, 15, 30];
   static const _timeoutLabels  = ['Immediately', '1 min', '5 min', '15 min', '30 min'];
 
@@ -347,6 +351,24 @@ class _SecuritySectionState extends State<_SecuritySection> {
             onTap: _showTimeoutPicker,
           ),
         ],
+
+        // ── Screenshot warning ──────────────────────────────────────────
+        _SettingTile(
+          icon: Icons.screenshot_rounded,
+          title: 'Screenshot Warning',
+          subtitle: _screenshotWarn
+              ? 'Remind me what a screenshot reveals'
+              : 'Reminder turned off',
+          subtitleColor: const Color(0xFFEF6C00),
+          iconColor: const Color(0xFFEF6C00),
+          trailing: Switch.adaptive(
+            value: _screenshotWarn,
+            onChanged: (v) {
+              _box.put('screenshotWarnDisabled', !v);
+              setState(() {});
+            },
+          ),
+        ),
       ],
     );
   }

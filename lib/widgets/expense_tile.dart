@@ -12,12 +12,26 @@ class ExpenseTile extends StatelessWidget {
   final ExpenseModel expense;
   final String symbol;
   final bool isSelecting;
+  final double? overrideAmount; // used to show split group total
+  // Daily threshold from Calendar. Amounts above it are flagged.
+  // Null or 0 means no flagging.
+  final double? threshold;
+  // Drawn by the card itself rather than by a wrapper, so the highlight
+  // lines up with the card instead of also covering its bottom margin.
+  final bool selected;
+  // Off when a date header already sits above the tile, so the day isn't
+  // printed twice on every card in the grouped list.
+  final bool showDate;
 
   const ExpenseTile({
     super.key,
     required this.expense,
     required this.symbol,
     this.isSelecting = false,
+    this.overrideAmount,
+    this.threshold,
+    this.selected = false,
+    this.showDate = true,
   });
 
   @override
@@ -30,11 +44,53 @@ class ExpenseTile extends StatelessWidget {
         : null;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final hasNote =
-        expense.note != null && expense.note!.trim().isNotEmpty;
-    final hasTime =
-        expense.timeHour != null && expense.timeMinute != null;
+
+    // Parse SPLIT_PART note
+    // Format: SPLIT_PART|groupId|partIndex/total|walletId:amt|...|NOTE:note
+    final isSplitPart = expense.note?.startsWith('SPLIT_PART|') == true;
+    String? userNote;
+    List<({String walletId, double amount})> splitWallets = [];
+
+    if (isSplitPart) {
+      final parts = expense.note!.split('|');
+      // parts[0]=SPLIT_PART, parts[1]=groupId, parts[2]=partIndex/total
+      // parts[3..N]=walletId:amount, optional NOTE:note
+      for (int i = 3; i < parts.length; i++) {
+        if (parts[i].startsWith('NOTE:')) {
+          userNote = parts[i].substring(5);
+        } else if (parts[i].contains(':')) {
+          final kv = parts[i].split(':');
+          final amt = double.tryParse(kv[1]) ?? 0;
+          splitWallets.add((walletId: kv[0], amount: amt));
+        }
+      }
+    } else {
+      final hasNote = expense.note != null && expense.note!.trim().isNotEmpty;
+      userNote = hasNote ? expense.note : null;
+    }
+
+    final hasNote = userNote != null && userNote.isNotEmpty;
+    final hasTime = expense.timeHour != null && expense.timeMinute != null;
     final isRecurringInstance = expense.recurringParentId != null;
+
+    // Above the daily threshold. The amount and the card outline share one
+    // colour so they can never disagree — the same bands the Calendar uses
+    // for its day dots.
+    final shownAmount = isSplitPart && splitWallets.isNotEmpty
+        ? splitWallets.fold(0.0, (s, e) => s + e.amount)
+        : expense.amount;
+    final Color? highColor =
+        threshold == null || threshold! <= 0 || shownAmount <= threshold!
+            ? null
+            : shownAmount <= threshold! * 2
+                ? const Color(0xFFFF9800)
+                : const Color(0xFFE57373);
+
+    // Only the red band outlines the card. Outlining the orange one too put a
+    // frame around most of the list, which stopped the flag meaning anything.
+    final bool outlineHigh = highColor == const Color(0xFFE57373);
+
+    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
 
     return Dismissible(
       key: ValueKey(expense.id),
@@ -81,17 +137,28 @@ class ExpenseTile extends StatelessWidget {
               builder: (_) =>
                   AddExpenseScreen(existing: expense)),
         ),
-        child: Container(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            color: selected
+                ? Color.alphaBlend(
+                    theme.colorScheme.primary.withOpacity(0.07), cardColor)
+                : cardColor,
             borderRadius: BorderRadius.circular(16),
-            border: isRecurringInstance
-                ? Border.all(
-                    color: theme.colorScheme.primary.withOpacity(0.15),
-                    width: 1)
-                : null,
+            // Selection wins over the high-spend outline, which wins over the
+            // faint recurring one.
+            border: selected
+                ? Border.all(color: theme.colorScheme.primary, width: 2)
+                : outlineHigh
+                    ? Border.all(color: highColor!, width: 1.5)
+                    : isRecurringInstance
+                        ? Border.all(
+                            color:
+                                theme.colorScheme.primary.withOpacity(0.15),
+                            width: 1)
+                        : null,
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.05),
@@ -102,7 +169,7 @@ class ExpenseTile extends StatelessWidget {
           ),
           child: Row(
             children: [
-              // ── Category icon with wallet badge ──────────────────────
+              // ── Category icon with split/recurring badge ─────────────
               Stack(
                 clipBehavior: Clip.none,
                 children: [
@@ -113,7 +180,7 @@ class ExpenseTile extends StatelessWidget {
                       color: cat != null
                           ? Color(cat.colorValue).withOpacity(0.15)
                           : theme.colorScheme.primary
-                              .withOpacity(0.15),
+                          .withOpacity(0.15),
                       borderRadius: BorderRadius.circular(14),
                     ),
                     alignment: Alignment.center,
@@ -125,27 +192,53 @@ class ExpenseTile extends StatelessWidget {
                       size: 22,
                     ),
                   ),
-                  if (wallet != null)
+                  // No wallet badge here — the wallet pill next to the
+                  // category name already names the wallet, and the badge
+                  // repeated it as an unlabelled icon.
+                  //
+                  // Split and recurring are mutually exclusive, so one slot
+                  // is enough. When it's a split, the badge doubles as the
+                  // button that opens the per-wallet breakdown.
+                  if (isSplitPart ||
+                      expense.isRecurring ||
+                      isRecurringInstance)
                     Positioned(
                       bottom: -4,
-                      right: -4,
-                      child: Container(
-                        width: 20,
-                        height: 20,
-                        decoration: BoxDecoration(
-                          color: Color(wallet.colorValue),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: isDark
-                                ? const Color(0xFF1E1E1E)
-                                : Colors.white,
-                            width: 1.5,
+                      left: -4,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: isSplitPart && splitWallets.isNotEmpty
+                            ? () => _showSplitBreakdown(
+                                context, isDark, theme, splitWallets)
+                            : null,
+                        // Padding grows the tap target inward over the avatar
+                        // without moving the badge, which is anchored
+                        // bottom-left. A bare 20x20 badge is too small to hit.
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 10, right: 10),
+                          child: Container(
+                            width: 20,
+                            height: 20,
+                            decoration: BoxDecoration(
+                              color: isSplitPart
+                                  ? const Color(0xFF4A90E2)
+                                  : Colors.orange,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: isDark
+                                    ? const Color(0xFF1E1E1E)
+                                    : Colors.white,
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Icon(
+                              isSplitPart
+                                  ? Icons.call_split_rounded
+                                  : Icons.repeat_rounded,
+                              color: Colors.white,
+                              size: 11,
+                            ),
                           ),
-                        ),
-                        child: Icon(
-                          WalletProvider.resolveIcon(wallet.type),
-                          color: Colors.white,
-                          size: 11,
                         ),
                       ),
                     ),
@@ -174,19 +267,21 @@ class ExpenseTile extends StatelessWidget {
                         ),
                         if (isRecurringInstance) ...[
                           const SizedBox(width: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 5, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                  color: Colors.orange.withOpacity(0.3)),
-                            ),
-                            child: const Icon(
-                              Icons.repeat_rounded,
-                              size: 10,
-                              color: Colors.orange,
+                          Tooltip(
+                            message: 'Auto-generated recurring',
+                            child: Container(
+                              padding: const EdgeInsets.all(3),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primary
+                                    .withOpacity(0.1),
+                                borderRadius:
+                                BorderRadius.circular(6),
+                              ),
+                              child: Icon(
+                                Icons.repeat_rounded,
+                                size: 12,
+                                color: theme.colorScheme.primary,
+                              ),
                             ),
                           ),
                         ],
@@ -201,7 +296,7 @@ class ExpenseTile extends StatelessWidget {
                                 color: theme.colorScheme.primary
                                     .withOpacity(0.1),
                                 borderRadius:
-                                    BorderRadius.circular(8),
+                                BorderRadius.circular(8),
                               ),
                               child: Icon(
                                 Icons.sticky_note_2_outlined,
@@ -229,8 +324,43 @@ class ExpenseTile extends StatelessWidget {
                             fontWeight: FontWeight.w500,
                           ),
                         ),
-                        // Wallet pill
-                        if (wallet != null) ...[
+                        // Wallet pill(s) — show all split wallets or single wallet
+                        if (isSplitPart && splitWallets.isNotEmpty) ...[
+                          ...splitWallets.map((sw) {
+                            final swWallet = wallets.getById(sw.walletId);
+                            if (swWallet == null) return const SizedBox.shrink();
+                            return Padding(
+                              padding: const EdgeInsets.only(left: 4),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: Color(swWallet.colorValue)
+                                      .withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                        WalletProvider.resolveIcon(swWallet.type),
+                                        size: 9,
+                                        color: Color(swWallet.colorValue)),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      swWallet.name,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Color(swWallet.colorValue),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }),
+                        ] else if (wallet != null) ...[
                           const SizedBox(width: 6),
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -239,7 +369,7 @@ class ExpenseTile extends StatelessWidget {
                               color: Color(wallet.colorValue)
                                   .withOpacity(0.12),
                               borderRadius:
-                                  BorderRadius.circular(6),
+                              BorderRadius.circular(6),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -249,7 +379,7 @@ class ExpenseTile extends StatelessWidget {
                                         wallet.type),
                                     size: 9,
                                     color:
-                                        Color(wallet.colorValue)),
+                                    Color(wallet.colorValue)),
                                 const SizedBox(width: 3),
                                 Text(
                                   wallet.name,
@@ -263,35 +393,24 @@ class ExpenseTile extends StatelessWidget {
                             ),
                           ),
                         ],
-                        // Recurring badge — icon style matching split badge
+                        // Recurring badge
                         if (expense.isRecurring) ...[
-                          const SizedBox(width: 4),
-                          GestureDetector(
-                            onTap: () => _showRecurringInfo(context, isDark, theme),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.orange.withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                    color: Colors.orange.withOpacity(0.3)),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.repeat_rounded,
-                                      size: 10, color: Colors.orange),
-                                  const SizedBox(width: 3),
-                                  Text(
-                                    expense.recurringType ?? 'recurring',
-                                    style: const TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.orange,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primary
+                                  .withOpacity(0.1),
+                              borderRadius:
+                              BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              expense.recurringType ?? 'recurring',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
@@ -304,21 +423,23 @@ class ExpenseTile extends StatelessWidget {
                     // Date + Time row
                     Row(
                       children: [
-                        Text(
-                          AppUtils.formatDate(expense.date),
-                          style: TextStyle(
-                              fontSize: 11,
-                              color: theme.colorScheme.onSurface
-                                  .withOpacity(0.4)),
-                        ),
-                        if (hasTime) ...[
+                        if (showDate)
                           Text(
-                            '  ·  ',
+                            AppUtils.formatDate(expense.date),
                             style: TextStyle(
                                 fontSize: 11,
                                 color: theme.colorScheme.onSurface
-                                    .withOpacity(0.25)),
+                                    .withOpacity(0.4)),
                           ),
+                        if (hasTime) ...[
+                          if (showDate)
+                            Text(
+                              '  ·  ',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: theme.colorScheme.onSurface
+                                      .withOpacity(0.25)),
+                            ),
                           Icon(
                             Icons.access_time_rounded,
                             size: 11,
@@ -343,11 +464,28 @@ class ExpenseTile extends StatelessWidget {
               ),
 
               // ── Amount ───────────────────────────────────────────────
-              Text(
-                AppUtils.formatAmount(expense.amount, symbol),
-                style: const TextStyle(
-                    fontWeight: FontWeight.w700, fontSize: 16),
-              ),
+              if (highColor == null)
+                Text(
+                  AppUtils.formatAmount(shownAmount, symbol),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700, fontSize: 16),
+                )
+              else
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.arrow_upward_rounded,
+                        size: 14, color: highColor),
+                    const SizedBox(width: 2),
+                    Text(
+                      AppUtils.formatAmount(shownAmount, symbol),
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                          color: highColor),
+                    ),
+                  ],
+                ),
             ],
           ),
         ),
@@ -355,237 +493,148 @@ class ExpenseTile extends StatelessWidget {
     );
   }
 
-  void _showRecurringInfo(BuildContext context, bool isDark, ThemeData theme) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        margin: const EdgeInsets.all(16),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.12),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.repeat_rounded,
-                  color: Colors.orange, size: 24),
-            ),
-            const SizedBox(height: 12),
-            Text('Recurring Expense',
-                style: const TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 6),
-            Text(
-              'This expense repeats ${expense.recurringType ?? 'regularly'}.',
-              style: TextStyle(
-                  fontSize: 13,
-                  color: theme.colorScheme.onSurface.withOpacity(0.55)),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showRecurringMenu(
-      BuildContext context, bool isDark, ThemeData theme) {
-    final provider = context.read<ExpenseProvider>();
-    final childCount = provider.allExpenses
-        .where((e) => e.recurringParentId == expense.id)
-        .length;
+  void _showSplitBreakdown(
+      BuildContext context,
+      bool isDark,
+      ThemeData theme,
+      List<({String walletId, double amount})> splitWallets) {
+    final wallets = context.read<WalletProvider>();
+    final total = splitWallets.fold(0.0, (s, e) => s + e.amount);
 
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
         margin: const EdgeInsets.all(16),
-        padding: EdgeInsets.fromLTRB(
-            20, 20, 20, MediaQuery.of(ctx).padding.bottom + 20),
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 20)
+          ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
             Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withOpacity(0.1),
+                    color: const Color(0xFF4A90E2).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(Icons.repeat_rounded,
-                      color: theme.colorScheme.primary, size: 18),
+                  child: const Icon(Icons.call_split_rounded,
+                      color: Color(0xFF4A90E2), size: 18),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(expense.name,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w700, fontSize: 15),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis),
                       Text(
-                        '${expense.recurringType ?? 'recurring'} · $childCount instance${childCount == 1 ? '' : 's'} generated',
+                        expense.name,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w700, fontSize: 16),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        'Split across ${splitWallets.length} wallets',
                         style: TextStyle(
-                            fontSize: 12,
-                            color: theme.colorScheme.primary,
-                            fontWeight: FontWeight.w500),
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurface.withOpacity(0.5),
+                        ),
                       ),
                     ],
                   ),
                 ),
+                IconButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  icon: Icon(Icons.close_rounded,
+                      color: theme.colorScheme.onSurface.withOpacity(0.4)),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
               ],
             ),
-            const SizedBox(height: 20),
-
-            // ── Edit ──────────────────────────────────────────────────
-            _RecurringOption(
-              icon: Icons.edit_rounded,
-              color: theme.colorScheme.primary,
-              title: 'Edit this expense',
-              subtitle: 'Change details for this entry only',
-              isDark: isDark,
-              onTap: () {
-                Navigator.pop(ctx);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => AddExpenseScreen(existing: expense)),
-                );
-              },
-            ),
-            const SizedBox(height: 10),
-
-            // ── Stop recurring ────────────────────────────────────────
-            _RecurringOption(
-              icon: Icons.stop_circle_rounded,
-              color: const Color(0xFFFF9800),
-              title: 'Stop recurring',
-              subtitle: 'Keep this expense but stop future auto-generation',
-              isDark: isDark,
-              onTap: () async {
-                Navigator.pop(ctx);
-                final confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (c) => AlertDialog(
-                    title: const Text('Stop Recurring?'),
-                    content: Text(
-                        '"${expense.name}" will no longer auto-generate new entries. Existing entries are kept.'),
-                    actions: [
-                      TextButton(
-                          onPressed: () => Navigator.pop(c, false),
-                          child: const Text('Cancel')),
-                      ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFFF9800)),
-                          onPressed: () => Navigator.pop(c, true),
-                          child: const Text('Stop')),
-                    ],
+            const SizedBox(height: 14),
+            ...splitWallets.map((sw) {
+              final w = wallets.getById(sw.walletId);
+              final color =
+                  w != null ? Color(w.colorValue) : theme.colorScheme.primary;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: color.withOpacity(0.2)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                      child: Icon(
+                        w != null
+                            ? WalletProvider.resolveIcon(w.type)
+                            : Icons.account_balance_wallet_rounded,
+                        size: 16,
+                        color: color,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        w?.name ?? 'Deleted wallet',
+                        style: const TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      AppUtils.formatAmount(sw.amount, symbol),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: color,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Row(
+                children: [
+                  Text(
+                    'Total',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    ),
                   ),
-                );
-                if (confirm == true) {
-                  final updated = ExpenseModel(
-                    id: expense.id,
-                    name: expense.name,
-                    amount: expense.amount,
-                    categoryId: expense.categoryId,
-                    date: expense.date,
-                    note: expense.note,
-                    isRecurring: false,
-                    recurringType: null,
-                    walletId: expense.walletId,
-                    timeHour: expense.timeHour,
-                    timeMinute: expense.timeMinute,
-                    recurringParentId: null,
-                    recurringLastGenerated: expense.recurringLastGenerated,
-                  );
-                  provider.updateExpense(updated);
-                }
-              },
-            ),
-            const SizedBox(height: 10),
-
-            // ── Delete this only ──────────────────────────────────────
-            _RecurringOption(
-              icon: Icons.delete_outline_rounded,
-              color: const Color(0xFFE57373),
-              title: 'Delete this entry only',
-              subtitle: 'Remove just this expense, keep recurring active',
-              isDark: isDark,
-              onTap: () async {
-                Navigator.pop(ctx);
-                final confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (c) => AlertDialog(
-                    title: const Text('Delete This Entry?'),
-                    content: Text(
-                        'Delete "${expense.name}"? The recurring schedule stays active.'),
-                    actions: [
-                      TextButton(
-                          onPressed: () => Navigator.pop(c, false),
-                          child: const Text('Cancel')),
-                      ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red),
-                          onPressed: () => Navigator.pop(c, true),
-                          child: const Text('Delete')),
-                    ],
+                  const Spacer(),
+                  Text(
+                    AppUtils.formatAmount(total, symbol),
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w800),
                   ),
-                );
-                if (confirm == true) {
-                  provider.deleteExpense(expense.id);
-                }
-              },
-            ),
-            const SizedBox(height: 10),
-
-            // ── Delete all ────────────────────────────────────────────
-            _RecurringOption(
-              icon: Icons.delete_forever_rounded,
-              color: const Color(0xFFB71C1C),
-              title: 'Delete all recurring entries',
-              subtitle: 'Remove this and all auto-generated entries',
-              isDark: isDark,
-              onTap: () async {
-                Navigator.pop(ctx);
-                final confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (c) => AlertDialog(
-                    title: const Text('Delete All?'),
-                    content: Text(
-                        'This will delete "${expense.name}" and all its auto-generated entries. This cannot be undone.'),
-                    actions: [
-                      TextButton(
-                          onPressed: () => Navigator.pop(c, false),
-                          child: const Text('Cancel')),
-                      ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red),
-                          onPressed: () => Navigator.pop(c, true),
-                          child: const Text('Delete All')),
-                    ],
-                  ),
-                );
-                if (confirm == true) {
-                  provider.deleteExpense(expense.id);
-                }
-              },
+                ],
+              ),
             ),
           ],
         ),
@@ -620,7 +669,7 @@ class ExpenseTile extends StatelessWidget {
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color:
-                        theme.colorScheme.primary.withOpacity(0.1),
+                    theme.colorScheme.primary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(Icons.sticky_note_2_rounded,
@@ -660,88 +709,26 @@ class ExpenseTile extends StatelessWidget {
                         .withOpacity(0.15)),
               ),
               child: Text(
-                expense.note!,
+                    () {
+                  final n = expense.note ?? '';
+                  if (n.startsWith('SPLIT_PART|')) {
+                    final parts = n.split('|');
+                    for (final p in parts) {
+                      if (p.startsWith('NOTE:')) return p.substring(5);
+                    }
+                    return '';
+                  }
+                  return n;
+                }(),
                 style: TextStyle(
                   fontSize: 14,
                   height: 1.6,
                   color:
-                      theme.colorScheme.onSurface.withOpacity(0.8),
+                  theme.colorScheme.onSurface.withOpacity(0.8),
                 ),
               ),
             ),
             const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-
-// ── Recurring option tile ─────────────────────────────────────────────────────
-
-class _RecurringOption extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String subtitle;
-  final bool isDark;
-  final VoidCallback onTap;
-
-  const _RecurringOption({
-    required this.icon,
-    required this.color,
-    required this.title,
-    required this.subtitle,
-    required this.isDark,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade50,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withOpacity(0.2)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: color, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title,
-                      style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: color)),
-                  const SizedBox(height: 2),
-                  Text(subtitle,
-                      style: TextStyle(
-                          fontSize: 11,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withOpacity(0.5))),
-                ],
-              ),
-            ),
-            Icon(Icons.chevron_right_rounded,
-                color: color.withOpacity(0.4), size: 18),
           ],
         ),
       ),

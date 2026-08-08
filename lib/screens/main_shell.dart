@@ -10,6 +10,7 @@ import 'statistics_screen.dart';
 import 'loans_screen.dart';
 import 'global_search_screen.dart';
 import 'lock_screen.dart';
+import '../widgets/screenshot_guard.dart';
 
 class _TabDef {
   final String id;
@@ -336,6 +337,12 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    // Guard lives above the tabs so the screenshot warning works everywhere,
+    // including on routes pushed from here.
+    return ScreenshotGuard(child: _buildShell(context));
+  }
+
+  Widget _buildShell(BuildContext context) {
     // ── Show lock screen if locked ─────────────────────────────────────────
     if (_locked) {
       return LockScreen(

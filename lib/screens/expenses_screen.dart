@@ -194,23 +194,15 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     return '$month $d$suffix';
   }
 
-  void _applyPeriodFilter(String period, ExpenseProvider expenses) {
+  /// Commits a period chosen in the filter sheet.
+  ///
+  /// A custom period arrives with the range the picker returned; the fixed ones
+  /// derive theirs from the key, so the sheet never has to know the dates.
+  void _applyPeriod(
+      String period, DateTimeRange? range, ExpenseProvider expenses) {
     setState(() => _periodFilter = period);
-    expenses.setDateRange(rangeForPeriod(period, DateTime.now()));
-  }
-
-  Future<void> _pickCustomRange(
-      BuildContext context, ExpenseProvider expenses) async {
-    final picked = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-      initialDateRange: expenses.dateRange,
-    );
-    if (picked != null) {
-      setState(() => _periodFilter = 'custom');
-      expenses.setDateRange(picked);
-    }
+    expenses.setDateRange(
+        period == 'custom' ? range : rangeForPeriod(period, DateTime.now()));
   }
 
   List<ExpenseModel> _applyWalletFilter(List<ExpenseModel> list) {
@@ -219,6 +211,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   }
 
   void _showSortFilter(BuildContext context) {
+    final expenses = context.read<ExpenseProvider>();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -226,8 +219,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       builder: (_) => _FilterSheet(
         walletFilter: _walletFilter,
         onWalletChanged: (id) => setState(() => _walletFilter = id),
+        periodFilter: _periodFilter,
+        customRange: _periodFilter == 'custom' ? expenses.dateRange : null,
+        onPeriodChanged: (p, r) => _applyPeriod(p, r, expenses),
         onClearAll: () {
-          context.read<ExpenseProvider>().clearFilters();
+          expenses.clearFilters();
           _searchController.clear();
           setState(() {
             _periodFilter = 'all';
@@ -438,16 +434,16 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         tips: [
           (icon: Icons.search_rounded,
            text: 'Search by name to filter the list as you type.'),
-          (icon: Icons.calendar_today_rounded,
-           text: 'Use the period chips for Today, This Week, This Month, or '
-                 'a custom range.'),
           (icon: Icons.swap_vert_rounded,
            text: 'The pill next to the search box sets the order — newest, '
                  'oldest, highest or lowest.'),
           (icon: Icons.tune_rounded,
-           text: 'Filter by wallet or category from the tune button. A dot on '
-                 'it means a filter is active, and each one appears as a chip '
-                 'you can tap to remove.'),
+           text: 'The tune button holds the period, wallet and category '
+                 'filters. A dot on it means one is active, and each appears '
+                 'as a chip you can tap to remove.'),
+          (icon: Icons.calendar_today_rounded,
+           text: 'Periods cover Today, This Week, This Month, or a custom '
+                 'range you pick yourself.'),
         ],
       ),
     ];
@@ -1015,10 +1011,22 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           : AppBar(
         backgroundColor:
         isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
-        leading: IconButton(
-          icon: const Icon(Icons.help_outline_rounded),
-          onPressed: () => _showHints(context),
-          tooltip: 'Tips',
+        // Tinted red so the tips are findable — a bare outline icon in the
+        // corner reads as decoration and went unnoticed.
+        leading: Center(
+          child: GestureDetector(
+            onTap: () => _showHints(context),
+            child: Container(
+              margin: const EdgeInsets.only(left: 12),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE53935).withOpacity(0.12),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(Icons.help_outline_rounded,
+                  color: Color(0xFFE53935), size: 20),
+            ),
+          ),
         ),
         title: const Text('Expenses'),
         actions: [
@@ -1056,17 +1064,19 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             onSearchChanged: expenses.setSearch,
             sortBy: expenses.sortBy,
             onSortChanged: expenses.setSortBy,
-            periodFilter: _periodFilter,
-            onPeriodChanged: (p) => _applyPeriodFilter(p, expenses),
-            onPickCustomRange: () => _pickCustomRange(context, expenses),
-            customRangeLabel: expenses.dateRange == null
-                ? null
-                : '${AppUtils.formatShortDate(expenses.dateRange!.start)} – '
-                    '${AppUtils.formatShortDate(expenses.dateRange!.end)}',
             onFilterTap: () => _showSortFilter(context),
-            hasActiveFilter:
-                expenses.filterCategory != null || _walletFilter != null,
+            hasActiveFilter: _periodFilter != 'all' ||
+                expenses.filterCategory != null ||
+                _walletFilter != null,
             activeFilters: [
+              // Period leads: it is the filter that changes the totals most, so
+              // it should be the first thing read back from the sheet.
+              if (_periodFilter != 'all')
+                ActiveFilter(
+                  label: periodChipLabel(_periodFilter, expenses.dateRange),
+                  icon: Icons.calendar_today_rounded,
+                  onRemove: () => _applyPeriod('all', null, expenses),
+                ),
               if (expenses.filterCategory != null)
                 () {
                   final cat = context
@@ -1094,7 +1104,6 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 }(),
             ],
           ),
-          const SizedBox(height: 8),
 
           // ── Summary bar ───────────────────────────────────────────────────
           if (hasActiveFilter && list.isNotEmpty)
@@ -1260,8 +1269,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Padding(
-                      padding: const EdgeInsets.only(
-                          top: 16, bottom: 8),
+                      // The first header needs no space above it — the top gap
+                      // separates one day from the previous one, and there is
+                      // no previous day at the top of the list.
+                      padding: EdgeInsets.only(
+                          top: i == 0 ? 0 : 16, bottom: 8),
                       child: Row(
                         mainAxisAlignment:
                         MainAxisAlignment.spaceBetween,
@@ -1361,19 +1373,28 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
 // ── Filter Sheet ──────────────────────────────────────────────────────────────
 
-/// The filters that need a list to pick from — wallet and category.
+/// Everything that narrows the list except search and sort — period, wallet
+/// and category.
 ///
-/// Period and sort deliberately live in [ListFilterBar] instead: they are the
-/// two that get changed constantly, and having them here as well meant the
-/// same setting could be read from two places.
+/// Search and sort stay inline in [ListFilterBar]: they are the two that get
+/// changed constantly. Period moved in here because four chips on their own row
+/// crowded the header for a filter that is set once and left alone.
 class _FilterSheet extends StatefulWidget {
   final String? walletFilter;
   final ValueChanged<String?> onWalletChanged;
+  final String periodFilter;
+  final DateTimeRange? customRange;
+
+  /// Reports the period and, for 'custom', the range the picker returned.
+  final void Function(String period, DateTimeRange? range) onPeriodChanged;
   final VoidCallback onClearAll;
 
   const _FilterSheet({
     required this.walletFilter,
     required this.onWalletChanged,
+    required this.periodFilter,
+    required this.customRange,
+    required this.onPeriodChanged,
     required this.onClearAll,
   });
 
@@ -1383,15 +1404,35 @@ class _FilterSheet extends StatefulWidget {
 
 class _FilterSheetState extends State<_FilterSheet> {
   // Edited locally and committed on Apply, so dismissing the sheet leaves the
-  // list exactly as it was.
+  // list exactly as it was. Period is held here too: mixing an instant-apply
+  // period with deferred wallet and category would make Apply mean two things.
   late String? _category;
   late String? _wallet;
+  late String _period;
+  late DateTimeRange? _customRange;
 
   @override
   void initState() {
     super.initState();
     _category = context.read<ExpenseProvider>().filterCategory;
     _wallet = widget.walletFilter;
+    _period = widget.periodFilter;
+    _customRange = widget.customRange;
+  }
+
+  Future<void> _pickCustomRange() async {
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      initialDateRange: _customRange,
+    );
+    if (picked != null) {
+      setState(() {
+        _period = 'custom';
+        _customRange = picked;
+      });
+    }
   }
 
   @override
@@ -1443,6 +1484,22 @@ class _FilterSheetState extends State<_FilterSheet> {
               ],
             ),
             const SizedBox(height: 16),
+
+            // ── Period ───────────────────────────────────────────────────────
+            Text('Period',
+                style: theme.textTheme.labelLarge
+                    ?.copyWith(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 10),
+            PeriodSelector(
+              periodFilter: _period,
+              onPeriodChanged: (p) => setState(() => _period = p),
+              onPickCustomRange: _pickCustomRange,
+              customRangeLabel: _customRange == null
+                  ? null
+                  : '${AppUtils.formatShortDate(_customRange!.start)} – '
+                      '${AppUtils.formatShortDate(_customRange!.end)}',
+            ),
+            const SizedBox(height: 20),
 
             // ── Payment Method ───────────────────────────────────────────────
             if (wallets.isNotEmpty) ...[
@@ -1630,6 +1687,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                       .read<ExpenseProvider>()
                       .setFilterCategory(_category);
                   widget.onWalletChanged(_wallet);
+                  widget.onPeriodChanged(_period, _customRange);
                   Navigator.pop(context);
                 },
                 child: const Text('Apply'),

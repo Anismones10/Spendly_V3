@@ -48,24 +48,14 @@ class _IncomeScreenState extends State<IncomeScreen> {
     super.dispose();
   }
 
-  void _applyPeriodFilter(String period, IncomeProvider income) {
+  /// Commits a period chosen in the filter sheet.
+  ///
+  /// A custom period arrives with the range the picker returned; the fixed ones
+  /// derive theirs from the key, so the sheet never has to know the dates.
+  void _applyPeriod(String period, DateTimeRange? range, IncomeProvider income) {
     setState(() => _periodFilter = period);
-    income.setDateRange(rangeForPeriod(period, DateTime.now()));
-  }
-
-  Future<void> _pickCustomRange(
-      BuildContext context, IncomeProvider income) async {
-    final picked = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(2020),
-      // Income can be dated ahead, so the picker has to allow it.
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-      initialDateRange: income.dateRange,
-    );
-    if (picked != null) {
-      setState(() => _periodFilter = 'custom');
-      income.setDateRange(picked);
-    }
+    income.setDateRange(
+        period == 'custom' ? range : rangeForPeriod(period, DateTime.now()));
   }
 
   List<IncomeModel> _applyWalletFilter(List<IncomeModel> list) {
@@ -74,6 +64,7 @@ class _IncomeScreenState extends State<IncomeScreen> {
   }
 
   void _showSortFilter(BuildContext context) {
+    final income = context.read<IncomeProvider>();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -81,8 +72,10 @@ class _IncomeScreenState extends State<IncomeScreen> {
       builder: (_) => _IncomeFilterSheet(
         walletFilter: _walletFilter,
         onWalletChanged: (id) => setState(() => _walletFilter = id),
+        periodFilter: _periodFilter,
+        customRange: _periodFilter == 'custom' ? income.dateRange : null,
+        onPeriodChanged: (p, r) => _applyPeriod(p, r, income),
         onClearAll: () {
-          final income = context.read<IncomeProvider>();
           income.clearFilters();
           _searchController.clear();
           setState(() {
@@ -211,16 +204,17 @@ class _IncomeScreenState extends State<IncomeScreen> {
             onSearchChanged: income.setSearch,
             sortBy: income.sortBy,
             onSortChanged: income.setSortBy,
-            periodFilter: _periodFilter,
-            onPeriodChanged: (p) => _applyPeriodFilter(p, income),
-            onPickCustomRange: () => _pickCustomRange(context, income),
-            customRangeLabel: income.dateRange == null
-                ? null
-                : '${AppUtils.formatShortDate(income.dateRange!.start)} – '
-                    '${AppUtils.formatShortDate(income.dateRange!.end)}',
             onFilterTap: () => _showSortFilter(context),
-            hasActiveFilter: hasActiveFilter,
+            hasActiveFilter: hasActiveFilter || _periodFilter != 'all',
             activeFilters: [
+              // Period leads: it is the filter that changes the totals most, so
+              // it should be the first thing read back from the sheet.
+              if (_periodFilter != 'all')
+                ActiveFilter(
+                  label: periodChipLabel(_periodFilter, income.dateRange),
+                  icon: Icons.calendar_today_rounded,
+                  onRemove: () => _applyPeriod('all', null, income),
+                ),
               if (income.filterSource != null)
                 ActiveFilter(
                   // Sources are stored as keys, so show the readable label.
@@ -744,17 +738,24 @@ class _IncomeTile extends StatelessWidget {
 
 /// The Income counterpart to the Expenses filter sheet.
 ///
-/// Holds the filters that need a list to choose from — source and wallet.
-/// Search, period and sort stay in [ListFilterBar] because they get changed
-/// far more often than these two.
+/// Holds period, source and wallet. Search and sort stay in [ListFilterBar]
+/// because they get changed far more often than these.
 class _IncomeFilterSheet extends StatefulWidget {
   final String? walletFilter;
   final ValueChanged<String?> onWalletChanged;
+  final String periodFilter;
+  final DateTimeRange? customRange;
+
+  /// Reports the period and, for 'custom', the range the picker returned.
+  final void Function(String period, DateTimeRange? range) onPeriodChanged;
   final VoidCallback onClearAll;
 
   const _IncomeFilterSheet({
     required this.walletFilter,
     required this.onWalletChanged,
+    required this.periodFilter,
+    required this.customRange,
+    required this.onPeriodChanged,
     required this.onClearAll,
   });
 
@@ -764,15 +765,36 @@ class _IncomeFilterSheet extends StatefulWidget {
 
 class _IncomeFilterSheetState extends State<_IncomeFilterSheet> {
   // Edited locally and committed on Apply, so backing out of the sheet leaves
-  // the list exactly as it was.
+  // the list exactly as it was. Period is held here too: mixing an instant-apply
+  // period with a deferred source and wallet would make Apply mean two things.
   late String? _source;
   late String? _wallet;
+  late String _period;
+  late DateTimeRange? _customRange;
 
   @override
   void initState() {
     super.initState();
     _source = context.read<IncomeProvider>().filterSource;
     _wallet = widget.walletFilter;
+    _period = widget.periodFilter;
+    _customRange = widget.customRange;
+  }
+
+  Future<void> _pickCustomRange() async {
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      // Income can be dated ahead, so the picker has to allow it.
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      initialDateRange: _customRange,
+    );
+    if (picked != null) {
+      setState(() {
+        _period = 'custom';
+        _customRange = picked;
+      });
+    }
   }
 
   @override
@@ -826,6 +848,22 @@ class _IncomeFilterSheetState extends State<_IncomeFilterSheet> {
               ],
             ),
             const SizedBox(height: 16),
+
+            // ── Period ───────────────────────────────────────────────────────
+            Text('Period',
+                style: theme.textTheme.labelLarge
+                    ?.copyWith(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 10),
+            PeriodSelector(
+              periodFilter: _period,
+              onPeriodChanged: (p) => setState(() => _period = p),
+              onPickCustomRange: _pickCustomRange,
+              customRangeLabel: _customRange == null
+                  ? null
+                  : '${AppUtils.formatShortDate(_customRange!.start)} – '
+                      '${AppUtils.formatShortDate(_customRange!.end)}',
+            ),
+            const SizedBox(height: 20),
 
             // ── Wallet ───────────────────────────────────────────────────────
             if (wallets.isNotEmpty) ...[
@@ -888,6 +926,7 @@ class _IncomeFilterSheetState extends State<_IncomeFilterSheet> {
                 onPressed: () {
                   context.read<IncomeProvider>().setFilterSource(_source);
                   widget.onWalletChanged(_wallet);
+                  widget.onPeriodChanged(_period, _customRange);
                   Navigator.pop(context);
                 },
                 child: const Text('Apply'),

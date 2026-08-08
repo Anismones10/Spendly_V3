@@ -62,6 +62,19 @@ DateTimeRange? rangeForPeriod(String period, DateTime now) {
   }
 }
 
+/// The label for a period, used on the chip that shows it is active.
+///
+/// A custom range names its dates; the fixed periods use their own label.
+String periodChipLabel(String period, DateTimeRange? range) {
+  if (period == 'custom' && range != null) {
+    return '${_short(range.start)} – ${_short(range.end)}';
+  }
+  final match = kFilterPeriods.where((p) => p.key == period);
+  return match.isEmpty ? 'Period' : match.first.label;
+}
+
+String _short(DateTime d) => '${d.day}/${d.month}';
+
 /// One filter currently narrowing the list, rendered as a removable chip.
 class ActiveFilter {
   final String label;
@@ -79,10 +92,9 @@ class ActiveFilter {
 
 /// The filter header shared by the Expenses and Income tabs.
 ///
-/// Everything that narrows the list is reachable from this one bar. Search,
-/// period and sort sit inline because they get changed constantly; the
-/// remaining filters need a list to pick from, so they stay behind the tune
-/// button and report back as removable chips.
+/// Only search and sort sit inline — the two that get changed constantly.
+/// Period, wallet and category live behind the tune button and report back as
+/// removable chips, so the header stays one row instead of three.
 class ListFilterBar extends StatelessWidget {
   final TextEditingController searchController;
   final String searchHint;
@@ -90,14 +102,6 @@ class ListFilterBar extends StatelessWidget {
 
   final String sortBy;
   final ValueChanged<String> onSortChanged;
-
-  final String periodFilter;
-  final ValueChanged<String> onPeriodChanged;
-  final VoidCallback onPickCustomRange;
-
-  /// Shown on the custom chip once a range exists, so the dates appear in the
-  /// chip that selected them instead of in a second chip underneath.
-  final String? customRangeLabel;
 
   final VoidCallback onFilterTap;
   final bool hasActiveFilter;
@@ -110,12 +114,8 @@ class ListFilterBar extends StatelessWidget {
     required this.onSearchChanged,
     required this.sortBy,
     required this.onSortChanged,
-    required this.periodFilter,
-    required this.onPeriodChanged,
-    required this.onPickCustomRange,
     required this.onFilterTap,
     required this.hasActiveFilter,
-    this.customRangeLabel,
     this.activeFilters = const [],
   });
 
@@ -248,42 +248,15 @@ class ListFilterBar extends StatelessWidget {
           ),
         ),
 
-        // ── Period chips ─────────────────────────────────────────────
-        SizedBox(
-          height: 32,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            children: [
-              for (final p in kFilterPeriods) ...[
-                _PeriodChip(
-                  label: p.label,
-                  selected: periodFilter == p.key,
-                  onTap: () => onPeriodChanged(p.key),
-                ),
-                const SizedBox(width: 8),
-              ],
-              // Once a range is picked the chip shows it, which is why there
-              // is no second chip repeating the same dates below.
-              _PeriodChip(
-                label: periodFilter == 'custom' && customRangeLabel != null
-                    ? customRangeLabel!
-                    : 'Custom',
-                icon: Icons.date_range_rounded,
-                selected: periodFilter == 'custom',
-                onTap: onPickCustomRange,
-              ),
-            ],
-          ),
-        ),
-
         // ── Whatever the sheet is currently filtering by ─────────────
+        // The bar ends here when nothing is set, so the list starts directly
+        // under the search row rather than after an empty strip.
         if (activeFilters.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
             // Left-aligned: the Column centres its children by default, which
-            // left this row floating in the middle while the search box,
-            // period chips and the list below it all start at the same margin.
+            // left this row floating in the middle while the search box and
+            // the list below it both start at the same margin.
             child: Align(
               alignment: Alignment.centerLeft,
               child: Wrap(
@@ -294,6 +267,53 @@ class ListFilterBar extends StatelessWidget {
               ),
             ),
           ),
+      ],
+    );
+  }
+}
+
+/// A period selector for the filter sheets.
+///
+/// Lives here so Expenses and Income offer the same periods in the same order.
+/// The custom entry opens a date picker instead of toggling, and shows the
+/// range it selected once there is one.
+class PeriodSelector extends StatelessWidget {
+  final String periodFilter;
+  final ValueChanged<String> onPeriodChanged;
+  final VoidCallback onPickCustomRange;
+
+  /// Shown on the custom chip once a range exists, so the dates appear in the
+  /// chip that selected them rather than in a second chip elsewhere.
+  final String? customRangeLabel;
+
+  const PeriodSelector({
+    super.key,
+    required this.periodFilter,
+    required this.onPeriodChanged,
+    required this.onPickCustomRange,
+    this.customRangeLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final p in kFilterPeriods)
+          _PeriodChip(
+            label: p.label,
+            selected: periodFilter == p.key,
+            onTap: () => onPeriodChanged(p.key),
+          ),
+        _PeriodChip(
+          label: periodFilter == 'custom' && customRangeLabel != null
+              ? customRangeLabel!
+              : 'Custom',
+          icon: Icons.date_range_rounded,
+          selected: periodFilter == 'custom',
+          onTap: onPickCustomRange,
+        ),
       ],
     );
   }
@@ -319,7 +339,9 @@ class _PeriodChip extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14),
+        // Vertical padding rather than a fixed height: these sit in a Wrap in
+        // the filter sheet, which gives them no height of its own.
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: selected

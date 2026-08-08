@@ -206,7 +206,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   : const Color(0xFFF5F7FA),
               title: const Text('Calendar'),
             ),
-      body: Column(
+      body: SingleChildScrollView(
+        child: Column(
         children: [
           // ── Calendar ────────────────────────────────────────────────
           Container(
@@ -233,7 +234,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   _selectedDay = selected;
                   _focusedDay  = focused;
                 });
-                _showDayExpenses(context, selected, expenses, symbol);
+                _showDayExpenses(
+                    context, selected, expenses, symbol, effectiveThreshold);
               },
               onPageChanged: (focused) {
                 setState(() => _focusedDay = focused);
@@ -383,12 +385,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
             ),
           ),
         ],
+        ),
       ),
     );
   }
 
   void _showDayExpenses(BuildContext context, DateTime day,
-      ExpenseProvider expenses, String symbol) {
+      ExpenseProvider expenses, String symbol, double threshold) {
     final dayExpenses = expenses.getExpensesForDay(day);
     if (dayExpenses.isEmpty) return;
 
@@ -453,6 +456,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   itemBuilder: (ctx, i) => ExpenseTile(
                     expense: dayExpenses[i],
                     symbol: symbol,
+                    threshold: threshold,
+                    // The sheet header already names the day, so the tile
+                    // only needs the time.
+                    showDate: false,
                   ),
                 ),
               ),

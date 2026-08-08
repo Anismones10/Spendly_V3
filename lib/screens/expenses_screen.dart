@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
+import 'package:hive/hive.dart';
 import '../models/expense_model.dart';
 import '../providers/expense_provider.dart';
 import '../providers/category_provider.dart';
@@ -298,7 +299,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius:
-              const BorderRadius.vertical(top: Radius.circular(24)),
+          const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
         child: Column(
@@ -378,6 +379,232 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                       color: theme.colorScheme.onSurface.withOpacity(0.5))),
             ],
           ],
+        ),
+      ),
+    );
+  }
+
+  // ── Tips / hints sheet ──────────────────────────────────────────────────
+  void _showHints(BuildContext context) {
+    final theme  = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final sections = <({
+      String title,
+      IconData icon,
+      Color color,
+      List<({IconData icon, String text})> tips,
+    })>[
+      (
+        title: 'Managing expenses',
+        icon: Icons.receipt_long_rounded,
+        color: theme.colorScheme.primary,
+        tips: [
+          (icon: Icons.touch_app_rounded,
+           text: 'Tap an expense to open and edit it.'),
+          (icon: Icons.swipe_left_rounded,
+           text: 'Swipe left on an expense to delete it.'),
+          (icon: Icons.arrow_upward_rounded,
+           text: 'An amount shown in orange with an up arrow is above your '
+                 'daily average. Red means more than double it, and outlines '
+                 'the card.'),
+          (icon: Icons.tune_rounded,
+           text: 'Set your own daily limit from the Calendar tab to change '
+                 'when an expense counts as high.'),
+        ],
+      ),
+      (
+        title: 'Split expenses',
+        icon: Icons.call_split_rounded,
+        color: const Color(0xFF4A90E2),
+        tips: [
+          (icon: Icons.call_split_rounded,
+           text: 'A blue split badge on the category icon means the expense '
+                 'was paid from more than one wallet.'),
+          (icon: Icons.touch_app_rounded,
+           text: 'Tap that blue badge to see how much came from each wallet, '
+                 'without opening the expense.'),
+          (icon: Icons.functions_rounded,
+           text: 'The amount shown on a split expense is the total of all '
+                 'its parts.'),
+        ],
+      ),
+      (
+        title: 'Recurring expenses',
+        icon: Icons.repeat_rounded,
+        color: Colors.orange,
+        tips: [
+          (icon: Icons.repeat_rounded,
+           text: 'An orange loop badge marks a recurring expense.'),
+          (icon: Icons.tune_rounded,
+           text: 'Use the loop button in the top bar to manage all your '
+                 'recurring expenses.'),
+        ],
+      ),
+      (
+        title: 'Selecting several at once',
+        icon: Icons.checklist_rounded,
+        color: Colors.teal,
+        tips: [
+          (icon: Icons.touch_app_rounded,
+           text: 'Long-press an expense to start selecting. Then tap others '
+                 'to add or remove them.'),
+          (icon: Icons.done_all_rounded,
+           text: 'Tap "All" in the top bar to select everything in view.'),
+          (icon: Icons.visibility_rounded,
+           text: 'While selecting, long-press an expense to view its details '
+                 'without leaving selection mode.'),
+          (icon: Icons.folder_rounded,
+           text: 'Move the selected expenses to another category, or delete '
+                 'them all, from the top bar.'),
+        ],
+      ),
+      (
+        title: 'Finding expenses',
+        icon: Icons.search_rounded,
+        color: Colors.purple,
+        tips: [
+          (icon: Icons.search_rounded,
+           text: 'Search by name to filter the list as you type.'),
+          (icon: Icons.calendar_today_rounded,
+           text: 'Use the period chips for Today, This Week, This Month, or '
+                 'a custom range.'),
+          (icon: Icons.tune_rounded,
+           text: 'Sort & Filter gives finer control. A dot on that button '
+                 'means a filter is currently active.'),
+        ],
+      ),
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.4,
+        maxChildSize: 0.92,
+        expand: false,
+        builder: (_, scrollController) => Container(
+          margin: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withOpacity(0.15), blurRadius: 20)
+            ],
+          ),
+          child: Column(
+            children: [
+              // ── Header ──────────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(Icons.help_outline_rounded,
+                          color: theme.colorScheme.primary, size: 18),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Tips',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700, fontSize: 16),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      icon: Icon(Icons.close_rounded,
+                          color:
+                              theme.colorScheme.onSurface.withOpacity(0.4)),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ),
+              ),
+              Divider(
+                  height: 1,
+                  color: theme.colorScheme.onSurface.withOpacity(0.07)),
+              // ── Sections ────────────────────────────────────────────
+              Expanded(
+                child: ListView.builder(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                  itemCount: sections.length,
+                  itemBuilder: (_, i) {
+                    final s = sections[i];
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(s.icon, size: 16, color: s.color),
+                            const SizedBox(width: 8),
+                            Text(
+                              s.title,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: s.color,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        ...s.tips.map((t) => Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Row(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(5),
+                                    decoration: BoxDecoration(
+                                      color: s.color.withOpacity(0.10),
+                                      borderRadius:
+                                          BorderRadius.circular(8),
+                                    ),
+                                    child: Icon(t.icon,
+                                        size: 13, color: s.color),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      t.text,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        height: 1.45,
+                                        color: theme.colorScheme.onSurface
+                                            .withOpacity(0.75),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )),
+                        if (i != sections.length - 1) ...[
+                          const SizedBox(height: 6),
+                          Divider(
+                              height: 1,
+                              color: theme.colorScheme.onSurface
+                                  .withOpacity(0.07)),
+                          const SizedBox(height: 16),
+                        ],
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -606,7 +833,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                                         timeMinute: parent.timeMinute,
                                         recurringParentId: null,
                                         recurringLastGenerated:
-                                            parent.recurringLastGenerated,
+                                        parent.recurringLastGenerated,
                                       );
                                       expenses.updateExpense(updated);
                                     }
@@ -705,6 +932,20 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
+    // Same daily threshold the Calendar uses for its day dots: the value
+    // saved by the Calendar's picker, or this month's daily average when
+    // it's left on Auto. Expenses above it get a coloured amount + arrow.
+    final now = DateTime.now();
+    final savedThreshold =
+        (Hive.box('settings').get('calendarThreshold', defaultValue: 0.0)
+                as num)
+            .toDouble();
+    final monthTotal = expenses.getTotalForMonth(now.year, now.month);
+    final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+    final highThreshold = savedThreshold > 0
+        ? savedThreshold
+        : (monthTotal > 0 ? monthTotal / daysInMonth : 0.0);
+
     final rawList = _applyWalletFilter(expenses.filteredExpenses);
 
     // For split expenses: show only part 1 (which represents the full split)
@@ -761,85 +1002,90 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
     return Scaffold(
       backgroundColor:
-          isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
+      isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
       appBar: _isSelecting
           ? AppBar(
-              backgroundColor:
-                  isDark ? const Color(0xFF1E1E1E) : Colors.white,
-              leading: IconButton(
-                icon: const Icon(Icons.close_rounded),
-                onPressed: _clearSelection,
-              ),
-              title: Text('${_selectedIds.length} selected',
-                  style: const TextStyle(fontWeight: FontWeight.w700)),
-              actions: [
-                TextButton(
-                  onPressed: () => _selectAll(list),
-                  child: const Text('All'),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.folder_rounded),
-                  tooltip: 'Move Category',
-                  onPressed: () => _moveCategorySelected(context),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete_rounded, color: Colors.red),
-                  tooltip: 'Delete',
-                  onPressed: () => _deleteSelected(context, expenses),
-                ),
-              ],
-            )
+        backgroundColor:
+        isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.close_rounded),
+          onPressed: _clearSelection,
+        ),
+        title: Text('${_selectedIds.length} selected',
+            style: const TextStyle(fontWeight: FontWeight.w700)),
+        actions: [
+          TextButton(
+            onPressed: () => _selectAll(list),
+            child: const Text('All'),
+          ),
+          IconButton(
+            icon: const Icon(Icons.folder_rounded),
+            tooltip: 'Move Category',
+            onPressed: () => _moveCategorySelected(context),
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_rounded, color: Colors.red),
+            tooltip: 'Delete',
+            onPressed: () => _deleteSelected(context, expenses),
+          ),
+        ],
+      )
           : AppBar(
-              backgroundColor:
-                  isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
-              title: const Text('Expenses'),
-              actions: [
-                // ── Recurring button ───────────────────────────────────────
-                IconButton(
-                  icon: const Icon(Icons.repeat_rounded),
-                  onPressed: () => _showRecurringManager(context, expenses),
-                  tooltip: 'Manage Recurring',
-                ),
-                // ── Filter button ──────────────────────────────────────────
-                Stack(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.tune_rounded),
-                      onPressed: () => _showSortFilter(context),
-                      tooltip: 'Sort & Filter',
-                    ),
-                    if (hasActiveFilter)
-                      Positioned(
-                        right: 8,
-                        top: 8,
-                        child: Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.primary,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                // ── More button ────────────────────────────────────────────
-                if (widget.onMoreTap != null)
-                  GestureDetector(
-                    onTap: widget.onMoreTap,
-                    child: Container(
-                      margin: const EdgeInsets.only(right: 4),
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Icon(Icons.more_horiz_rounded,
-                          color: theme.colorScheme.primary, size: 20),
+        backgroundColor:
+        isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
+        leading: IconButton(
+          icon: const Icon(Icons.help_outline_rounded),
+          onPressed: () => _showHints(context),
+          tooltip: 'Tips',
+        ),
+        title: const Text('Expenses'),
+        actions: [
+          // ── Recurring button ───────────────────────────────────────
+          IconButton(
+            icon: const Icon(Icons.repeat_rounded),
+            onPressed: () => _showRecurringManager(context, expenses),
+            tooltip: 'Manage Recurring',
+          ),
+          // ── Filter button ──────────────────────────────────────────
+          Stack(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.tune_rounded),
+                onPressed: () => _showSortFilter(context),
+                tooltip: 'Sort & Filter',
+              ),
+              if (hasActiveFilter)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary,
+                      shape: BoxShape.circle,
                     ),
                   ),
-              ],
+                ),
+            ],
+          ),
+          // ── More button ────────────────────────────────────────────
+          if (widget.onMoreTap != null)
+            GestureDetector(
+              onTap: widget.onMoreTap,
+              child: Container(
+                margin: const EdgeInsets.only(right: 4),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Icon(Icons.more_horiz_rounded,
+                    color: theme.colorScheme.primary, size: 20),
+              ),
             ),
+        ],
+      ),
       body: Column(
         children: [
           // ── Search ────────────────────────────────────────────────────────
@@ -853,12 +1099,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 prefixIcon: const Icon(Icons.search_rounded),
                 suffixIcon: expenses.searchQuery.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.close_rounded),
-                        onPressed: () {
-                          _searchController.clear();
-                          expenses.setSearch('');
-                        },
-                      )
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () {
+                    _searchController.clear();
+                    expenses.setSearch('');
+                  },
+                )
                     : null,
               ),
             ),
@@ -917,7 +1163,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                       return Chip(
                         avatar: cat != null
                             ? Icon(CategoryIcons.resolve(cat.icon),
-                                size: 14, color: Color(cat.colorValue))
+                            size: 14, color: Color(cat.colorValue))
                             : null,
                         label: Text(cat?.name ?? ''),
                         deleteIcon: const Icon(Icons.close, size: 14),
@@ -979,7 +1225,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                     style: TextStyle(
                       fontSize: 13,
                       color:
-                          theme.colorScheme.onSurface.withOpacity(0.6),
+                      theme.colorScheme.onSurface.withOpacity(0.6),
                     ),
                   ),
                   Text(
@@ -994,273 +1240,218 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               ),
             ),
 
-          // ── Swipe hint ────────────────────────────────────────────────────
-          if (list.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-              child: Row(
-                children: [
-                  Icon(Icons.swipe_left_rounded,
-                      size: 14,
-                      color:
-                          theme.colorScheme.onSurface.withOpacity(0.3)),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Swipe left to delete an expense',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color:
-                          theme.colorScheme.onSurface.withOpacity(0.3),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
           // ── Expense list ──────────────────────────────────────────────────
           Expanded(
             child: list.isEmpty
                 ? const EmptyState(
-                    icon: Icons.receipt_long_rounded,
-                    title: 'No Expenses Found',
-                    subtitle:
-                        'Add your first expense using the + button below.',
-                  )
+              icon: Icons.receipt_long_rounded,
+              title: 'No Expenses Found',
+              subtitle:
+              'Add your first expense using the + button below.',
+            )
                 : expenses.sortBy.startsWith('amount')
-                    ? ListView.builder(
-                        padding:
-                            const EdgeInsets.fromLTRB(16, 4, 16, 100),
-                        itemCount: list.length,
-                        itemBuilder: (ctx, i) {
-                          final expense = list[i];
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (i == 0)
-                                Padding(
-                                  padding: const EdgeInsets.only(
-                                      bottom: 8, top: 4),
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.sort_rounded,
-                                          size: 14,
-                                          color:
-                                              theme.colorScheme.primary),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        expenses.sortBy == 'amountDesc'
-                                            ? 'Highest first'
-                                            : 'Lowest first',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color:
-                                              theme.colorScheme.primary,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              Stack(
-                                children: [
-                                  GestureDetector(
-                                    onLongPress: _isSelecting ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => AddExpenseScreen(existing: expense))) : () => _toggleSelection(expense.id),
-                                    onTap: _isSelecting
-                                        ? () => _toggleSelection(expense.id)
-                                        : (expense.note?.startsWith('SPLIT_PART|') == true)
-                                            ? () => _showSplitDetail(context, expense)
-                                            : null,
-                                    child: AnimatedContainer(
-                                      duration: const Duration(milliseconds: 150),
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(16),
-                                        border: _selectedIds.contains(expense.id)
-                                            ? Border.all(color: theme.colorScheme.primary, width: 2)
-                                            : null,
-                                        color: _selectedIds.contains(expense.id)
-                                            ? theme.colorScheme.primary.withOpacity(0.07)
-                                            : Colors.transparent,
-                                      ),
-                                      child: Stack(
-                                        children: [
-                                          ExpenseTile(expense: expense, symbol: symbol, isSelecting: _isSelecting),
-                                          if (expense.note?.startsWith('SPLIT_PART|') == true)
-                                            Positioned(
-                                              top: 8, right: 8,
-                                              child: Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xFF4A90E2).withOpacity(0.15),
-                                                  borderRadius: BorderRadius.circular(6),
-                                                  border: Border.all(color: const Color(0xFF4A90E2).withOpacity(0.3)),
-                                                ),
-                                                child: const Text('split',
-                                                  style: TextStyle(fontSize: 9, color: Color(0xFF4A90E2), fontWeight: FontWeight.w700),
-                                                ),
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  if (_selectedIds.contains(expense.id))
-                                    Positioned(
-                                      top: 12, left: 12,
-                                      child: Container(
-                                        width: 22, height: 22,
-                                        decoration: BoxDecoration(
-                                          color: theme.colorScheme.primary,
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(Icons.check_rounded,
-                                            color: Colors.white, size: 14),
-                                      ),
-                                    ),
-                                  Positioned(
-                                    top: 8,
-                                    right: 8,
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 7, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: i == 0
-                                            ? theme.colorScheme.primary
-                                            : theme.colorScheme.primary
-                                                .withOpacity(0.08),
-                                        borderRadius:
-                                            BorderRadius.circular(10),
-                                      ),
-                                      child: Text(
-                                        '#${i + 1}',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w700,
-                                          color: i == 0
-                                              ? Colors.white
-                                              : theme.colorScheme.primary,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                ? ListView.builder(
+              padding:
+              const EdgeInsets.fromLTRB(16, 4, 16, 100),
+              itemCount: list.length,
+              itemBuilder: (ctx, i) {
+                final expense = list[i];
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (i == 0)
+                      Padding(
+                        padding: const EdgeInsets.only(
+                            bottom: 8, top: 4),
+                        child: Row(
+                          children: [
+                            Icon(Icons.sort_rounded,
+                                size: 14,
+                                color:
+                                theme.colorScheme.primary),
+                            const SizedBox(width: 4),
+                            Text(
+                              expenses.sortBy == 'amountDesc'
+                                  ? 'Highest first'
+                                  : 'Lowest first',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color:
+                                theme.colorScheme.primary,
                               ),
-                            ],
-                          )
-                              .animate()
-                              .fadeIn(delay: (i * 30).ms)
-                              .slideX(begin: 0.08);
-                        },
-                      )
-                    : ListView.builder(
-                        padding:
-                            const EdgeInsets.fromLTRB(16, 4, 16, 100),
-                        itemCount: days.length,
-                        itemBuilder: (ctx, i) {
-                          final day = days[i];
-                          final dayExpenses = grouped[day]!;
-                          final dayTotal = dayExpenses.fold(0.0, (s, e) {
-                            if (e.note?.startsWith('SPLIT_PART|') == true) {
-                              final parts = e.note!.split('|');
-                              if (parts.length > 1) {
-                                return s + (splitGroupTotals[parts[1]] ?? e.amount);
-                              }
-                            }
-                            return s + e.amount;
-                          });
-
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.only(
-                                    top: 16, bottom: 8),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      _formatDayHeader(day),
-                                      style: TextStyle(
-                                        fontSize: 17,
-                                        fontWeight: FontWeight.w700,
-                                        color:
-                                            theme.colorScheme.onSurface,
-                                      ),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 10, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: theme.colorScheme.primary
-                                            .withOpacity(0.1),
-                                        borderRadius:
-                                            BorderRadius.circular(20),
-                                      ),
-                                      child: Text(
-                                        AppUtils.formatAmount(
-                                            dayTotal, symbol),
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w700,
-                                          color: theme.colorScheme.primary,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ).animate().fadeIn(delay: (i * 40).ms),
-                              ...dayExpenses.asMap().entries.map((entry) {
-                                final expense = entry.value;
-                                final isSelected = _selectedIds.contains(expense.id);
-                                return GestureDetector(
-                                  onLongPress: _isSelecting ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => AddExpenseScreen(existing: expense))) : () => _toggleSelection(expense.id),
-                                  onTap: _isSelecting ? () => _toggleSelection(expense.id) : null,
-                                  child: Stack(
-                                    children: [
-                                      AnimatedContainer(
-                                        duration: const Duration(milliseconds: 150),
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(16),
-                                          border: isSelected
-                                              ? Border.all(color: theme.colorScheme.primary, width: 2)
-                                              : null,
-                                          color: isSelected
-                                              ? theme.colorScheme.primary.withOpacity(0.07)
-                                              : Colors.transparent,
-                                        ),
-                                        child: ExpenseTile(
-                                          expense: expense,
-                                          symbol: symbol,
-                                          isSelecting: _isSelecting,
-                                        ),
-                                      ),
-                                      if (isSelected)
-                                        Positioned(
-                                          top: 12, left: 12,
-                                          child: Container(
-                                            width: 22, height: 22,
-                                            decoration: BoxDecoration(
-                                              color: theme.colorScheme.primary,
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: const Icon(Icons.check_rounded,
-                                                color: Colors.white, size: 14),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                )
-                                    .animate()
-                                    .fadeIn(
-                                        delay: ((i * 40) +
-                                                (entry.key * 25))
-                                            .ms)
-                                    .slideX(begin: 0.08);
-                              }),
-                            ],
-                          );
-                        },
+                            ),
+                          ],
+                        ),
                       ),
+                    Stack(
+                      children: [
+                        GestureDetector(
+                          onLongPress: _isSelecting ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => AddExpenseScreen(existing: expense))) : () => _toggleSelection(expense.id),
+                          onTap: _isSelecting
+                              ? () => _toggleSelection(expense.id)
+                              : (expense.note?.startsWith('SPLIT_PART|') == true)
+                              ? () => _showSplitDetail(context, expense)
+                              : null,
+                          child: ExpenseTile(
+                            expense: expense,
+                            symbol: symbol,
+                            isSelecting: _isSelecting,
+                            threshold: highThreshold,
+                            selected: _selectedIds.contains(expense.id),
+                          ),
+                        ),
+                        if (_selectedIds.contains(expense.id))
+                          Positioned(
+                            top: 12, left: 12,
+                            child: Container(
+                              width: 22, height: 22,
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primary,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.check_rounded,
+                                  color: Colors.white, size: 14),
+                            ),
+                          ),
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: i == 0
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.primary
+                                  .withOpacity(0.08),
+                              borderRadius:
+                              BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '#${i + 1}',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: i == 0
+                                    ? Colors.white
+                                    : theme.colorScheme.primary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                )
+                    .animate()
+                    .fadeIn(delay: (i * 30).ms)
+                    .slideX(begin: 0.08);
+              },
+            )
+                : ListView.builder(
+              padding:
+              const EdgeInsets.fromLTRB(16, 4, 16, 100),
+              itemCount: days.length,
+              itemBuilder: (ctx, i) {
+                final day = days[i];
+                final dayExpenses = grouped[day]!;
+                final dayTotal = dayExpenses.fold(0.0, (s, e) {
+                  if (e.note?.startsWith('SPLIT_PART|') == true) {
+                    final parts = e.note!.split('|');
+                    if (parts.length > 1) {
+                      return s + (splitGroupTotals[parts[1]] ?? e.amount);
+                    }
+                  }
+                  return s + e.amount;
+                });
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(
+                          top: 16, bottom: 8),
+                      child: Row(
+                        mainAxisAlignment:
+                        MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            _formatDayHeader(day),
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                              color:
+                              theme.colorScheme.onSurface,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primary
+                                  .withOpacity(0.1),
+                              borderRadius:
+                              BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              AppUtils.formatAmount(
+                                  dayTotal, symbol),
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ).animate().fadeIn(delay: (i * 40).ms),
+                    ...dayExpenses.asMap().entries.map((entry) {
+                      final expense = entry.value;
+                      final isSelected = _selectedIds.contains(expense.id);
+                      return GestureDetector(
+                        onLongPress: _isSelecting ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => AddExpenseScreen(existing: expense))) : () => _toggleSelection(expense.id),
+                        onTap: _isSelecting ? () => _toggleSelection(expense.id) : null,
+                        child: Stack(
+                          children: [
+                            ExpenseTile(
+                              expense: expense,
+                              symbol: symbol,
+                              isSelecting: _isSelecting,
+                              threshold: highThreshold,
+                              selected: isSelected,
+                              // The day header above already carries the
+                              // date, so the tile only needs the time.
+                              showDate: false,
+                            ),
+                            if (isSelected)
+                              Positioned(
+                                top: 12, left: 12,
+                                child: Container(
+                                  width: 22, height: 22,
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.primary,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.check_rounded,
+                                      color: Colors.white, size: 14),
+                                ),
+                              ),
+                          ],
+                        ),
+                      )
+                          .animate()
+                          .fadeIn(
+                          delay: ((i * 40) +
+                              (entry.key * 25))
+                              .ms)
+                          .slideX(begin: 0.08);
+                    }),
+                  ],
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -1298,7 +1489,7 @@ class _PeriodChip extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
           color: selected
               ? theme.colorScheme.primary
@@ -1390,7 +1581,7 @@ class _FilterSheetState extends State<_FilterSheet> {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius:
-            const BorderRadius.vertical(top: Radius.circular(28)),
+        const BorderRadius.vertical(top: Radius.circular(28)),
       ),
       padding: EdgeInsets.fromLTRB(
           24, 16, 24, MediaQuery.of(context).padding.bottom + 24),
@@ -1538,7 +1729,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                           color: isSelected
                               ? color.withOpacity(0.15)
                               : theme.colorScheme.primary
-                                  .withOpacity(0.06),
+                              .withOpacity(0.06),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
                             color: isSelected
@@ -1556,7 +1747,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                               color: isSelected
                                   ? color
                                   : theme.colorScheme.onSurface
-                                      .withOpacity(0.5),
+                                  .withOpacity(0.5),
                             ),
                             const SizedBox(width: 6),
                             Text(
@@ -1567,7 +1758,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                                 color: isSelected
                                     ? color
                                     : theme.colorScheme.onSurface
-                                        .withOpacity(0.6),
+                                    .withOpacity(0.6),
                               ),
                             ),
                           ],
@@ -1644,7 +1835,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                             color: isSelected
                                 ? catColor
                                 : theme.colorScheme.onSurface
-                                    .withOpacity(0.5),
+                                .withOpacity(0.5),
                           ),
                           const SizedBox(width: 6),
                           Text(
@@ -1655,7 +1846,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                               color: isSelected
                                   ? catColor
                                   : theme.colorScheme.onSurface
-                                      .withOpacity(0.6),
+                                  .withOpacity(0.6),
                             ),
                           ),
                         ],

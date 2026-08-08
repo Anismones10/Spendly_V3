@@ -157,23 +157,21 @@ class _IncomeScreenState extends State<IncomeScreen> {
                       (e) {
                         final isSelected = _selectedIds.contains(e.value.id);
                         return GestureDetector(
-                          onLongPress: () => _toggleSelection(e.value.id),
+                          onLongPress: _isSelecting
+                              ? () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (_) => AddIncomeScreen(
+                                          existing: e.value)))
+                              : () => _toggleSelection(e.value.id),
                           onTap: _isSelecting ? () => _toggleSelection(e.value.id) : null,
                           child: Stack(
                             children: [
-                              AnimatedContainer(
-                                duration: const Duration(milliseconds: 150),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: isSelected
-                                      ? Border.all(color: const Color(0xFF2ECC71), width: 2)
-                                      : null,
-                                  color: isSelected
-                                      ? const Color(0xFF2ECC71).withOpacity(0.07)
-                                      : Colors.transparent,
-                                ),
-                                child: _IncomeTile(income: e.value, symbol: symbol),
-                              ),
+                              _IncomeTile(
+                                  income: e.value,
+                                  symbol: symbol,
+                                  isSelecting: _isSelecting,
+                                  selected: isSelected),
                               if (isSelected)
                                 Positioned(
                                   top: 12, left: 12,
@@ -363,8 +361,17 @@ class _SummaryItem extends StatelessWidget {
 class _IncomeTile extends StatelessWidget {
   final IncomeModel income;
   final String symbol;
+  final bool isSelecting;
+  // Drawn by the card itself rather than by a wrapper, so the highlight lines
+  // up with the card instead of also covering its bottom margin.
+  final bool selected;
 
-  const _IncomeTile({required this.income, required this.symbol});
+  const _IncomeTile({
+    required this.income,
+    required this.symbol,
+    this.isSelecting = false,
+    this.selected = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -414,17 +421,25 @@ class _IncomeTile extends StatelessWidget {
             const Icon(Icons.delete_rounded, color: Colors.white, size: 28),
       ),
       child: GestureDetector(
-        onTap: () => Navigator.push(
+        onTap: isSelecting ? null : () => Navigator.push(
           context,
           MaterialPageRoute(
               builder: (_) => AddIncomeScreen(existing: income)),
         ),
-        child: Container(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            color: selected
+                ? Color.alphaBlend(
+                    const Color(0xFF2ECC71).withOpacity(0.07),
+                    isDark ? const Color(0xFF1E1E1E) : Colors.white)
+                : (isDark ? const Color(0xFF1E1E1E) : Colors.white),
             borderRadius: BorderRadius.circular(16),
+            border: selected
+                ? Border.all(color: const Color(0xFF2ECC71), width: 2)
+                : null,
             boxShadow: [
               BoxShadow(
                   color: Colors.black.withOpacity(0.05), blurRadius: 8)

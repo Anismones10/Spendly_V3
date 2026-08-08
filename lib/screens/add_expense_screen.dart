@@ -13,6 +13,7 @@ import '../utils/app_utils.dart';
 import '../utils/category_icons.dart';
 import '../utils/sound_helper.dart';
 import '../widgets/calculator_sheet.dart';
+import '../widgets/discard_changes_dialog.dart';
 import '../utils/notification_helper.dart';
 
 // ── Helper widgets live in part files under add_expense/ ────────────────────
@@ -168,34 +169,11 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
   Future<bool> _onWillPop() async {
     if (!_hasUnsavedChanges) return true;
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape:
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(children: [
-          Text('⚠️', style: TextStyle(fontSize: 22)),
-          SizedBox(width: 10),
-          Text('Discard Changes?',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
-        ]),
-        content: const Text(
-          'You have unsaved changes. Are you sure you want to go back?',
-          style: TextStyle(fontSize: 14, height: 1.5),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Keep Editing')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Discard'),
-          ),
-        ],
-      ),
+    return confirmDiscardChanges(
+      context,
+      label: 'expense',
+      isEditing: widget.existing != null,
     );
-    return result ?? false;
   }
 
   Future<void> _openCalculator() async {
@@ -1757,19 +1735,19 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                           ),
                           if (hasMultiple) ...[
                             const SizedBox(width: 12),
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                icon: const Icon(Icons.call_split_rounded,
-                                    size: 16),
-                                label: const Text('Split'),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: const Color(0xFF4A90E2),
-                                  side: const BorderSide(
-                                      color: Color(0xFF4A90E2)),
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: 14),
-                                ),
-                                onPressed: () async {
+                            Tooltip(
+                              message: 'Split across wallets',
+                              child: OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF4A90E2),
+                                side: const BorderSide(
+                                    color: Color(0xFF4A90E2)),
+                                padding: EdgeInsets.zero,
+                                minimumSize: const Size(52, 52),
+                                tapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              onPressed: () async {
                                   final name = _nameController.text.trim();
                                   final amount = double.tryParse(
                                       _amountController.text) ?? 0;
@@ -1801,7 +1779,9 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                                     remaining: primaryUse,
                                   );
                                 },
-                              ).animate().fadeIn(delay: 300.ms),
+                              child: const Icon(Icons.call_split_rounded,
+                                  size: 20),
+                            ).animate().fadeIn(delay: 300.ms),
                             ),
                           ],
                         ],

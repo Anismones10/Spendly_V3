@@ -7,6 +7,7 @@ import '../providers/settings_provider.dart';
 import '../providers/wallet_provider.dart';
 import '../utils/app_utils.dart';
 import '../utils/sound_helper.dart';
+import '../widgets/discard_changes_dialog.dart';
 
 const List<Map<String, dynamic>> _incomeSources = [
   {'key': 'salary',     'label': 'Salary',     'icon': Icons.work_rounded,           'color': 0xFF2ECC71},
@@ -92,6 +93,32 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
     _amountController.dispose();
     _noteController.dispose();
     super.dispose();
+  }
+
+  bool get _hasUnsavedChanges {
+    if (widget.existing != null) {
+      final e = widget.existing!;
+      return _nameController.text != e.name ||
+          _amountController.text != e.amount.toStringAsFixed(2) ||
+          _noteController.text != (e.note ?? '') ||
+          _selectedSource != e.source ||
+          _selectedWalletId != e.walletId ||
+          _selectedDate != e.date ||
+          _selectedTime?.hour != e.timeHour ||
+          _selectedTime?.minute != e.timeMinute;
+    }
+    return _nameController.text.isNotEmpty ||
+        _amountController.text.isNotEmpty ||
+        _noteController.text.isNotEmpty;
+  }
+
+  Future<bool> _onWillPop() async {
+    if (!_hasUnsavedChanges) return true;
+    return confirmDiscardChanges(
+      context,
+      label: 'income',
+      isEditing: widget.existing != null,
+    );
   }
 
   Future<void> _pickDate() async {
@@ -181,7 +208,14 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final shouldPop = await _onWillPop();
+        if (shouldPop && context.mounted) Navigator.of(context).pop();
+      },
+      child: Scaffold(
       backgroundColor: isDark
           ? const Color(0xFF121212)
           : const Color(0xFFF5F7FA),
@@ -192,6 +226,13 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
         title: Text(widget.existing != null
             ? 'Edit Income'
             : 'Add Income'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () async {
+            final shouldPop = await _onWillPop();
+            if (shouldPop && context.mounted) Navigator.of(context).pop();
+          },
+        ),
         actions: [
           TextButton(
             onPressed: _save,
@@ -680,6 +721,7 @@ class _AddIncomeScreenState extends State<AddIncomeScreen> {
             const SizedBox(height: 40),
           ],
         ),
+      ),
       ),
     );
   }

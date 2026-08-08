@@ -69,9 +69,21 @@ class DailySummaryCard extends StatelessWidget {
         ? projectedMonthly <= monthlyBudget
         : true;
 
+    // Average per day so far this month, and how today compares to it.
+    final avgPerDay = daysPassed > 0 ? monthlyTotal / daysPassed : 0.0;
+    final vsAvg = todayTotal - avgPerDay;
+
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final primary = theme.colorScheme.primary;
+
+    // Green when today is under the running average, red when over. With no
+    // spending yet there is nothing to compare, so stay neutral.
+    final avgColor = avgPerDay <= 0
+        ? primary
+        : vsAvg > 0
+            ? const Color(0xFFE57373)
+            : const Color(0xFF2ECC71);
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -274,6 +286,58 @@ class DailySummaryCard extends StatelessWidget {
               ],
             ),
           ],
+
+          // ── Average per day ─────────────────────────────────────────
+          const SizedBox(height: 12),
+          Divider(color: Colors.grey.withOpacity(0.12)),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              // Same 32×32 tile as the category row above, so the two read as
+              // one list instead of two unrelated styles.
+              Container(
+                width: 32, height: 32,
+                decoration: BoxDecoration(
+                  color: avgColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.speed_rounded, color: avgColor, size: 18),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Average per day',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: theme.colorScheme.onSurface.withOpacity(0.45),
+                        fontWeight: FontWeight.w500,
+                      )),
+                    Text(
+                      avgPerDay <= 0
+                          ? 'This month'
+                          : vsAvg > 0
+                              ? 'Today is ${AppUtils.formatAmount(vsAvg, symbol)} above'
+                              : vsAvg < 0
+                                  ? 'Today is ${AppUtils.formatAmount(-vsAvg, symbol)} below'
+                                  : 'Today is right on it',
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                AppUtils.formatAmount(avgPerDay, symbol),
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  color: avgColor,
+                ),
+              ),
+            ],
+          ),
 
           // ── Monthly pace ────────────────────────────────────────────
           if (monthlyBudget > 0) ...[

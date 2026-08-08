@@ -8,6 +8,7 @@ import '../providers/settings_provider.dart';
 import '../providers/wallet_provider.dart';
 import '../utils/app_utils.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/list_filter_bar.dart';
 import 'add_income_screen.dart';
 
 class IncomeScreen extends StatefulWidget {
@@ -21,6 +22,77 @@ class IncomeScreen extends StatefulWidget {
 class _IncomeScreenState extends State<IncomeScreen> {
   final Set<String> _selectedIds = {};
   bool get _isSelecting => _selectedIds.isNotEmpty;
+
+  final _searchController = TextEditingController();
+
+  // Defaults to the current month because that is what this screen showed
+  // before it had filters at all.
+  String _periodFilter = 'month';
+  String? _walletFilter;
+
+  @override
+  void initState() {
+    super.initState();
+    // The provider keeps filter state, so seed it to match the default chip.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context
+          .read<IncomeProvider>()
+          .setDateRange(rangeForPeriod(_periodFilter, DateTime.now()));
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _applyPeriodFilter(String period, IncomeProvider income) {
+    setState(() => _periodFilter = period);
+    income.setDateRange(rangeForPeriod(period, DateTime.now()));
+  }
+
+  Future<void> _pickCustomRange(
+      BuildContext context, IncomeProvider income) async {
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      // Income can be dated ahead, so the picker has to allow it.
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      initialDateRange: income.dateRange,
+    );
+    if (picked != null) {
+      setState(() => _periodFilter = 'custom');
+      income.setDateRange(picked);
+    }
+  }
+
+  List<IncomeModel> _applyWalletFilter(List<IncomeModel> list) {
+    if (_walletFilter == null) return list;
+    return list.where((e) => e.walletId == _walletFilter).toList();
+  }
+
+  void _showSortFilter(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _IncomeFilterSheet(
+        walletFilter: _walletFilter,
+        onWalletChanged: (id) => setState(() => _walletFilter = id),
+        onClearAll: () {
+          final income = context.read<IncomeProvider>();
+          income.clearFilters();
+          _searchController.clear();
+          setState(() {
+            _periodFilter = 'all';
+            _walletFilter = null;
+          });
+        },
+      ),
+    );
+  }
 
   void _toggleSelection(String id) {
     setState(() {
@@ -70,10 +142,18 @@ class _IncomeScreenState extends State<IncomeScreen> {
     final isDark = theme.brightness == Brightness.dark;
     final now = DateTime.now();
 
+    // The summary card always reports the current month, whatever the list is
+    // filtered to — it is a month-to-date figure, not a view of the list.
     final monthlyIncome = income.getTotalForMonth(now.year, now.month);
     final monthlyExpenses = expenses.getTotalForMonth(now.year, now.month);
     final balance = monthlyIncome - monthlyExpenses;
-    final monthIncomeList = income.getIncomeForMonth(now.year, now.month);
+
+    final incomeList = _applyWalletFilter(income.filteredIncome);
+    final listTotal = incomeList.fold(0.0, (s, e) => s + e.amount);
+    final hasActiveFilter = income.filterSource != null || _walletFilter != null;
+    final isNarrowed = hasActiveFilter ||
+        _periodFilter != 'all' ||
+        income.searchQuery.isNotEmpty;
 
     return Scaffold(
       backgroundColor:
@@ -90,7 +170,8 @@ class _IncomeScreenState extends State<IncomeScreen> {
                   style: const TextStyle(fontWeight: FontWeight.w700)),
               actions: [
                 TextButton(
-                  onPressed: () => _selectAll(monthIncomeList),
+                  // Selects what is on screen, not every entry ever recorded.
+                  onPressed: () => _selectAll(incomeList),
                   child: const Text('All'),
                 ),
                 IconButton(
@@ -121,80 +202,166 @@ class _IncomeScreenState extends State<IncomeScreen> {
                   ),
               ],
             ),
-      body: monthIncomeList.isEmpty
-          ? Column(
-              children: [
-                _buildSummaryCard(
-                    context, symbol, monthlyIncome, monthlyExpenses, balance, isDark, theme),
-                const Expanded(
-                  child: EmptyState(
-                    icon: Icons.account_balance_wallet_rounded,
-                    title: 'No Income Yet',
-                    subtitle:
-                        'Add your first income source using the + button below.',
-                  ),
+      body: Column(
+        children: [
+          // ── Filter bar ────────────────────────────────────────────────────
+          ListFilterBar(
+            searchController: _searchController,
+            searchHint: 'Search income...',
+            onSearchChanged: income.setSearch,
+            sortBy: income.sortBy,
+            onSortChanged: income.setSortBy,
+            periodFilter: _periodFilter,
+            onPeriodChanged: (p) => _applyPeriodFilter(p, income),
+            onPickCustomRange: () => _pickCustomRange(context, income),
+            customRangeLabel: income.dateRange == null
+                ? null
+                : '${AppUtils.formatShortDate(income.dateRange!.start)} – '
+                    '${AppUtils.formatShortDate(income.dateRange!.end)}',
+            onFilterTap: () => _showSortFilter(context),
+            hasActiveFilter: hasActiveFilter,
+            activeFilters: [
+              if (income.filterSource != null)
+                ActiveFilter(
+                  // Sources are stored as keys, so show the readable label.
+                  label: incomeSourceLabel(income.filterSource!),
+                  icon: incomeSourceIcon(income.filterSource!),
+                  color: incomeSourceColor(income.filterSource!),
+                  onRemove: () => income.setFilterSource(null),
                 ),
-              ],
-            )
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-              children: [
-                // Summary card
-                _buildSummaryCard(
-                    context, symbol, monthlyIncome, monthlyExpenses, balance, isDark, theme),
-                const SizedBox(height: 20),
+              if (_walletFilter != null)
+                () {
+                  final w =
+                      context.read<WalletProvider>().getById(_walletFilter!);
+                  return ActiveFilter(
+                    label: w?.name ?? 'Wallet',
+                    icon: w != null
+                        ? WalletProvider.resolveIcon(w.type)
+                        : Icons.account_balance_wallet_rounded,
+                    color: w != null ? Color(w.colorValue) : null,
+                    onRemove: () => setState(() => _walletFilter = null),
+                  );
+                }(),
+            ],
+          ),
+          const SizedBox(height: 8),
 
-                // Month label
-                Text(
-                  AppUtils.formatMonthYear(now),
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w700, fontSize: 16),
-                ),
-                const SizedBox(height: 12),
+          Expanded(
+            child: incomeList.isEmpty
+                ? Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: _buildSummaryCard(context, symbol, monthlyIncome,
+                            monthlyExpenses, balance, isDark, theme),
+                      ),
+                      Expanded(
+                        child: EmptyState(
+                          icon: Icons.account_balance_wallet_rounded,
+                          title: isNarrowed
+                              ? 'No Income Found'
+                              : 'No Income Yet',
+                          subtitle: isNarrowed
+                              ? 'Nothing matches the current filters.'
+                              : 'Add your first income source using the + '
+                                  'button below.',
+                        ),
+                      ),
+                    ],
+                  )
+                : ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                    children: [
+                      // Summary card
+                      _buildSummaryCard(context, symbol, monthlyIncome,
+                          monthlyExpenses, balance, isDark, theme),
+                      const SizedBox(height: 16),
 
-                // Income tiles
-                ...monthIncomeList.asMap().entries.map(
-                      (e) {
-                        final isSelected = _selectedIds.contains(e.value.id);
-                        return GestureDetector(
-                          onLongPress: _isSelecting
-                              ? () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                      builder: (_) => AddIncomeScreen(
-                                          existing: e.value)))
-                              : () => _toggleSelection(e.value.id),
-                          onTap: _isSelecting ? () => _toggleSelection(e.value.id) : null,
-                          child: Stack(
-                            children: [
-                              _IncomeTile(
-                                  income: e.value,
-                                  symbol: symbol,
-                                  isSelecting: _isSelecting,
-                                  selected: isSelected),
-                              if (isSelected)
-                                Positioned(
-                                  top: 12, left: 12,
-                                  child: Container(
-                                    width: 22, height: 22,
-                                    decoration: const BoxDecoration(
-                                      color: Color(0xFF2ECC71),
-                                      shape: BoxShape.circle,
+                      // What the list is currently showing. Replaces the old
+                      // month heading, which lied once a filter was applied.
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 9),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2ECC71).withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '${incomeList.length} '
+                              'entr${incomeList.length == 1 ? 'y' : 'ies'}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: theme.colorScheme.onSurface
+                                    .withOpacity(0.6),
+                              ),
+                            ),
+                            Text(
+                              'Total: ${AppUtils.formatAmount(listTotal, symbol)}',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF2ECC71),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Income tiles
+                      ...incomeList.asMap().entries.map(
+                        (e) {
+                          final isSelected =
+                              _selectedIds.contains(e.value.id);
+                          return GestureDetector(
+                            onLongPress: _isSelecting
+                                ? () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                        builder: (_) => AddIncomeScreen(
+                                            existing: e.value)))
+                                : () => _toggleSelection(e.value.id),
+                            onTap: _isSelecting
+                                ? () => _toggleSelection(e.value.id)
+                                : null,
+                            child: Stack(
+                              children: [
+                                _IncomeTile(
+                                    income: e.value,
+                                    symbol: symbol,
+                                    isSelecting: _isSelecting,
+                                    selected: isSelected),
+                                if (isSelected)
+                                  Positioned(
+                                    top: 12,
+                                    left: 12,
+                                    child: Container(
+                                      width: 22,
+                                      height: 22,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF2ECC71),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(Icons.check_rounded,
+                                          color: Colors.white, size: 14),
                                     ),
-                                    child: const Icon(Icons.check_rounded,
-                                        color: Colors.white, size: 14),
                                   ),
-                                ),
-                            ],
-                          ),
-                        )
-                            .animate()
-                            .fadeIn(delay: (e.key * 50).ms)
-                            .slideX(begin: 0.08);
-                      },
-                    ),
-              ],
-            ),
+                              ],
+                            ),
+                          )
+                              .animate()
+                              .fadeIn(delay: (e.key * 50).ms)
+                              .slideX(begin: 0.08);
+                        },
+                      ),
+                    ],
+                  ),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => Navigator.push(
           context,
@@ -245,6 +412,27 @@ class _IncomeScreenState extends State<IncomeScreen> {
       ),
       child: Column(
         children: [
+          // Names the month explicitly. The list below can be filtered to any
+          // range, so without this the card looks like it belongs to whatever
+          // the list is showing.
+          Row(
+            children: [
+              Icon(Icons.calendar_today_rounded,
+                  size: 12, color: Colors.white.withOpacity(0.8)),
+              const SizedBox(width: 6),
+              Text(
+                AppUtils.formatMonthYear(DateTime.now()),
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.85),
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
           // Income vs Expenses row
           Row(
             children: [
@@ -548,6 +736,257 @@ class _IncomeTile extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The Income counterpart to the Expenses filter sheet.
+///
+/// Holds the filters that need a list to choose from — source and wallet.
+/// Search, period and sort stay in [ListFilterBar] because they get changed
+/// far more often than these two.
+class _IncomeFilterSheet extends StatefulWidget {
+  final String? walletFilter;
+  final ValueChanged<String?> onWalletChanged;
+  final VoidCallback onClearAll;
+
+  const _IncomeFilterSheet({
+    required this.walletFilter,
+    required this.onWalletChanged,
+    required this.onClearAll,
+  });
+
+  @override
+  State<_IncomeFilterSheet> createState() => _IncomeFilterSheetState();
+}
+
+class _IncomeFilterSheetState extends State<_IncomeFilterSheet> {
+  // Edited locally and committed on Apply, so backing out of the sheet leaves
+  // the list exactly as it was.
+  late String? _source;
+  late String? _wallet;
+
+  @override
+  void initState() {
+    super.initState();
+    _source = context.read<IncomeProvider>().filterSource;
+    _wallet = widget.walletFilter;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final wallets = context.read<WalletProvider>().wallets;
+
+    // Only the sources actually in use — offering the full list would mean
+    // chips that can only ever return nothing.
+    final sources = context.read<IncomeProvider>().allSources;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+          24, 16, 24, MediaQuery.of(context).padding.bottom + 24),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Handle
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Filter Income',
+                    style: theme.textTheme.titleLarge
+                        ?.copyWith(fontWeight: FontWeight.w700)),
+                TextButton(
+                  onPressed: () {
+                    widget.onClearAll();
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Clear All'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // ── Wallet ───────────────────────────────────────────────────────
+            if (wallets.isNotEmpty) ...[
+              Text('Wallet',
+                  style: theme.textTheme.labelLarge
+                      ?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _SheetChip(
+                    label: 'All',
+                    selected: _wallet == null,
+                    onTap: () => setState(() => _wallet = null),
+                  ),
+                  ...wallets.map((wallet) => _SheetChip(
+                        label: wallet.name,
+                        icon: WalletProvider.resolveIcon(wallet.type),
+                        accent: Color(wallet.colorValue),
+                        selected: _wallet == wallet.id,
+                        onTap: () => setState(() => _wallet = wallet.id),
+                      )),
+                ],
+              ),
+              const SizedBox(height: 20),
+            ],
+
+            // ── Source ───────────────────────────────────────────────────────
+            if (sources.isNotEmpty) ...[
+              Text('Source',
+                  style: theme.textTheme.labelLarge
+                      ?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _SheetChip(
+                    label: 'All',
+                    selected: _source == null,
+                    onTap: () => setState(() => _source = null),
+                  ),
+                  ...sources.map((key) => _SheetChip(
+                        label: incomeSourceLabel(key),
+                        icon: incomeSourceIcon(key),
+                        accent: incomeSourceColor(key),
+                        selected: _source == key,
+                        onTap: () => setState(() => _source = key),
+                      )),
+                ],
+              ),
+              const SizedBox(height: 20),
+            ],
+
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  context.read<IncomeProvider>().setFilterSource(_source);
+                  widget.onWalletChanged(_wallet);
+                  Navigator.pop(context);
+                },
+                child: const Text('Apply'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A selectable chip inside [_IncomeFilterSheet].
+///
+/// Matches the Expenses sheet: plain primary fill for the "All" chip, and a
+/// tinted outline in the item's own colour for everything else.
+class _SheetChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final IconData? icon;
+
+  /// The item's own colour. Null falls back to the theme, which is what the
+  /// "All" chip uses.
+  final Color? accent;
+
+  const _SheetChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.icon,
+    this.accent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
+
+    if (accent == null) {
+      return GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          decoration: BoxDecoration(
+            color: selected ? primary : primary.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: selected ? Colors.white : primary,
+            ),
+          ),
+        ),
+      );
+    }
+
+    final color = accent!;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(
+          color: selected
+              ? color.withOpacity(0.15)
+              : primary.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? color : Colors.transparent,
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon,
+                  size: 14,
+                  color: selected
+                      ? color
+                      : theme.colorScheme.onSurface.withOpacity(0.5)),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: selected
+                    ? color
+                    : theme.colorScheme.onSurface.withOpacity(0.6),
+              ),
+            ),
+          ],
         ),
       ),
     );

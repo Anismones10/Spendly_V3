@@ -760,6 +760,33 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     final now = DateTime.now();
     final baseName = _nameController.text.trim();
     final baseNote = _noteController.text.trim();
+
+    // One wallet covering the whole amount is not a split. Writing it as one
+    // anyway left the list showing the split badge above a single wallet tag.
+    if (confirmed.length == 1) {
+      final only = confirmed.first;
+      expenseProvider.addExpense(ExpenseModel(
+        id: AppUtils.generateId(),
+        name: baseName,
+        amount: only['amount'] as double,
+        categoryId: _selectedCategoryId ?? '',
+        date: _selectedDate,
+        note: baseNote.isEmpty ? null : baseNote,
+        isRecurring: false,
+        recurringType: null,
+        walletId: only['walletId'] as String,
+        timeHour: _selectedTime?.hour ?? now.hour,
+        timeMinute: _selectedTime?.minute ?? now.minute,
+      ));
+      if (mounted) {
+        await SoundHelper.playChaChing();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) Navigator.pop(context);
+        });
+      }
+      return;
+    }
+
     final splitGroupId = AppUtils.generateId(); // shared ID linking split parts
     final total = confirmed.length;
 

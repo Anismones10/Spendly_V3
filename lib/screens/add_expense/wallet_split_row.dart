@@ -12,6 +12,16 @@ class _WalletSplitRow extends StatefulWidget {
   final VoidCallback? onToggle;
   final void Function(double)? onChanged;
 
+  /// The most this row may be assigned — usually its own balance, but less when
+  /// the split has only part of the total left to cover. Defaults to
+  /// [available] for a row that answers to nothing but its own wallet.
+  ///
+  /// The dialog clamps again on its side, but the limit has to be known here
+  /// too: the field only corrects itself when this row rejects the number, so a
+  /// cap applied solely by the parent left the field showing an amount the
+  /// split had already refused.
+  final double? maxAssignable;
+
   const _WalletSplitRow({
     required this.name,
     required this.icon,
@@ -22,6 +32,7 @@ class _WalletSplitRow extends StatefulWidget {
     this.isEnabled = true,
     this.onToggle,
     this.onChanged,
+    this.maxAssignable,
   });
 
   @override
@@ -79,6 +90,12 @@ class _WalletSplitRowState extends State<_WalletSplitRow> {
   @override
   Widget build(BuildContext context) {
     final active = widget.isFixed || widget.isEnabled;
+    // Nothing left for this wallet to pay: the box still answers a tap so the
+    // dialog can say why, but it should not look like one simply waiting to be
+    // ticked.
+    final noRoom = !widget.isEnabled &&
+        widget.maxAssignable != null &&
+        widget.maxAssignable! <= 0.001;
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.all(10),
@@ -109,13 +126,16 @@ class _WalletSplitRowState extends State<_WalletSplitRow> {
                 border: Border.all(
                   color: widget.isEnabled
                       ? const Color(0xFF4A90E2)
-                      : Colors.grey.withOpacity(0.4),
+                      : Colors.grey.withOpacity(noRoom ? 0.25 : 0.4),
                   width: 1.5,
                 ),
               ),
               child: widget.isEnabled
                   ? const Icon(Icons.check, color: Colors.white, size: 14)
-                  : null,
+                  : noRoom
+                      ? Icon(Icons.lock_outline_rounded,
+                          size: 13, color: Colors.grey.withOpacity(0.6))
+                      : null,
             ),
           ),
         Icon(widget.icon,
@@ -175,14 +195,20 @@ class _WalletSplitRowState extends State<_WalletSplitRow> {
               onChanged: (v) {
                 final val = double.tryParse(v) ?? 0;
                 // Cap at available balance — can't use more than wallet has
-                final capped = val > widget.available
+                final availCap = val > widget.available
                     ? widget.available
                     : val;
-                if (capped != val) {
+                // And at what's still needed of the total, when the parent
+                // told us a tighter limit than the balance
+                final cap =
+                    availCap > (widget.maxAssignable ?? availCap)
+                        ? (widget.maxAssignable ?? availCap)
+                        : availCap;
+                if (cap != val) {
                   // Correct the field if over limit
-                  _setCtrlValue(capped);
+                  _setCtrlValue(cap);
                 }
-                widget.onChanged?.call(capped);
+                widget.onChanged?.call(cap);
               },
             ),
           ),

@@ -27,6 +27,11 @@ class _MultiWalletSplitDialogState extends State<_MultiWalletSplitDialog> {
   late Map<String, double> _selected;
   late double _primaryAmount;
 
+  /// Set when a wallet was ticked while the total was already covered, so the
+  /// dialog can say why nothing happened instead of adding a wallet that pays
+  /// zero and silently drops out on save.
+  bool _showNoRoomHint = false;
+
   @override
   void initState() {
     super.initState();
@@ -43,6 +48,26 @@ class _MultiWalletSplitDialogState extends State<_MultiWalletSplitDialog> {
   bool get _fullyFunded =>
       _coveredSoFar >= widget.totalNeeded - 0.001 &&
           _coveredSoFar <= widget.totalNeeded + 0.001;
+
+  /// The most the primary wallet may take: whatever the expense still needs
+  /// once the other wallets have taken their share, never more than it holds.
+  ///
+  /// Every row is capped this way, so the assigned amounts can never add up
+  /// past the total. One wallet paying the whole amount leaves the others with
+  /// nothing to give, rather than letting two wallets each cover it.
+  double get _primaryCap =>
+      (widget.totalNeeded - _selected.values.fold(0.0, (s, v) => s + v))
+          .clamp(0.0, widget.primaryAmount);
+
+  /// The same cap for one of the other wallets, ignoring what that wallet
+  /// itself currently holds so editing its own field is not capped by it.
+  double _capFor(String walletId, double available) {
+    final elsewhere = _primaryAmount +
+        _selected.entries
+            .where((e) => e.key != walletId)
+            .fold(0.0, (s, e) => s + e.value);
+    return (widget.totalNeeded - elsewhere).clamp(0.0, available);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -117,9 +142,11 @@ class _MultiWalletSplitDialogState extends State<_MultiWalletSplitDialog> {
                 symbol: widget.symbol,
                 isFixed: false,
                 isEnabled: true,
+                maxAssignable: _primaryCap,
                 onChanged: (val) {
                   setState(() {
-                    _primaryAmount = val.clamp(0, widget.primaryAmount);
+                    _showNoRoomHint = false;
+                    _primaryAmount = val.clamp(0.0, _primaryCap);
                   });
                 },
               ),
@@ -129,6 +156,7 @@ class _MultiWalletSplitDialogState extends State<_MultiWalletSplitDialog> {
               ...widget.otherWallets.map((e) {
                 final isUsed = _selected.containsKey(e.wallet.id);
                 final assigned = _selected[e.wallet.id] ?? 0.0;
+                final cap = _capFor(e.wallet.id, e.available);
                 return _WalletSplitRow(
                   name: e.wallet.name,
                   icon: WalletProvider.resolveIcon(e.wallet.type),
@@ -137,28 +165,34 @@ class _MultiWalletSplitDialogState extends State<_MultiWalletSplitDialog> {
                   symbol: widget.symbol,
                   isFixed: false,
                   isEnabled: isUsed,
+                  maxAssignable: cap,
                   onToggle: () {
                     setState(() {
                       if (isUsed) {
+                        _showNoRoomHint = false;
                         _selected.remove(e.wallet.id);
-                      } else {
-                        final need = _stillNeeded;
-                        _selected[e.wallet.id] =
-                        need > e.available ? e.available : need;
+                        return;
                       }
+                      final need = _stillNeeded;
+                      // Ticking a wallet with nothing left to pay would show it
+                      // as part of the split and then drop it on save, leaving
+                      // an expense marked split but tagged with one wallet.
+                      if (need <= 0.001) {
+                        _showNoRoomHint = true;
+                        return;
+                      }
+                      _showNoRoomHint = false;
+                      _selected[e.wallet.id] =
+                      need > e.available ? e.available : need;
                     });
                   },
                   onChanged: (val) {
                     setState(() {
-                      // Cap at available AND at what's still needed from other wallets
-                      final otherSelected = _selected.entries
-                          .where((entry) => entry.key != e.wallet.id)
-                          .fold(0.0, (s, entry) => s + entry.value);
-                      final maxAllowed = (widget.totalNeeded -
-                          _primaryAmount -
-                          otherSelected)
-                          .clamp(0.0, e.available);
-                      _selected[e.wallet.id] = val.clamp(0, maxAllowed);
+                      _showNoRoomHint = false;
+                      // Capped at this wallet's balance and at what the others
+                      // have not already taken, so the split cannot exceed the
+                      // total.
+                      _selected[e.wallet.id] = val.clamp(0.0, cap);
                     });
                   },
                 );
@@ -166,7 +200,27 @@ class _MultiWalletSplitDialogState extends State<_MultiWalletSplitDialog> {
 
               const SizedBox(height: 10),
 
-              // Status indicator
+              if (_showNoRoomHint)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF9800).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(children: [
+                    const Icon(Icons.info_outline_rounded,
+                        color: Color(0xFFFF9800), size: 16),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Lower the primary wallet’s amount first — the total is already covered',
+                        style: TextStyle(
+                            fontSize: 12, color: Color(0xFFFF9800)),
+                      ),
+                    ),
+                  ]),
+                ),
               if (!_fullyFunded)
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -200,15 +254,10 @@ class _MultiWalletSplitDialogState extends State<_MultiWalletSplitDialog> {
                     const Icon(Icons.check_circle_rounded,
                         color: Color(0xFF2ECC71), size: 16),
                     const SizedBox(width: 8),
-                    Text(
-                      _coveredSoFar > widget.totalNeeded + 0.001
-                          ? 'Over by ${AppUtils.formatAmount(_coveredSoFar - widget.totalNeeded, widget.symbol)} — adjust amounts'
-                          : 'Fully covered!',
+                    const Text(
+                      'Fully covered!',
                       style: TextStyle(
-                          fontSize: 12,
-                          color: _coveredSoFar > widget.totalNeeded + 0.001
-                              ? const Color(0xFFFF9800)
-                              : const Color(0xFF2ECC71)),
+                          fontSize: 12, color: Color(0xFF2ECC71)),
                     ),
                   ]),
                 ),
@@ -224,11 +273,14 @@ class _MultiWalletSplitDialogState extends State<_MultiWalletSplitDialog> {
         FilledButton(
           onPressed: _fullyFunded
               ? () {
+            // A wallet assigned nothing is not part of the split — kept in, it
+            // would save as a 0.00 expense and still tag the list entry.
             final result = <Map<String, dynamic>>[
-              {
-                'walletId': widget.primaryWallet?.id ?? '',
-                'amount': _primaryAmount,
-              },
+              if (_primaryAmount > 0.001)
+                {
+                  'walletId': widget.primaryWallet?.id ?? '',
+                  'amount': _primaryAmount,
+                },
               ..._selected.entries
                   .where((e) => e.value > 0.001)
                   .map((e) =>

@@ -121,8 +121,22 @@ class IncomeProvider extends ChangeNotifier {
         .fold(0, (sum, e) => sum + e.amount);
   }
 
-  Map<String, double> getSourceTotals(int year, int month) {
+  /// Day of month → total earned that day, for the days that had any.
+  ///
+  /// Mirrors ExpenseProvider.getDailyTotals so the two Overview tabs can find
+  /// their best and quietest days the same way. Days with nothing earned are
+  /// absent rather than zero — the callers count them as the difference from
+  /// the month's length.
+  Map<int, double> getDailyTotals(int year, int month) {
     final income = getIncomeForMonth(year, month);
+    final Map<int, double> totals = {};
+    for (final e in income) {
+      totals[e.date.day] = (totals[e.date.day] ?? 0) + e.amount;
+    }
+    return totals;
+  }
+
+  Map<String, double> getSourceTotals(int year, int month) {    final income = getIncomeForMonth(year, month);
     final Map<String, double> totals = {};
     for (final e in income) {
       totals[e.source] = (totals[e.source] ?? 0) + e.amount;

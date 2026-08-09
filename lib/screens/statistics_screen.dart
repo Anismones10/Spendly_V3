@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:intl/intl.dart';
 import '../providers/expense_provider.dart';
 import '../providers/category_provider.dart';
 import '../providers/settings_provider.dart';
@@ -234,6 +235,14 @@ class _OverviewTabState extends State<_OverviewTab> {
     // Average daily spend
     final daysWithExpense = dailyTotals.values.where((v) => v > 0).length;
     final avgDaily = daysWithExpense > 0 ? thisMonth / daysWithExpense : 0.0;
+
+    // Biggest and smallest spending day. Only the days that have happened
+    // count as no-spend — the rest of the current month hasn't had its chance.
+    final daysInSelMonth = DateTime(selYear, selMonth + 1, 0).day;
+    final dayExtremes = _DayExtremes.from(
+      dailyTotals,
+      isCurrentMonth ? now.day : daysInSelMonth,
+    );
 
     // Top 3 categories this month
     final catTotals = expenses.getCategoryTotals(selYear, selMonth);
@@ -503,6 +512,31 @@ class _OverviewTabState extends State<_OverviewTab> {
               ],
             ),
           ).animate().fadeIn(delay: 360.ms),
+          const SizedBox(height: 16),
+        ],
+
+        // ── Biggest and smallest day ───────────────────────────────────
+        // Above the chart it summarises: the bars show the shape of the month,
+        // these name the two days worth remembering out of it.
+        if (!dayExtremes.isEmpty) ...[
+          const Text('Days to Note',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+          const SizedBox(height: 12),
+          _DayExtremesCards(
+            extremes: dayExtremes,
+            month: _selectedMonth,
+            symbol: symbol,
+            isDark: isDark,
+            highLabel: 'Spent most',
+            lowLabel: 'Spent least',
+            // Red for the big day, green for the small one: on this tab less
+            // spending is the good outcome.
+            highColor: const Color(0xFFE57373),
+            lowColor: const Color(0xFF2ECC71),
+            highIcon: Icons.trending_up_rounded,
+            lowIcon: Icons.trending_down_rounded,
+            emptyLabel: 'no-spend days',
+          ).animate().fadeIn(delay: 320.ms, duration: 400.ms).slideY(begin: 0.2),
           const SizedBox(height: 16),
         ],
 
@@ -1392,6 +1426,13 @@ class _IncomeOverviewTab extends StatelessWidget {
     });
     final safeMax = maxY == 0 ? 100.0 : maxY * 1.25;
 
+    // Best and leanest earning day of this month. This tab has no month
+    // navigation, so it always reads the current one.
+    final dayExtremes = _DayExtremes.from(
+      income.getDailyTotals(now.year, now.month),
+      now.day,
+    );
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -1483,6 +1524,29 @@ class _IncomeOverviewTab extends StatelessWidget {
         ).animate().fadeIn(delay: 100.ms),
 
         const SizedBox(height: 20),
+
+        // ── Biggest and smallest earning day ──────────────────────────
+        if (!dayExtremes.isEmpty) ...[
+          const Text('Days to Note',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+          const SizedBox(height: 12),
+          _DayExtremesCards(
+            extremes: dayExtremes,
+            month: DateTime(now.year, now.month),
+            symbol: symbol,
+            isDark: isDark,
+            highLabel: 'Earned most',
+            lowLabel: 'Earned least',
+            // Reversed against the Expense tab: here the big day is the good
+            // one, so it takes the green.
+            highColor: const Color(0xFF2ECC71),
+            lowColor: const Color(0xFF78909C),
+            highIcon: Icons.trending_up_rounded,
+            lowIcon: Icons.trending_down_rounded,
+            emptyLabel: 'days without income',
+          ).animate().fadeIn(delay: 140.ms, duration: 400.ms).slideY(begin: 0.2),
+          const SizedBox(height: 20),
+        ],
 
         // Income vs Expense bar chart
         Container(
@@ -2080,6 +2144,267 @@ class _IncomeTrendTab extends StatelessWidget {
 }
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
+
+/// The busiest and quietest day of a month, plus the days that saw nothing.
+///
+/// Built from the same day→total map the Daily chart already uses, so this is a
+/// written summary of the bars beside it rather than a second source of truth.
+///
+/// The quiet day is the smallest day that had *any* activity. Counting empty
+/// days would put it at 0.00 every month, which says nothing — those are worth
+/// more as their own count, and for spending a run of them is the good news.
+class _DayExtremes {
+  final int? highDay;
+  final double highAmount;
+  final int? lowDay;
+  final double lowAmount;
+
+  /// Days in the range with no entry at all.
+  final int emptyDays;
+
+  const _DayExtremes({
+    required this.highDay,
+    required this.highAmount,
+    required this.lowDay,
+    required this.lowAmount,
+    required this.emptyDays,
+  });
+
+  /// The month held nothing, so the caller skips the row entirely.
+  bool get isEmpty => highDay == null;
+
+  /// One day carries the whole month — naming it as both high and low reads as
+  /// a bug rather than as a quiet month.
+  bool get isSingleDay => highDay != null && highDay == lowDay;
+
+  /// [daysElapsed] is how much of the month counts towards [emptyDays]: the
+  /// whole month once it is over, but only up to today while it is running —
+  /// the rest of this month hasn't had the chance to be a no-spend day yet.
+  factory _DayExtremes.from(Map<int, double> dailyTotals, int daysElapsed) {
+    // A day can sit in the map with a zero total once its entries are deleted,
+    // and it isn't a day the user did anything on.
+    final active = dailyTotals.entries.where((e) => e.value > 0.001).toList();
+    if (active.isEmpty) {
+      return _DayExtremes(
+        highDay: null,
+        highAmount: 0,
+        lowDay: null,
+        lowAmount: 0,
+        emptyDays: daysElapsed,
+      );
+    }
+
+    var high = active.first;
+    var low = active.first;
+    for (final e in active) {
+      // Strict compares so a tie keeps the earlier day rather than the last
+      // one the map happened to yield.
+      if (e.value > high.value) high = e;
+      if (e.value < low.value) low = e;
+    }
+
+    // A day dated ahead of today can be active, which would otherwise push the
+    // count negative on the current month.
+    final empty = daysElapsed - active.length;
+
+    return _DayExtremes(
+      highDay: high.key,
+      highAmount: high.value,
+      lowDay: low.key,
+      lowAmount: low.value,
+      emptyDays: empty < 0 ? 0 : empty,
+    );
+  }
+}
+
+/// The high/low day pair, as two cards side by side.
+///
+/// The colours come from the caller: on Expense a big day is the one to watch,
+/// on Income it is the one to celebrate, so the widget does not assume that
+/// "highest" means red.
+class _DayExtremesCards extends StatelessWidget {
+  final _DayExtremes extremes;
+  final DateTime month;
+  final String symbol;
+  final bool isDark;
+  final String highLabel;
+  final String lowLabel;
+  final Color highColor;
+  final Color lowColor;
+  final IconData highIcon;
+  final IconData lowIcon;
+
+  /// What to call a day with nothing on it, e.g. 'no-spend days'.
+  final String emptyLabel;
+
+  const _DayExtremesCards({
+    required this.extremes,
+    required this.month,
+    required this.symbol,
+    required this.isDark,
+    required this.highLabel,
+    required this.lowLabel,
+    required this.highColor,
+    required this.lowColor,
+    required this.highIcon,
+    required this.lowIcon,
+    required this.emptyLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final e = extremes;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: _DayCard(
+                  label: highLabel,
+                  day: e.highDay!,
+                  month: month,
+                  amount: e.highAmount,
+                  symbol: symbol,
+                  color: highColor,
+                  icon: highIcon,
+                  isDark: isDark,
+                ),
+              ),
+              if (!e.isSingleDay) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _DayCard(
+                    label: lowLabel,
+                    day: e.lowDay!,
+                    month: month,
+                    amount: e.lowAmount,
+                    symbol: symbol,
+                    color: lowColor,
+                    icon: lowIcon,
+                    isDark: isDark,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        if (e.emptyDays > 0) ...[
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.only(left: 4),
+            child: Text(
+              '${e.emptyDays} $emptyLabel this month',
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: theme.colorScheme.onSurface.withOpacity(0.45),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _DayCard extends StatelessWidget {
+  final String label;
+  final int day;
+  final DateTime month;
+  final double amount;
+  final String symbol;
+  final Color color;
+  final IconData icon;
+  final bool isDark;
+
+  const _DayCard({
+    required this.label,
+    required this.day,
+    required this.month,
+    required this.amount,
+    required this.symbol,
+    required this.color,
+    required this.icon,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final date = DateTime(month.year, month.month, day);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.15)),
+        boxShadow: [
+          BoxShadow(
+              color: color.withOpacity(0.12),
+              blurRadius: 12,
+              offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 18),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.onSurface.withOpacity(0.5),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // The weekday is the point of the card: "the 14th" means little on
+          // its own, "Saturday the 14th" is the pattern worth noticing.
+          Text(
+            DateFormat('EEEE').format(date),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+                fontSize: 14, fontWeight: FontWeight.w800, color: color),
+          ),
+          Text(
+            AppUtils.formatShortDate(date),
+            style: TextStyle(
+              fontSize: 11,
+              color: theme.colorScheme.onSurface.withOpacity(0.45),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            AppUtils.formatAmount(amount, symbol),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w800,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _IncomeBar {
   final String month;

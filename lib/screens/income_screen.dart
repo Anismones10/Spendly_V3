@@ -179,6 +179,31 @@ class _IncomeScreenState extends State<IncomeScreen> {
                   isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
               title: const Text('Income'),
               actions: [
+                // ── Filter button ──────────────────────────────────────────
+                // Beside More, matching the Expenses tab. The dot marks
+                // filters that are on but not visible from here.
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.tune_rounded),
+                      onPressed: () => _showSortFilter(context),
+                      tooltip: 'Filters',
+                    ),
+                    if (hasActiveFilter || _periodFilter != 'all')
+                      Positioned(
+                        right: 8,
+                        top: 8,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                              color: theme.colorScheme.primary,
+                              shape: BoxShape.circle),
+                        ),
+                      ),
+                  ],
+                ),
                 if (widget.onMoreTap != null)
                   GestureDetector(
                     onTap: widget.onMoreTap,
@@ -204,8 +229,6 @@ class _IncomeScreenState extends State<IncomeScreen> {
             onSearchChanged: income.setSearch,
             sortBy: income.sortBy,
             onSortChanged: income.setSortBy,
-            onFilterTap: () => _showSortFilter(context),
-            hasActiveFilter: hasActiveFilter || _periodFilter != 'all',
             activeFilters: [
               // Period leads: it is the filter that changes the totals most, so
               // it should be the first thing read back from the sheet.
@@ -739,7 +762,7 @@ class _IncomeTile extends StatelessWidget {
 /// The Income counterpart to the Expenses filter sheet.
 ///
 /// Holds period, source and wallet. Search and sort stay in [ListFilterBar]
-/// because they get changed far more often than these.
+/// because those get changed far more often than these.
 class _IncomeFilterSheet extends StatefulWidget {
   final String? walletFilter;
   final ValueChanged<String?> onWalletChanged;

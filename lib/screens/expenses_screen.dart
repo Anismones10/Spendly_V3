@@ -372,13 +372,30 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
            text: 'Tap an expense to open and edit it.'),
           (icon: Icons.swipe_left_rounded,
            text: 'Swipe left on an expense to delete it.'),
+        ],
+      ),
+      (
+        title: 'Why an amount turns red',
+        icon: Icons.arrow_upward_rounded,
+        color: const Color(0xFFE57373),
+        tips: [
+          (icon: Icons.straighten_rounded,
+           text: 'Every expense is measured against a daily limit. Both '
+                 'colours mean the single expense went over it — not your '
+                 'whole day.'),
           (icon: Icons.arrow_upward_rounded,
-           text: 'An amount shown in orange with an up arrow is above your '
-                 'daily average. Red means more than double it, and outlines '
-                 'the card.'),
+           text: 'Orange with an up arrow: above the limit, but not more '
+                 'than double it.'),
+          (icon: Icons.crop_square_rounded,
+           text: 'Red: more than double the limit. Only red also outlines '
+                 'the card, so the biggest ones stand out at a glance.'),
+          (icon: Icons.calculate_rounded,
+           text: 'On Auto the limit is this month\'s spending divided by its '
+                 'days, so it moves as you spend.'),
           (icon: Icons.tune_rounded,
-           text: 'Set your own daily limit from the Calendar tab to change '
-                 'when an expense counts as high.'),
+           text: 'Set your own limit from the Calendar tab to decide exactly '
+                 'when an expense counts as high. The Calendar dots use the '
+                 'same three colours.'),
         ],
       ),
       (
@@ -405,7 +422,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           (icon: Icons.repeat_rounded,
            text: 'An orange loop badge marks a recurring expense.'),
           (icon: Icons.tune_rounded,
-           text: 'Use the loop button in the top bar to manage all your '
+           text: 'Use the loop button beside this one to manage all your '
                  'recurring expenses.'),
         ],
       ),
@@ -435,12 +452,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           (icon: Icons.search_rounded,
            text: 'Search by name to filter the list as you type.'),
           (icon: Icons.swap_vert_rounded,
-           text: 'The pill next to the search box sets the order — newest, '
-                 'oldest, highest or lowest.'),
+           text: 'The pill at the end of the search row sets the order — '
+                 'newest, oldest, highest or lowest.'),
           (icon: Icons.tune_rounded,
-           text: 'The tune button holds the period, wallet and category '
-                 'filters. A dot on it means one is active, and each appears '
-                 'as a chip you can tap to remove.'),
+           text: 'The tune button in the top bar holds the period, wallet and '
+                 'category filters. A dot on it means one is active, and each '
+                 'appears as a chip you can tap to remove.'),
           (icon: Icons.calendar_today_rounded,
            text: 'Periods cover Today, This Week, This Month, or a custom '
                  'range you pick yourself.'),
@@ -978,6 +995,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         expenses.searchQuery.isNotEmpty ||
         _walletFilter != null;
 
+    // Search is excluded: it is visible in its own box, so flagging it on the
+    // filter button would mark a filter the user can already see.
+    final hasSheetFilter = _periodFilter != 'all' ||
+        expenses.filterCategory != null ||
+        _walletFilter != null;
+
     return Scaffold(
       backgroundColor:
       isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
@@ -1011,39 +1034,62 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           : AppBar(
         backgroundColor:
         isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
-        // Tinted red so the tips are findable — a bare outline icon in the
-        // corner reads as decoration and went unnoticed.
-        leading: Center(
-          child: GestureDetector(
-            onTap: () => _showHints(context),
-            child: Container(
-              margin: const EdgeInsets.only(left: 12),
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE53935).withOpacity(0.12),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Icon(Icons.help_outline_rounded,
-                  color: Color(0xFFE53935), size: 20),
+        // Tips and Recurring sit together on the left: both explain or manage
+        // the list rather than change what it shows. 96 is exactly the two
+        // buttons; the rest is the inset that keeps Tips off the screen edge
+        // plus a little air before the title.
+        leadingWidth: 108,
+        leading: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(width: 6),
+            IconButton(
+              icon: const Icon(Icons.help_outline_rounded),
+              onPressed: () => _showHints(context),
+              tooltip: 'Tips',
             ),
-          ),
+            IconButton(
+              icon: const Icon(Icons.repeat_rounded),
+              onPressed: () => _showRecurringManager(context, expenses),
+              tooltip: 'Manage Recurring',
+            ),
+          ],
         ),
         title: const Text('Expenses'),
         actions: [
-          // ── Recurring button ───────────────────────────────────────
-          IconButton(
-            icon: const Icon(Icons.repeat_rounded),
-            onPressed: () => _showRecurringManager(context, expenses),
-            tooltip: 'Manage Recurring',
+          // ── Filter button ──────────────────────────────────────────
+          // Next to More rather than in the bar below: sort stays inline
+          // because it is changed constantly, while these are set and left.
+          // The dot marks filters that are on but not visible from here.
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.tune_rounded),
+                onPressed: () => _showSortFilter(context),
+                tooltip: 'Filters',
+              ),
+              if (hasSheetFilter)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                        color: theme.colorScheme.primary,
+                        shape: BoxShape.circle),
+                  ),
+                ),
+            ],
           ),
-          // Sort & Filter moved into the filter bar below, next to the search
-          // field, so every control that narrows the list sits together.
           // ── More button ────────────────────────────────────────────
           if (widget.onMoreTap != null)
             GestureDetector(
               onTap: widget.onMoreTap,
               child: Container(
-                margin: const EdgeInsets.only(right: 4),
+                // Matches the Income tab, and keeps the pill clear of the edge.
+                margin: const EdgeInsets.only(right: 16),
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.primary.withOpacity(0.1),
@@ -1064,10 +1110,6 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             onSearchChanged: expenses.setSearch,
             sortBy: expenses.sortBy,
             onSortChanged: expenses.setSortBy,
-            onFilterTap: () => _showSortFilter(context),
-            hasActiveFilter: _periodFilter != 'all' ||
-                expenses.filterCategory != null ||
-                _walletFilter != null,
             activeFilters: [
               // Period leads: it is the filter that changes the totals most, so
               // it should be the first thing read back from the sheet.
@@ -1377,8 +1419,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 /// and category.
 ///
 /// Search and sort stay inline in [ListFilterBar]: they are the two that get
-/// changed constantly. Period moved in here because four chips on their own row
-/// crowded the header for a filter that is set once and left alone.
+/// changed constantly. Period moved into the sheet because four chips on their
+/// own row crowded the header for a filter that is set once and left alone.
 class _FilterSheet extends StatefulWidget {
   final String? walletFilter;
   final ValueChanged<String?> onWalletChanged;

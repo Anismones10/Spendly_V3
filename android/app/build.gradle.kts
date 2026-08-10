@@ -35,6 +35,12 @@ android {
             keyPassword = keyProperties["keyPassword"] as String
             storeFile = file(keyProperties["storeFile"] as String)
             storePassword = keyProperties["storePassword"] as String
+
+            // v3 is what makes key rotation possible later without users
+            // reinstalling; v4 enables incremental install over adb. Both are
+            // additive — older Androids still read the v2 block.
+            enableV3Signing = true
+            enableV4Signing = true
         }
     }
 
@@ -49,6 +55,16 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("release")
+
+            // R8 strips unused code and resources. What it cannot see — classes
+            // reached from native code, the manifest, or reflection — is listed
+            // in proguard-rules.pro; those failures appear at runtime, not here.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 }

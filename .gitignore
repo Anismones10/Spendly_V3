@@ -46,3 +46,12 @@ app.*.map.json
 
 # Firebase config — keep out of version control (backup: ~/google-services.json.backup)
 android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+lib/firebase_options.dart
+
+# Signing keys and secrets
+key.properties
+*.jks
+*.keystore
+.env
+*-firebase-adminsdk-*.json

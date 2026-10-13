@@ -105,19 +105,7 @@ The Firebase config files are **not** included in this repo (they are in `.gitig
    ```
 6. Restrict your API key to your Android package name and SHA-1 in Google Cloud Console → APIs & Services → Credentials.
 
-### 4. Add sound files
-
-Place these in `assets/sounds/`:
-
-- `chaching.mp3` plays when you add an expense
-- `celebration.mp3` plays when a goal or savings is completed
-- `warning.mp3` plays when the budget is low
-
-Free sources: [freesound.org](https://freesound.org), [zapsplat.com](https://zapsplat.com)
-
-Lottie animations are optional. Put JSON files in `assets/lottie/` (from [lottiefiles.com](https://lottiefiles.com)). The app uses emoji instead if they are missing.
-
-### 5. Run the app
+### 4. Run the app
 
 ```
 flutter run

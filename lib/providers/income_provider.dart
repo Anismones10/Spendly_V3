@@ -7,6 +7,96 @@ class IncomeProvider extends ChangeNotifier {
   final Box<IncomeModel> _box = Hive.box<IncomeModel>('income');
   final Box<WalletModel> _walletBox = Hive.box<WalletModel>('wallets');
 
+  // ── Filter state ───────────────────────────────────────────────────────────
+  // Named to match ExpenseProvider so the shared filter bar can drive either
+  // one without a translation layer.
+  String _searchQuery = '';
+  String? _filterSource;
+  String _sortBy = 'dateDesc';
+  DateTimeRange? _dateRange;
+
+  String get searchQuery => _searchQuery;
+  String? get filterSource => _filterSource;
+  String get sortBy => _sortBy;
+  DateTimeRange? get dateRange => _dateRange;
+
+  void setSearch(String query) {
+    _searchQuery = query;
+    notifyListeners();
+  }
+
+  void setFilterSource(String? source) {
+    _filterSource = source;
+    notifyListeners();
+  }
+
+  void setSortBy(String sort) {
+    _sortBy = sort;
+    notifyListeners();
+  }
+
+  void setDateRange(DateTimeRange? range) {
+    _dateRange = range;
+    notifyListeners();
+  }
+
+  void clearFilters() {
+    _searchQuery = '';
+    _filterSource = null;
+    _sortBy = 'dateDesc';
+    _dateRange = null;
+    notifyListeners();
+  }
+
+  /// Everything matching the current search, source and date filters, in the
+  /// chosen sort order.
+  List<IncomeModel> get filteredIncome {
+    var list = _box.values.toList();
+
+    if (_searchQuery.isNotEmpty) {
+      final q = _searchQuery.toLowerCase();
+      list = list.where((e) => e.name.toLowerCase().contains(q)).toList();
+    }
+
+    if (_filterSource != null) {
+      list = list.where((e) => e.source == _filterSource).toList();
+    }
+
+    if (_dateRange != null) {
+      // End is inclusive of the whole day, matching how the ranges are built.
+      list = list
+          .where((e) =>
+              e.date.isAfter(
+                  _dateRange!.start.subtract(const Duration(days: 1))) &&
+              e.date.isBefore(_dateRange!.end.add(const Duration(days: 1))))
+          .toList();
+    }
+
+    switch (_sortBy) {
+      case 'dateAsc':
+        list.sort((a, b) => a.date.compareTo(b.date));
+        break;
+      case 'amountDesc':
+        list.sort((a, b) => b.amount.compareTo(a.amount));
+        break;
+      case 'amountAsc':
+        list.sort((a, b) => a.amount.compareTo(b.amount));
+        break;
+      case 'dateDesc':
+      default:
+        list.sort((a, b) => b.date.compareTo(a.date));
+        break;
+    }
+    return list;
+  }
+
+  /// Every distinct source in use, for the filter sheet to offer.
+  List<String> get allSources {
+    final set = _box.values.map((e) => e.source).toSet().toList();
+    set.sort();
+    return set;
+  }
+
   List<IncomeModel> get allIncome =>
       _box.values.toList()..sort((a, b) => b.date.compareTo(a.date));
 
@@ -31,8 +121,22 @@ class IncomeProvider extends ChangeNotifier {
         .fold(0, (sum, e) => sum + e.amount);
   }
 
-  Map<String, double> getSourceTotals(int year, int month) {
+  /// Day of month → total earned that day, for the days that had any.
+  ///
+  /// Mirrors ExpenseProvider.getDailyTotals so the two Overview tabs can find
+  /// their best and quietest days the same way. Days with nothing earned are
+  /// absent rather than zero — the callers count them as the difference from
+  /// the month's length.
+  Map<int, double> getDailyTotals(int year, int month) {
     final income = getIncomeForMonth(year, month);
+    final Map<int, double> totals = {};
+    for (final e in income) {
+      totals[e.date.day] = (totals[e.date.day] ?? 0) + e.amount;
+    }
+    return totals;
+  }
+
+  Map<String, double> getSourceTotals(int year, int month) {    final income = getIncomeForMonth(year, month);
     final Map<String, double> totals = {};
     for (final e in income) {
       totals[e.source] = (totals[e.source] ?? 0) + e.amount;

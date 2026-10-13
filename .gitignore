@@ -44,13 +44,14 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Firebase config — keep out of version control (backup: ~/google-services.json.backup)
+# Firebase config - keep out of version control
 android/app/google-services.json
 ios/Runner/GoogleService-Info.plist
 lib/firebase_options.dart
 
 # Signing keys and secrets
 key.properties
+android/key.properties
 *.jks
 *.keystore
 .env

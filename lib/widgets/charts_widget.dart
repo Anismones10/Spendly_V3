@@ -180,7 +180,7 @@ class _PieChartViewState extends State<_PieChartView> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          cat?.name ?? e.key,
+                          cat?.name ?? 'Uncategorized',
                           style: const TextStyle(
                               fontSize: 11, fontWeight: FontWeight.w600),
                         ),

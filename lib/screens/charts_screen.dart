@@ -141,7 +141,7 @@ class _ChartsScreenState extends State<ChartsScreen>
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          '${cat?.icon ?? ''} ${cat?.name ?? e.key}: ${AppUtils.formatAmount(e.value, symbol)}',
+                          '${cat?.icon ?? ''} ${cat?.name ?? 'Uncategorized'}: ${AppUtils.formatAmount(e.value, symbol)}',
                           style: const TextStyle(fontSize: 12),
                         ),
                       ],

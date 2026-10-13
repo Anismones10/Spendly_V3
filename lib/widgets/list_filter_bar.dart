@@ -1,0 +1,476 @@
+import 'package:flutter/material.dart';
+
+/// The periods offered by [ListFilterBar].
+///
+/// 'custom' is deliberately absent — it needs a date picker rather than a
+/// plain toggle, so the bar renders it as its own chip.
+const kFilterPeriods = <({String key, String label})>[
+  (key: 'all', label: 'All'),
+  (key: 'today', label: 'Today'),
+  (key: 'week', label: 'This Week'),
+  (key: 'month', label: 'This Month'),
+];
+
+/// Sort orders shared by both lists.
+///
+/// Labels are short because they have to fit a chip in the bar; the icon
+/// carries the direction.
+const kSortOptions = <({String key, String label, IconData icon})>[
+  (key: 'dateDesc', label: 'Newest', icon: Icons.arrow_downward_rounded),
+  (key: 'dateAsc', label: 'Oldest', icon: Icons.arrow_upward_rounded),
+  (
+    key: 'amountDesc',
+    label: 'Highest',
+    icon: Icons.keyboard_double_arrow_up_rounded
+  ),
+  (
+    key: 'amountAsc',
+    label: 'Lowest',
+    icon: Icons.keyboard_double_arrow_down_rounded
+  ),
+];
+
+/// The date range a period key selects, or null for 'all' — no restriction.
+///
+/// Lives here rather than in either screen so Expenses and Income can never
+/// disagree about what "This Week" means.
+///
+/// Ranges run to the end of their last day, not to the current instant. Both
+/// expenses and income can be dated ahead (a scheduled bill, next week's pay),
+/// and those entries belong to the month they fall in.
+DateTimeRange? rangeForPeriod(String period, DateTime now) {
+  switch (period) {
+    case 'today':
+      return DateTimeRange(
+        start: DateTime(now.year, now.month, now.day),
+        end: DateTime(now.year, now.month, now.day, 23, 59, 59),
+      );
+    case 'week':
+      return DateTimeRange(
+        start: DateTime(now.year, now.month, now.day)
+            .subtract(const Duration(days: 6)),
+        end: DateTime(now.year, now.month, now.day, 23, 59, 59),
+      );
+    case 'month':
+      return DateTimeRange(
+        start: DateTime(now.year, now.month, 1),
+        // Day 0 of next month is the last day of this one.
+        end: DateTime(now.year, now.month + 1, 0, 23, 59, 59),
+      );
+    default:
+      return null;
+  }
+}
+
+/// The label for a period, used on the chip that shows it is active.
+///
+/// A custom range names its dates; the fixed periods use their own label.
+String periodChipLabel(String period, DateTimeRange? range) {
+  if (period == 'custom' && range != null) {
+    return '${_short(range.start)} – ${_short(range.end)}';
+  }
+  final match = kFilterPeriods.where((p) => p.key == period);
+  return match.isEmpty ? 'Period' : match.first.label;
+}
+
+String _short(DateTime d) => '${d.day}/${d.month}';
+
+/// One filter currently narrowing the list, rendered as a removable chip.
+class ActiveFilter {
+  final String label;
+  final VoidCallback onRemove;
+  final IconData? icon;
+  final Color? color;
+
+  const ActiveFilter({
+    required this.label,
+    required this.onRemove,
+    this.icon,
+    this.color,
+  });
+}
+
+/// The filter header shared by the Expenses and Income tabs.
+///
+/// Search and sort sit inline. Period, wallet and category live behind the app
+/// bar's tune button and report back here as removable chips, so the header
+/// stays one row.
+///
+/// The sort pill ends the row so it lines up under the app bar's own buttons —
+/// it belongs to that group visually even though it is changed too often to be
+/// worth a trip into the sheet.
+class ListFilterBar extends StatelessWidget {
+  final TextEditingController searchController;
+  final String searchHint;
+  final ValueChanged<String> onSearchChanged;
+
+  final String sortBy;
+  final ValueChanged<String> onSortChanged;
+
+  /// Null when the screen puts the tune button in its app bar instead.
+  final VoidCallback? onFilterTap;
+  final bool hasActiveFilter;
+  final List<ActiveFilter> activeFilters;
+
+  const ListFilterBar({
+    super.key,
+    required this.searchController,
+    required this.searchHint,
+    required this.onSearchChanged,
+    required this.sortBy,
+    required this.onSortChanged,
+    this.onFilterTap,
+    this.hasActiveFilter = false,
+    this.activeFilters = const [],
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
+
+    return Column(
+      children: [
+        // ── Search, sort and filter on one line ──────────────────────
+        Padding(
+          // 16 on the right puts the pill's edge exactly under the More
+          // button's, which carries the same margin. The tune button, when a
+          // screen hosts it here instead, needs 12 to offset its own padding.
+          padding: EdgeInsets.fromLTRB(16, 0, onFilterTap == null ? 16 : 12, 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 42,
+                  child: TextField(
+                    controller: searchController,
+                    onChanged: onSearchChanged,
+                    style: const TextStyle(fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: searchHint,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                      prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                      prefixIconConstraints:
+                          const BoxConstraints(minWidth: 38, minHeight: 38),
+                      suffixIcon: searchController.text.isEmpty
+                          ? null
+                          : IconButton(
+                              icon: const Icon(Icons.close_rounded, size: 18),
+                              splashRadius: 18,
+                              onPressed: () {
+                                searchController.clear();
+                                onSearchChanged('');
+                              },
+                            ),
+                      suffixIconConstraints:
+                          const BoxConstraints(minWidth: 34, minHeight: 34),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              SortPill(sortBy: sortBy, onSortChanged: onSortChanged),
+              // The dot marks filters that are set but not visible from here.
+              if (onFilterTap != null) ...[
+                const SizedBox(width: 4),
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.tune_rounded),
+                      onPressed: onFilterTap,
+                      tooltip: 'More filters',
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    if (hasActiveFilter)
+                      Positioned(
+                        right: 4,
+                        top: 4,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                              color: primary, shape: BoxShape.circle),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+
+        // ── Whatever the sheet is currently filtering by ─────────────
+        // The bar ends here when nothing is set, so the list starts directly
+        // under the search row rather than after an empty strip.
+        if (activeFilters.isNotEmpty)
+          Padding(
+            // The chips carry their own bottom gap rather than leaving it to
+            // whatever follows: on Expenses the next thing is the filtered
+            // total, which has no top margin of its own and sat against them.
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+            // Left-aligned: the Column centres its children by default, which
+            // left this row floating in the middle while the search box and
+            // the list below it both start at the same margin.
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children:
+                    activeFilters.map((f) => _ActiveChip(filter: f)).toList(),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// How wide the sort pill is, so both its edges land on something above.
+///
+/// The app bar ends in a 36-wide More button set 16 from the screen edge, with
+/// a 48 tune button before it; the pill's own right edge sits at that same 16.
+/// 16 + 36 + 48 - 16 leaves 84, which puts the pill's left edge under the tune
+/// button's and its right edge under More's.
+///
+/// Fixed rather than sized to the label, so switching Newest to Highest does not
+/// move the pill.
+const double _kSortPillWidth = 84;
+
+/// The sort order, as a pill that names the order it is currently in.
+///
+/// Sort was once buried in the filter sheet, so the list could be ordered by
+/// amount with nothing on screen saying so.
+///
+/// 36 high with fully rounded ends, which is the More button's own size and
+/// shape — the pill sits directly beneath it, so matching it makes the two read
+/// as one group rather than two sizes of the same idea. That leaves it shorter
+/// than the 42 search box beside it, deliberately: the search box is a field
+/// you type into, the pill is a button.
+class SortPill extends StatelessWidget {
+  final String sortBy;
+  final ValueChanged<String> onSortChanged;
+
+  const SortPill({
+    super.key,
+    required this.sortBy,
+    required this.onSortChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
+    final sort = kSortOptions.firstWhere((o) => o.key == sortBy,
+        orElse: () => kSortOptions.first);
+
+    return PopupMenuButton<String>(
+      onSelected: onSortChanged,
+      tooltip: 'Sort',
+      position: PopupMenuPosition.under,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      itemBuilder: (_) => kSortOptions
+          .map((o) => PopupMenuItem<String>(
+                value: o.key,
+                height: 44,
+                child: Row(
+                  children: [
+                    Icon(o.icon,
+                        size: 17,
+                        color: o.key == sortBy
+                            ? primary
+                            : theme.colorScheme.onSurface.withOpacity(0.55)),
+                    const SizedBox(width: 10),
+                    Text(o.label,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: o.key == sortBy
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: o.key == sortBy ? primary : null,
+                        )),
+                  ],
+                ),
+              ))
+          .toList(),
+      child: Container(
+        width: _kSortPillWidth,
+        height: 36,
+        // No horizontal padding: the width is fixed, so the Row centres the
+        // icon and label in whatever space the longest one leaves.
+        decoration: BoxDecoration(
+          color: primary.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(sort.icon, size: 16, color: primary),
+            const SizedBox(width: 4),
+            // 'Highest' is the widest label and only just fits; ellipsis rather
+            // than an overflow stripe if a future label or text scale exceeds it.
+            Flexible(
+              child: Text(sort.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: primary)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A period selector for the filter sheets.
+///
+/// Lives here so Expenses and Income offer the same periods in the same order.
+/// The custom entry opens a date picker instead of toggling, and shows the
+/// range it selected once there is one.
+class PeriodSelector extends StatelessWidget {
+  final String periodFilter;
+  final ValueChanged<String> onPeriodChanged;
+  final VoidCallback onPickCustomRange;
+
+  /// Shown on the custom chip once a range exists, so the dates appear in the
+  /// chip that selected them rather than in a second chip elsewhere.
+  final String? customRangeLabel;
+
+  const PeriodSelector({
+    super.key,
+    required this.periodFilter,
+    required this.onPeriodChanged,
+    required this.onPickCustomRange,
+    this.customRangeLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final p in kFilterPeriods)
+          _PeriodChip(
+            label: p.label,
+            selected: periodFilter == p.key,
+            onTap: () => onPeriodChanged(p.key),
+          ),
+        _PeriodChip(
+          label: periodFilter == 'custom' && customRangeLabel != null
+              ? customRangeLabel!
+              : 'Custom',
+          icon: Icons.date_range_rounded,
+          selected: periodFilter == 'custom',
+          onTap: onPickCustomRange,
+        ),
+      ],
+    );
+  }
+}
+
+class _PeriodChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final IconData? icon;
+
+  const _PeriodChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        // Vertical padding rather than a fixed height: these sit in a Wrap in
+        // the filter sheet, which gives them no height of its own.
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected
+              ? theme.colorScheme.primary
+              : theme.colorScheme.primary.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon,
+                  size: 13,
+                  color: selected ? Colors.white : theme.colorScheme.primary),
+              const SizedBox(width: 5),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: selected ? Colors.white : theme.colorScheme.primary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A filter set from the sheet, shown so it can be undone without reopening
+/// the sheet to hunt for what is switched on.
+class _ActiveChip extends StatelessWidget {
+  final ActiveFilter filter;
+  const _ActiveChip({required this.filter});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = filter.color ?? theme.colorScheme.primary;
+    return Material(
+      color: color.withOpacity(0.10),
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        onTap: filter.onRemove,
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 6, 8, 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (filter.icon != null) ...[
+                Icon(filter.icon, size: 13, color: color),
+                const SizedBox(width: 5),
+              ],
+              // Long category and wallet names get cut rather than forcing
+              // the chip past the screen edge.
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 140),
+                child: Text(
+                  filter.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w600, color: color),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(Icons.close_rounded, size: 14, color: color),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

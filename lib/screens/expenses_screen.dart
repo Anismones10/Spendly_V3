@@ -11,6 +11,7 @@ import '../providers/wallet_provider.dart';
 import '../models/wallet_model.dart';
 import '../widgets/expense_tile.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/list_filter_bar.dart';
 import '../utils/app_utils.dart';
 import '../utils/category_icons.dart';
 import 'add_expense_screen.dart';
@@ -193,47 +194,15 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     return '$month $d$suffix';
   }
 
-  void _applyPeriodFilter(String period, ExpenseProvider expenses) {
-    final now = DateTime.now();
+  /// Commits a period chosen in the filter sheet.
+  ///
+  /// A custom period arrives with the range the picker returned; the fixed ones
+  /// derive theirs from the key, so the sheet never has to know the dates.
+  void _applyPeriod(
+      String period, DateTimeRange? range, ExpenseProvider expenses) {
     setState(() => _periodFilter = period);
-    switch (period) {
-      case 'today':
-        expenses.setDateRange(DateTimeRange(
-          start: DateTime(now.year, now.month, now.day),
-          end: DateTime(now.year, now.month, now.day, 23, 59, 59),
-        ));
-        break;
-      case 'week':
-        expenses.setDateRange(DateTimeRange(
-          start: now.subtract(const Duration(days: 7)),
-          end: now,
-        ));
-        break;
-      case 'month':
-        expenses.setDateRange(DateTimeRange(
-          start: DateTime(now.year, now.month, 1),
-          end: now,
-        ));
-        break;
-      case 'all':
-      default:
-        expenses.setDateRange(null);
-        break;
-    }
-  }
-
-  Future<void> _pickCustomRange(
-      BuildContext context, ExpenseProvider expenses) async {
-    final picked = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-      initialDateRange: expenses.dateRange,
-    );
-    if (picked != null) {
-      setState(() => _periodFilter = 'custom');
-      expenses.setDateRange(picked);
-    }
+    expenses.setDateRange(
+        period == 'custom' ? range : rangeForPeriod(period, DateTime.now()));
   }
 
   List<ExpenseModel> _applyWalletFilter(List<ExpenseModel> list) {
@@ -242,20 +211,19 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   }
 
   void _showSortFilter(BuildContext context) {
+    final expenses = context.read<ExpenseProvider>();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _FilterSheet(
-        periodFilter: _periodFilter,
         walletFilter: _walletFilter,
-        onPeriodChanged: (p) =>
-            _applyPeriodFilter(p, context.read<ExpenseProvider>()),
-        onPickCustomRange: () =>
-            _pickCustomRange(context, context.read<ExpenseProvider>()),
         onWalletChanged: (id) => setState(() => _walletFilter = id),
+        periodFilter: _periodFilter,
+        customRange: _periodFilter == 'custom' ? expenses.dateRange : null,
+        onPeriodChanged: (p, r) => _applyPeriod(p, r, expenses),
         onClearAll: () {
-          context.read<ExpenseProvider>().clearFilters();
+          expenses.clearFilters();
           _searchController.clear();
           setState(() {
             _periodFilter = 'all';
@@ -404,13 +372,30 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
            text: 'Tap an expense to open and edit it.'),
           (icon: Icons.swipe_left_rounded,
            text: 'Swipe left on an expense to delete it.'),
+        ],
+      ),
+      (
+        title: 'Why an amount turns red',
+        icon: Icons.arrow_upward_rounded,
+        color: const Color(0xFFE57373),
+        tips: [
+          (icon: Icons.straighten_rounded,
+           text: 'Every expense is measured against a daily limit. Both '
+                 'colours mean the single expense went over it — not your '
+                 'whole day.'),
           (icon: Icons.arrow_upward_rounded,
-           text: 'An amount shown in orange with an up arrow is above your '
-                 'daily average. Red means more than double it, and outlines '
-                 'the card.'),
+           text: 'Orange with an up arrow: above the limit, but not more '
+                 'than double it.'),
+          (icon: Icons.crop_square_rounded,
+           text: 'Red: more than double the limit. Only red also outlines '
+                 'the card, so the biggest ones stand out at a glance.'),
+          (icon: Icons.calculate_rounded,
+           text: 'On Auto the limit is this month\'s spending divided by its '
+                 'days, so it moves as you spend.'),
           (icon: Icons.tune_rounded,
-           text: 'Set your own daily limit from the Calendar tab to change '
-                 'when an expense counts as high.'),
+           text: 'Set your own limit from the Calendar tab to decide exactly '
+                 'when an expense counts as high. The Calendar dots use the '
+                 'same three colours.'),
         ],
       ),
       (
@@ -437,7 +422,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           (icon: Icons.repeat_rounded,
            text: 'An orange loop badge marks a recurring expense.'),
           (icon: Icons.tune_rounded,
-           text: 'Use the loop button in the top bar to manage all your '
+           text: 'Use the loop button beside this one to manage all your '
                  'recurring expenses.'),
         ],
       ),
@@ -466,12 +451,16 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         tips: [
           (icon: Icons.search_rounded,
            text: 'Search by name to filter the list as you type.'),
-          (icon: Icons.calendar_today_rounded,
-           text: 'Use the period chips for Today, This Week, This Month, or '
-                 'a custom range.'),
+          (icon: Icons.swap_vert_rounded,
+           text: 'The pill at the end of the search row sets the order — '
+                 'newest, oldest, highest or lowest.'),
           (icon: Icons.tune_rounded,
-           text: 'Sort & Filter gives finer control. A dot on that button '
-                 'means a filter is currently active.'),
+           text: 'The tune button in the top bar holds the period, wallet and '
+                 'category filters. A dot on it means one is active, and each '
+                 'appears as a chip you can tap to remove.'),
+          (icon: Icons.calendar_today_rounded,
+           text: 'Periods cover Today, This Week, This Month, or a custom '
+                 'range you pick yourself.'),
         ],
       ),
     ];
@@ -962,9 +951,15 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       }
     }
 
-    // Keep only part 1 of each split group for display
+    // Keep only part 1 of each split group for display.
+    //
+    // A wallet filter has already reduced each group to the single part that
+    // wallet paid, so collapsing by part index would drop the whole expense
+    // whenever that part happened to be 2nd or later. With the filter on, the
+    // surviving part is exactly what should be listed.
     final seenGroups = <String>{};
     final list = rawList.where((e) {
+      if (_walletFilter != null) return true;
       if (e.note?.startsWith('SPLIT_PART|') == true) {
         final parts = e.note!.split('|');
         if (parts.length > 2) {
@@ -1000,6 +995,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         expenses.searchQuery.isNotEmpty ||
         _walletFilter != null;
 
+    // Search is excluded: it is visible in its own box, so flagging it on the
+    // filter button would mark a filter the user can already see.
+    final hasSheetFilter = _periodFilter != 'all' ||
+        expenses.filterCategory != null ||
+        _walletFilter != null;
+
     return Scaffold(
       backgroundColor:
       isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
@@ -1033,28 +1034,42 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           : AppBar(
         backgroundColor:
         isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
-        leading: IconButton(
-          icon: const Icon(Icons.help_outline_rounded),
-          onPressed: () => _showHints(context),
-          tooltip: 'Tips',
+        // Tips and Recurring sit together on the left: both explain or manage
+        // the list rather than change what it shows. 96 is exactly the two
+        // buttons; the rest is the inset that keeps Tips off the screen edge
+        // plus a little air before the title.
+        leadingWidth: 108,
+        leading: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(width: 6),
+            IconButton(
+              icon: const Icon(Icons.help_outline_rounded),
+              onPressed: () => _showHints(context),
+              tooltip: 'Tips',
+            ),
+            IconButton(
+              icon: const Icon(Icons.repeat_rounded),
+              onPressed: () => _showRecurringManager(context, expenses),
+              tooltip: 'Manage Recurring',
+            ),
+          ],
         ),
         title: const Text('Expenses'),
         actions: [
-          // ── Recurring button ───────────────────────────────────────
-          IconButton(
-            icon: const Icon(Icons.repeat_rounded),
-            onPressed: () => _showRecurringManager(context, expenses),
-            tooltip: 'Manage Recurring',
-          ),
           // ── Filter button ──────────────────────────────────────────
+          // Next to More rather than in the bar below: sort stays inline
+          // because it is changed constantly, while these are set and left.
+          // The dot marks filters that are on but not visible from here.
           Stack(
+            alignment: Alignment.center,
             children: [
               IconButton(
                 icon: const Icon(Icons.tune_rounded),
                 onPressed: () => _showSortFilter(context),
-                tooltip: 'Sort & Filter',
+                tooltip: 'Filters',
               ),
-              if (hasActiveFilter)
+              if (hasSheetFilter)
                 Positioned(
                   right: 8,
                   top: 8,
@@ -1062,9 +1077,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                     width: 8,
                     height: 8,
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.primary,
-                      shape: BoxShape.circle,
-                    ),
+                        color: theme.colorScheme.primary,
+                        shape: BoxShape.circle),
                   ),
                 ),
             ],
@@ -1074,7 +1088,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             GestureDetector(
               onTap: widget.onMoreTap,
               child: Container(
-                margin: const EdgeInsets.only(right: 4),
+                // Matches the Income tab, and keeps the pill clear of the edge.
+                margin: const EdgeInsets.only(right: 16),
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.primary.withOpacity(0.1),
@@ -1088,124 +1103,49 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       ),
       body: Column(
         children: [
-          // ── Search ────────────────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-            child: TextField(
-              controller: _searchController,
-              onChanged: expenses.setSearch,
-              decoration: InputDecoration(
-                hintText: 'Search expenses...',
-                prefixIcon: const Icon(Icons.search_rounded),
-                suffixIcon: expenses.searchQuery.isNotEmpty
-                    ? IconButton(
-                  icon: const Icon(Icons.close_rounded),
-                  onPressed: () {
-                    _searchController.clear();
-                    expenses.setSearch('');
-                  },
-                )
-                    : null,
-              ),
-            ),
+          // ── Filter bar ────────────────────────────────────────────────────
+          ListFilterBar(
+            searchController: _searchController,
+            searchHint: 'Search expenses...',
+            onSearchChanged: expenses.setSearch,
+            sortBy: expenses.sortBy,
+            onSortChanged: expenses.setSortBy,
+            activeFilters: [
+              // Period leads: it is the filter that changes the totals most, so
+              // it should be the first thing read back from the sheet.
+              if (_periodFilter != 'all')
+                ActiveFilter(
+                  label: periodChipLabel(_periodFilter, expenses.dateRange),
+                  icon: Icons.calendar_today_rounded,
+                  onRemove: () => _applyPeriod('all', null, expenses),
+                ),
+              if (expenses.filterCategory != null)
+                () {
+                  final cat = context
+                      .read<CategoryProvider>()
+                      .getById(expenses.filterCategory!);
+                  return ActiveFilter(
+                    label: cat?.name ?? 'Category',
+                    icon: cat != null ? CategoryIcons.resolve(cat.icon) : null,
+                    color: cat != null ? Color(cat.colorValue) : null,
+                    onRemove: () => expenses.setFilterCategory(null),
+                  );
+                }(),
+              if (_walletFilter != null)
+                () {
+                  final w =
+                      context.read<WalletProvider>().getById(_walletFilter!);
+                  return ActiveFilter(
+                    label: w?.name ?? 'Wallet',
+                    icon: w != null
+                        ? WalletProvider.resolveIcon(w.type)
+                        : Icons.account_balance_wallet_rounded,
+                    color: w != null ? Color(w.colorValue) : null,
+                    onRemove: () => setState(() => _walletFilter = null),
+                  );
+                }(),
+            ],
           ),
-
-          // ── Period chips ──────────────────────────────────────────────────
-          SizedBox(
-            height: 36,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              children: [
-                _PeriodChip(
-                    label: 'All',
-                    selected: _periodFilter == 'all',
-                    onTap: () => _applyPeriodFilter('all', expenses)),
-                const SizedBox(width: 8),
-                _PeriodChip(
-                    label: 'Today',
-                    selected: _periodFilter == 'today',
-                    onTap: () => _applyPeriodFilter('today', expenses)),
-                const SizedBox(width: 8),
-                _PeriodChip(
-                    label: 'This Week',
-                    selected: _periodFilter == 'week',
-                    onTap: () => _applyPeriodFilter('week', expenses)),
-                const SizedBox(width: 8),
-                _PeriodChip(
-                    label: 'This Month',
-                    selected: _periodFilter == 'month',
-                    onTap: () => _applyPeriodFilter('month', expenses)),
-                const SizedBox(width: 8),
-                _PeriodChip(
-                    label: 'Custom Range',
-                    selected: _periodFilter == 'custom',
-                    onTap: () => _pickCustomRange(context, expenses)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-
-          // ── Active filter chips ───────────────────────────────────────────
-          if (expenses.filterCategory != null ||
-              _walletFilter != null ||
-              (_periodFilter == 'custom' && expenses.dateRange != null))
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
-              child: Wrap(
-                spacing: 6,
-                children: [
-                  if (expenses.filterCategory != null)
-                    Builder(builder: (ctx) {
-                      final cat = context
-                          .read<CategoryProvider>()
-                          .getById(expenses.filterCategory!);
-                      return Chip(
-                        avatar: cat != null
-                            ? Icon(CategoryIcons.resolve(cat.icon),
-                            size: 14, color: Color(cat.colorValue))
-                            : null,
-                        label: Text(cat?.name ?? ''),
-                        deleteIcon: const Icon(Icons.close, size: 14),
-                        onDeleted: () =>
-                            expenses.setFilterCategory(null),
-                        visualDensity: VisualDensity.compact,
-                      );
-                    }),
-                  if (_walletFilter != null)
-                    Builder(builder: (ctx) {
-                      final wallet = context
-                          .read<WalletProvider>()
-                          .getById(_walletFilter!);
-                      if (wallet == null) return const SizedBox.shrink();
-                      return Chip(
-                        avatar: Icon(
-                            WalletProvider.resolveIcon(wallet.type),
-                            size: 14,
-                            color: Color(wallet.colorValue)),
-                        label: Text(wallet.name),
-                        deleteIcon: const Icon(Icons.close, size: 14),
-                        onDeleted: () =>
-                            setState(() => _walletFilter = null),
-                        visualDensity: VisualDensity.compact,
-                      );
-                    }),
-                  if (_periodFilter == 'custom' &&
-                      expenses.dateRange != null)
-                    Chip(
-                      label: Text(
-                        '${AppUtils.formatShortDate(expenses.dateRange!.start)} – ${AppUtils.formatShortDate(expenses.dateRange!.end)}',
-                      ),
-                      deleteIcon: const Icon(Icons.close, size: 14),
-                      onDeleted: () {
-                        setState(() => _periodFilter = 'all');
-                        expenses.setDateRange(null);
-                      },
-                      visualDensity: VisualDensity.compact,
-                    ),
-                ],
-              ),
-            ),
 
           // ── Summary bar ───────────────────────────────────────────────────
           if (hasActiveFilter && list.isNotEmpty)
@@ -1298,6 +1238,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                             symbol: symbol,
                             isSelecting: _isSelecting,
                             threshold: highThreshold,
+                            walletFilter: _walletFilter,
                             selected: _selectedIds.contains(expense.id),
                           ),
                         ),
@@ -1370,8 +1311,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Padding(
-                      padding: const EdgeInsets.only(
-                          top: 16, bottom: 8),
+                      // The first header needs no space above it — the top gap
+                      // separates one day from the previous one, and there is
+                      // no previous day at the top of the list.
+                      padding: EdgeInsets.only(
+                          top: i == 0 ? 0 : 16, bottom: 8),
                       child: Row(
                         mainAxisAlignment:
                         MainAxisAlignment.spaceBetween,
@@ -1420,6 +1364,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                               symbol: symbol,
                               isSelecting: _isSelecting,
                               threshold: highThreshold,
+                              walletFilter: _walletFilter,
                               selected: isSelected,
                               // The day header above already carries the
                               // date, so the tile only needs the time.
@@ -1468,63 +1413,30 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   }
 }
 
-// ── Period Chip ───────────────────────────────────────────────────────────────
-
-class _PeriodChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _PeriodChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding:
-        const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        decoration: BoxDecoration(
-          color: selected
-              ? theme.colorScheme.primary
-              : theme.colorScheme.primary.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: selected ? Colors.white : theme.colorScheme.primary,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 // ── Filter Sheet ──────────────────────────────────────────────────────────────
 
+/// Everything that narrows the list except search and sort — period, wallet
+/// and category.
+///
+/// Search and sort stay inline in [ListFilterBar]: they are the two that get
+/// changed constantly. Period moved into the sheet because four chips on their
+/// own row crowded the header for a filter that is set once and left alone.
 class _FilterSheet extends StatefulWidget {
-  final String periodFilter;
   final String? walletFilter;
-  final ValueChanged<String> onPeriodChanged;
-  final VoidCallback onPickCustomRange;
   final ValueChanged<String?> onWalletChanged;
+  final String periodFilter;
+  final DateTimeRange? customRange;
+
+  /// Reports the period and, for 'custom', the range the picker returned.
+  final void Function(String period, DateTimeRange? range) onPeriodChanged;
   final VoidCallback onClearAll;
 
   const _FilterSheet({
-    required this.periodFilter,
     required this.walletFilter,
-    required this.onPeriodChanged,
-    required this.onPickCustomRange,
     required this.onWalletChanged,
+    required this.periodFilter,
+    required this.customRange,
+    required this.onPeriodChanged,
     required this.onClearAll,
   });
 
@@ -1533,17 +1445,36 @@ class _FilterSheet extends StatefulWidget {
 }
 
 class _FilterSheetState extends State<_FilterSheet> {
-  late String _sort;
+  // Edited locally and committed on Apply, so dismissing the sheet leaves the
+  // list exactly as it was. Period is held here too: mixing an instant-apply
+  // period with deferred wallet and category would make Apply mean two things.
   late String? _category;
   late String? _wallet;
+  late String _period;
+  late DateTimeRange? _customRange;
 
   @override
   void initState() {
     super.initState();
-    final ep = context.read<ExpenseProvider>();
-    _sort = ep.sortBy;
-    _category = ep.filterCategory;
+    _category = context.read<ExpenseProvider>().filterCategory;
     _wallet = widget.walletFilter;
+    _period = widget.periodFilter;
+    _customRange = widget.customRange;
+  }
+
+  Future<void> _pickCustomRange() async {
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      initialDateRange: _customRange,
+    );
+    if (picked != null) {
+      setState(() {
+        _period = 'custom';
+        _customRange = picked;
+      });
+    }
   }
 
   @override
@@ -1552,30 +1483,6 @@ class _FilterSheetState extends State<_FilterSheet> {
     final wallets = context.read<WalletProvider>().wallets;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-
-    // Sort options with icons
-    final sortOptions = [
-      {
-        'key': 'dateDesc',
-        'label': 'Newest First',
-        'icon': Icons.arrow_downward_rounded,
-      },
-      {
-        'key': 'dateAsc',
-        'label': 'Oldest First',
-        'icon': Icons.arrow_upward_rounded,
-      },
-      {
-        'key': 'amountDesc',
-        'label': 'Highest Amount',
-        'icon': Icons.keyboard_double_arrow_up_rounded,
-      },
-      {
-        'key': 'amountAsc',
-        'label': 'Lowest Amount',
-        'icon': Icons.keyboard_double_arrow_down_rounded,
-      },
-    ];
 
     return Container(
       decoration: BoxDecoration(
@@ -1606,17 +1513,12 @@ class _FilterSheetState extends State<_FilterSheet> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Sort & Filter',
+                Text('Filter Expenses',
                     style: theme.textTheme.titleLarge
                         ?.copyWith(fontWeight: FontWeight.w700)),
                 TextButton(
                   onPressed: () {
                     widget.onClearAll();
-                    setState(() {
-                      _sort = 'dateDesc';
-                      _category = null;
-                      _wallet = null;
-                    });
                     Navigator.pop(context);
                   },
                   child: const Text('Clear All'),
@@ -1625,58 +1527,19 @@ class _FilterSheetState extends State<_FilterSheet> {
             ),
             const SizedBox(height: 16),
 
-            // ── Sort By ──────────────────────────────────────────────────────
-            Text('Sort By',
+            // ── Period ───────────────────────────────────────────────────────
+            Text('Period',
                 style: theme.textTheme.labelLarge
                     ?.copyWith(fontWeight: FontWeight.w700)),
             const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: sortOptions.map((option) {
-                final key = option['key'] as String;
-                final label = option['label'] as String;
-                final icon = option['icon'] as IconData;
-                final isSelected = _sort == key;
-
-                return GestureDetector(
-                  onTap: () => setState(() => _sort = key),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 9),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.primary.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          icon,
-                          size: 15,
-                          color: isSelected
-                              ? Colors.white
-                              : theme.colorScheme.primary,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          label,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: isSelected
-                                ? Colors.white
-                                : theme.colorScheme.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
+            PeriodSelector(
+              periodFilter: _period,
+              onPeriodChanged: (p) => setState(() => _period = p),
+              onPickCustomRange: _pickCustomRange,
+              customRangeLabel: _customRange == null
+                  ? null
+                  : '${AppUtils.formatShortDate(_customRange!.start)} – '
+                      '${AppUtils.formatShortDate(_customRange!.end)}',
             ),
             const SizedBox(height: 20),
 
@@ -1862,11 +1725,11 @@ class _FilterSheetState extends State<_FilterSheet> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
-                  context.read<ExpenseProvider>().setSortBy(_sort);
                   context
                       .read<ExpenseProvider>()
                       .setFilterCategory(_category);
                   widget.onWalletChanged(_wallet);
+                  widget.onPeriodChanged(_period, _customRange);
                   Navigator.pop(context);
                 },
                 child: const Text('Apply'),
